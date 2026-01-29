@@ -1,12 +1,17 @@
 # My Skills
 
-这是一个用于管理 Gemini CLI 技能的项目仓库。
+这是一个通用的 Agent 技能（Skills）集合仓库。这里的技能遵循通用的规范，可以通过 `skills` 工具安装并管理，供各种 Code Agents（如 Gemini CLI 等）调用。
 
 ## 项目结构
 
-- `volc-gen/`: 调用火山引擎 Ark API 进行内容生成的技能。
+- `volc-gen/`: 调用火山引擎 Ark API 进行内容生成的技能，支持文生图、图生图及图生视频。
 
 ## 快速开始
 
-1. 确保已安装 [Gemini CLI](https://github.com/google/gemini-cli)。
-2. 按照各技能目录下的说明进行配置和使用。
+1. **安装管理工具**: 建议安装 `skills` 命令行工具以便管理。
+2. **安装技能**: 进入对应技能目录，或直接通过远程地址安装。
+3. **配置环境**: 按照各技能目录下的 `README.md` 或 `SKILL.md` 说明配置必要的环境变量（如 API Keys）。
+
+## 兼容性
+
+本项目中的技能旨在兼容支持标准 Skill 协议的 AI 助手和 CLI 工具。
