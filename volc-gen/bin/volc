@@ -1,0 +1,281 @@
+#!/bin/bash
+
+# ==============================================================================
+# 环境检查
+# ==============================================================================
+
+# 检查 curl
+if ! command -v curl &> /dev/null; then
+    echo "Error: 'curl' is not installed." >&2
+    echo "Please install curl (e.g., 'brew install curl' on macOS or 'apt install curl' on Linux)." >&2
+    exit 1
+fi
+
+# 检查 jq
+if ! command -v jq &> /dev/null; then
+    echo "Error: 'jq' is not installed." >&2
+    echo "Please install jq (e.g., 'brew install jq' on macOS or 'apt install jq' on Linux)." >&2
+    exit 1
+fi
+
+# 检查 API Key
+if [ -z "$ARK_API_KEY" ]; then
+    echo "Error: ARK_API_KEY environment variable is not set." >&2
+    echo "Please set it using: export ARK_API_KEY='your_api_key_here'" >&2
+    exit 1
+fi
+
+# ==============================================================================
+# 配置与函数
+# ==============================================================================
+
+BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
+
+function check_task_status() {
+    local task_id="$1"
+    curl -s -X GET "$BASE_URL/contents/generations/tasks/$task_id" \
+      -H "Authorization: Bearer $ARK_API_KEY"
+}
+
+function wait_for_task() {
+    local task_id="$1"
+    local max_retries=120 # 10 minutes (120 * 5s)
+    local count=0
+    
+    echo "Waiting for task $task_id to complete..." >&2
+    
+    while [ $count -lt $max_retries ]; do
+        response=$(check_task_status "$task_id")
+        
+        # Check for API errors first
+        if echo "$response" | jq -e '.error' > /dev/null; then
+            echo "API Error during check:" >&2
+            echo "$response" | jq '.' >&2
+            return 1
+        fi
+
+        status=$(echo "$response" | jq -r '.status')
+        # Normalize status to lowercase for comparison
+        status_lower=$(echo "$status" | tr '[:upper:]' '[:lower:]')
+        
+        if [ "$status_lower" == "succeeded" ]; then
+            echo -e "\nTask Succeeded!" >&2
+            video_url=$(echo "$response" | jq -r '.content.video_url // .result.video_url // empty')
+            
+            if [ -z "$video_url" ]; then
+                echo "Warning: Status is succeeded but cannot find video_url in response:" >&2
+                echo "$response" | jq '.' >&2
+            else
+                echo "$video_url"
+            fi
+            return 0
+        elif [ "$status_lower" == "failed" ] || [ "$status_lower" == "cancelled" ]; then
+            echo -e "\nTask $status." >&2
+            echo "$response" | jq '.' >&2
+            return 1
+        else
+            # Running / Pending
+            echo -ne "Status: $status... (${count}/${max_retries})\r" >&2
+        fi
+        
+        sleep 5
+        count=$((count + 1))
+    done
+
+    echo -e "\nTimeout waiting for task." >&2
+    return 1
+}
+
+function text2img() {
+    local prompt="$1"
+    local size="${2:-2K}"
+    
+    [ -z "$prompt" ] && { echo "Usage: volc t2i <prompt> [size]"; exit 1; }
+
+    echo "Generating image (Text-to-Image)..." >&2
+
+    response=$(curl -s -X POST "$BASE_URL/images/generations" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $ARK_API_KEY" \
+      -d "{
+        \"model\": \"doubao-seedream-4-5-251128\",
+        \"prompt\": \"$prompt\",
+        \"size\": \"$size\",
+        \"watermark\": false
+    }")
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Curl request failed." >&2
+        exit 1
+    fi
+
+    # 检查 API 逻辑错误
+    if echo "$response" | jq -e '.error' > /dev/null; then
+        echo "API Error:" >&2
+        echo "$response" | jq '.' >&2
+        exit 1
+    fi
+
+    url=$(echo "$response" | jq -r '.data[0].url')
+    if [ "$url" == "null" ]; then
+         echo "Error: Result URL is null." >&2
+         echo "$response" | jq '.' >&2
+         exit 1
+    fi
+    
+    echo "$url"
+}
+
+function img2img() {
+    local prompt="$1"
+    local image_url="$2"
+    local size="${3:-2K}"
+
+    if [ -z "$prompt" ] || [ -z "$image_url" ]; then
+        echo "Usage: volc i2i <prompt> <image_url> [size]"
+        exit 1
+    fi
+
+    echo "Generating image (Image-to-Image)..." >&2
+    
+    response=$(curl -s -X POST "$BASE_URL/images/generations" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $ARK_API_KEY" \
+      -d "{
+        \"model\": \"doubao-seedream-4-5-251128\",
+        \"prompt\": \"$prompt\",
+        \"image\": \"$image_url\",
+        \"size\": \"$size\",
+        \"watermark\": false
+    }")
+
+    if echo "$response" | jq -e '.error' > /dev/null; then
+        echo "API Error:" >&2
+        echo "$response" | jq '.' >&2
+        exit 1
+    fi
+
+    echo "$response" | jq -r '.data[0].url'
+}
+
+function img2video() {
+    local text="$1"
+    local image_url="$2"
+
+    if [ -z "$text" ] || [ -z "$image_url" ]; then
+        echo "Usage: volc i2v <text> <image_url>"
+        exit 1
+    fi
+    
+    echo "Generating video task (Image-to-Video)..." >&2
+
+    response=$(curl -s -X POST "$BASE_URL/contents/generations/tasks" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $ARK_API_KEY" \
+      -d "{
+        \"model\": \"doubao-seedance-1-5-pro-251215\",
+        \"content\": [
+            {
+                \"type\": \"text\",
+                \"text\": \"$text\"
+            },
+            {
+                \"type\": \"image_url\",
+                \"image_url\": {
+                    \"url\": \"$image_url\"
+                }
+            }
+        ],
+        \"generate_audio\": true,
+        \"ratio\": \"adaptive\",
+        \"duration\": 12,
+        \"watermark\": false
+    }")
+
+    if echo "$response" | jq -e '.error' > /dev/null; then
+        echo "API Error:" >&2
+        echo "$response" | jq '.' >&2
+        exit 1
+    fi
+    
+    task_id=$(echo "$response" | jq -r '.id')
+    echo "Task Submitted. ID: $task_id" >&2
+    
+    wait_for_task "$task_id"
+}
+
+function get_task_details() {
+    local task_id="$1"
+    response=$(check_task_status "$task_id")
+    echo "$response" | jq '.'
+}
+
+function list_tasks() {
+    local page_num="${1:-1}"
+    local page_size="${2:-10}"
+    
+    response=$(curl -s -X GET "$BASE_URL/contents/generations/tasks?page_num=$page_num&page_size=$page_size" \
+      -H "Authorization: Bearer $ARK_API_KEY")
+
+    if echo "$response" | jq -e '.error' > /dev/null; then
+        echo "API Error:" >&2
+        echo "$response" | jq '.' >&2
+        exit 1
+    fi
+
+    # Pretty print table-like output
+    # Using tab-separated values and column command for formatting
+    echo "Recent Tasks (Page $page_num, Size $page_size):"
+    echo "$response" | jq -r '["ID", "STATUS", "CREATED_AT", "VIDEO_URL"], (.items[] | [.id, .status, (.created_at | todate), (.content.video_url // .result.video_url // "N/A")]) | @tsv' | column -t
+}
+
+function dispatch_query() {
+    local arg1="$1"
+    local arg2="$2"
+
+    if [[ -z "$arg1" ]]; then
+        # No args -> List default
+        list_tasks 1 10
+    elif [[ "$arg1" =~ ^[0-9]+$ ]]; then
+        # Number -> List page
+        list_tasks "$arg1" "${arg2:-10}"
+    else
+        # Not a number -> Assume Task ID
+        get_task_details "$arg1"
+    fi
+}
+
+# ==============================================================================
+# 入口
+# ==============================================================================
+
+COMMAND="$1"
+shift
+
+case "$COMMAND" in
+    t2i)
+        text2img "$@"
+        ;;
+    i2i)
+        img2img "$@"
+        ;;
+    i2v)
+        img2video "$@"
+        ;;
+    query|list)
+        dispatch_query "$@"
+        ;;
+    *)
+        echo "Volcengine Ark Content Generation Tool"
+        echo ""
+        echo "Usage: $0 {t2i|i2i|i2v|query} [args...]"
+        echo "  t2i <prompt> [size]             Text to Image"
+        echo "  i2i <prompt> <image_url> [size] Image to Image"
+        echo "  i2v <text> <image_url>          Image to Video"
+        echo "  query [id|page] [size]          Query Task(s)"
+        echo "    query                         List recent tasks (page 1)"
+        echo "    query <page> [size]           List tasks on specific page"
+        echo "    query <task_id>               Show details for a specific task"
+        exit 1
+        ;;
+esac
