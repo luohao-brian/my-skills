@@ -1,86 +1,64 @@
 ---
 name: volc-gen
-description: 调用火山引擎 Ark API 进行内容生成的技能。支持文生图、图生图和图生视频。
+description: 调用火山引擎 Ark API 生成图片和视频。支持文生图(t2i)、图生图(i2i)、图生视频(i2v)。当用户需要生成图片、编辑图片风格或将图片转为视频时使用。
+metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_KEY"}}
 ---
 
-# volc-gen
+# 火山引擎内容生成
 
-调用火山引擎 Ark API 进行内容生成的技能。支持文生图、图生图和图生视频。
+调用火山引擎 Ark API 进行内容生成，支持文生图、图生图和图生视频。
 
-## 前置要求
-
-1.  **环境变量**: 必须设置 `ARK_API_KEY`。
-    ```bash
-    export ARK_API_KEY="your-api-key"
-    ```
-2.  **工具**: 系统需安装 `jq`。
-
-## 功能列表
-
-### 1. 文生图 (Text-to-Image)
+## 文生图 (t2i)
 
 根据文本提示词生成图片。
 
-- **命令**: `t2i`
-- **参数**:
-    - `prompt` (string): 提示词。
-    - `size` (string, optional): 图片尺寸，默认为 "2K"。
-- **示例**:
-    ```bash
-    /usr/local/bin/volc t2i "一只赛博朋克风格的猫"
-    ```
+```bash
+{baseDir}/bin/volc-gen t2i "一只赛博朋克风格的猫"
+{baseDir}/bin/volc-gen t2i "山水画风格的城市天际线" --size 2K
+```
 
-### 2. 图生图 (Image-to-Image)
+- `prompt`（必需）：提示词
+- `--size`（可选）：图片尺寸，默认 "2K"
 
-基于一张输入图片和提示词生成新图片。
+## 图生图 (i2i)
 
-- **命令**: `i2i`
-- **参数**:
-    - `prompt` (string): 修改指令或描述。
-    - `image_url` (string): 参考图片的 URL。
-    - `size` (string, optional): 图片尺寸，默认为 "2K"。
-- **示例**:
-    ```bash
-    /usr/local/bin/volc i2i "变成油画风格" "https://example.com/image.png"
-    ```
+基于输入图片和提示词生成新图片。
 
-### 3. 图生视频 (Image-to-Video)
+```bash
+{baseDir}/bin/volc-gen i2i "变成油画风格" "https://example.com/image.png"
+{baseDir}/bin/volc-gen i2i "增加雪景效果" "https://example.com/photo.jpg" --size 2K
+```
 
-让图片动起来。该命令会自动提交任务并轮询状态，直到生成完成或超时。
+- `prompt`（必需）：修改指令或描述
+- `image_url`（必需）：参考图片的 URL
+- `--size`（可选）：图片尺寸，默认 "2K"
 
-- **命令**: `i2v`
-- **参数**:
-    - `text` (string): 动作描述。
-    - `image_url` (string): 起始图片的 URL。
-- **示例**:
-    ```bash
-    /usr/local/bin/volc i2v "女孩微笑着回头" "https://example.com/start.png"
-    ```
+## 图生视频 (i2v)
 
-### 4. 查询与列表 (Query & List)
+将图片转为视频。命令会自动提交任务并轮询状态，直到生成完成或超时（4 分钟）。
 
-查询指定生成任务的详情，或列出历史任务列表。
+```bash
+{baseDir}/bin/volc-gen i2v "女孩微笑着回头" "https://example.com/start.png"
+```
 
-- **命令**: `query` (别名 `list`)
-- **参数**:
-    - 无参数: 列出最近的任务（第 1 页，默认 10 条）。
-    - `page` (number): 指定页码列出任务。
-    - `page` `size` (number): 指定页码和每页数量。
-    - `task_id` (string): 查询指定任务 ID 的详细信息。
+- `text`（必需）：动作描述
+- `image_url`（必需）：起始图片的 URL
 
-- **示例**:
-    ```bash
-    # 列出最近任务
-    /usr/local/bin/volc query
-    
-    # 列出第 2 页任务
-    /usr/local/bin/volc query 2
-    
-    # 查询特定任务详情
-    /usr/local/bin/volc query "cgt-2025xxxx"
-    ```
+## 查询任务 (query)
+
+查询生成任务详情或列出历史任务。
+
+```bash
+# 列出最近任务
+{baseDir}/bin/volc-gen query
+
+# 列出第 2 页，每页 20 条
+{baseDir}/bin/volc-gen query 2 20
+
+# 查询特定任务详情
+{baseDir}/bin/volc-gen query "cgt-2025xxxx"
+```
 
 ## 注意事项
 
-- 视频生成可能需要几分钟时间，请耐心等待。
-- 确保 API Key 有对应模型的调用权限。
+- 确保 `ARK_API_KEY` 已设置且有对应模型的调用权限

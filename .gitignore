@@ -181,3 +181,16 @@ Temporary Items
 
 # Gemini CLI
 .gemini/
+
+# Rust build artifacts
+rust/target/
+
+# Compiled binaries (built by build-skill-bundle.sh)
+cli/macos/
+cli/linux/
+
+# Skill bundle dist
+dist/
+
+# Conversation exports
+*.txt
