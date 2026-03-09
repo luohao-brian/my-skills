@@ -34,16 +34,21 @@ bundle_skill() {
     mkdir -p "$staging/bin"
 
     # Copy skill files (SKILL.md, references/, etc.)
-    # Use rsync to exclude hidden files
+    # Use rsync to exclude hidden files and strip macOS extended attributes
     rsync -a --exclude='.*' "$skill_src/" "$staging/"
 
-    # Copy binary
+    # Copy binary and strip xattr
     cp "$bin_src" "$staging/bin/$bin"
     chmod +x "$staging/bin/$bin"
 
-    # Create tarball: extracts as <skill-name>/
+    # Strip macOS extended attributes to avoid Linux tar warnings
+    if command -v xattr &>/dev/null; then
+      xattr -cr "$staging"
+    fi
+
+    # Create tarball without macOS metadata (no-xattrs, no-mac-metadata)
     local tarball="$DIST_DIR/${skill}-${platform}.tar.gz"
-    tar -czf "$tarball" -C "$DIST_DIR/_staging" "$skill"
+    COPYFILE_DISABLE=1 tar -czf "$tarball" -C "$DIST_DIR/_staging" "$skill"
     echo "    Created: $tarball"
   done
 
