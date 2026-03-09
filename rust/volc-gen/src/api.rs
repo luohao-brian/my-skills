@@ -3,8 +3,16 @@ use std::thread;
 use std::time::Duration;
 
 const BASE_URL: &str = "https://ark.cn-beijing.volces.com/api/v3";
-const IMAGE_MODEL: &str = "doubao-seedream-5-0-260128";
-const VIDEO_MODEL: &str = "doubao-seedance-1-5-pro-251215";
+const DEFAULT_IMAGE_MODEL: &str = "doubao-seedream-5-0-260128";
+const DEFAULT_VIDEO_MODEL: &str = "doubao-seedance-1-5-pro-251215";
+
+fn image_model() -> String {
+    std::env::var("VOLC_IMAGE_MODEL_ID").unwrap_or_else(|_| DEFAULT_IMAGE_MODEL.to_string())
+}
+
+fn video_model() -> String {
+    std::env::var("VOLC_VIDEO_MODEL_ID").unwrap_or_else(|_| DEFAULT_VIDEO_MODEL.to_string())
+}
 
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
@@ -36,7 +44,7 @@ fn get_json(api_key: &str, url: &str) -> Result<String, String> {
 pub fn text_to_image(api_key: &str, prompt: &str, size: &str) -> Result<String, String> {
     eprintln!("Generating image (Text-to-Image)...");
     let req = ImageGenRequest {
-        model: IMAGE_MODEL,
+        model: image_model(),
         prompt: prompt.to_string(),
         image: None,
         size: size.to_string(),
@@ -57,7 +65,7 @@ pub fn text_to_image(api_key: &str, prompt: &str, size: &str) -> Result<String, 
 pub fn image_to_image(api_key: &str, prompt: &str, image_url: &str, size: &str) -> Result<String, String> {
     eprintln!("Generating image (Image-to-Image)...");
     let req = ImageGenRequest {
-        model: IMAGE_MODEL,
+        model: image_model(),
         prompt: prompt.to_string(),
         image: Some(image_url.to_string()),
         size: size.to_string(),
@@ -78,7 +86,7 @@ pub fn image_to_image(api_key: &str, prompt: &str, image_url: &str, size: &str) 
 pub fn image_to_video(api_key: &str, text: &str, image_url: &str) -> Result<String, String> {
     eprintln!("Generating video task (Image-to-Video)...");
     let req = VideoGenRequest {
-        model: VIDEO_MODEL,
+        model: video_model(),
         content: vec![
             ContentItem::Text { text: text.to_string() },
             ContentItem::ImageUrl {

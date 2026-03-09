@@ -2,7 +2,7 @@
 name: volc-websearch
 description: 使用火山引擎 API 联网搜索网页信息。当用户需要联网检索、查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
 homepage: https://www.volcengine.com/docs/85508/1650263
-metadata: {"openclaw":{"requires":{"env":["TORCHLIGHT_API_KEY"]},"primaryEnv":"TORCHLIGHT_API_KEY"}}
+metadata: {"openclaw":{"requires":{"env":["VE_ACCESS_KEY","VE_SECRET_KEY"]},"primaryEnv":"VE_ACCESS_KEY","emoji":"🔍"}}
 ---
 
 # 火山引擎联网搜索
@@ -17,12 +17,11 @@ metadata: {"openclaw":{"requires":{"env":["TORCHLIGHT_API_KEY"]},"primaryEnv":"T
 - 需要从特定站点或官网获取信息
 - 需要给回答附上来源链接
 
-## 使用前检查
+## 环境变量
 
-需要配置以下任一凭证（优先级从高到低）：
-
-1. `VE_ACCESS_KEY` + `VE_SECRET_KEY`
-2. `TORCHLIGHT_API_KEY`
+- `VE_ACCESS_KEY`（必需）：火山引擎 Access Key ID
+- `VE_SECRET_KEY`（必需）：火山引擎 Secret Access Key
+- `TORCHLIGHT_API_KEY`（可选）：API Key 鉴权方式，设置后优先使用，无需 AK/SK
 
 如果缺少凭证，打开 [references/setup-guide.md](references/setup-guide.md) 查看开通、申请和配置方式。
 

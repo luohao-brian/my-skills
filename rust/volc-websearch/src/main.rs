@@ -71,24 +71,24 @@ enum AuthMethod {
 }
 
 fn get_auth() -> Result<AuthMethod, String> {
-    // Priority 1: TORCHLIGHT_API_KEY
-    if let Ok(key) = std::env::var("TORCHLIGHT_API_KEY") {
-        if !key.is_empty() {
-            return Ok(AuthMethod::ApiKey(key));
-        }
-    }
-
-    // Priority 2: VE_ACCESS_KEY + VE_SECRET_KEY
+    // Priority 1: VE_ACCESS_KEY + VE_SECRET_KEY
     let ak = std::env::var("VE_ACCESS_KEY").unwrap_or_default();
     let sk = std::env::var("VE_SECRET_KEY").unwrap_or_default();
     if !ak.is_empty() && !sk.is_empty() {
         return Ok(AuthMethod::AkSk(ak, sk));
     }
 
+    // Priority 2: TORCHLIGHT_API_KEY (optional, simpler auth)
+    if let Ok(key) = std::env::var("TORCHLIGHT_API_KEY") {
+        if !key.is_empty() {
+            return Ok(AuthMethod::ApiKey(key));
+        }
+    }
+
     Err(
         "No credentials found. Set one of:\n\
-         1) TORCHLIGHT_API_KEY\n\
-         2) VE_ACCESS_KEY + VE_SECRET_KEY"
+         1) VE_ACCESS_KEY + VE_SECRET_KEY\n\
+         2) TORCHLIGHT_API_KEY"
             .to_string(),
     )
 }

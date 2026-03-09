@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct ImageGenRequest {
-    pub model: &'static str,
+    pub model: String,
     pub prompt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
@@ -14,7 +14,7 @@ pub struct ImageGenRequest {
 
 #[derive(Serialize)]
 pub struct VideoGenRequest {
-    pub model: &'static str,
+    pub model: String,
     pub content: Vec<ContentItem>,
     pub generate_audio: bool,
     pub ratio: &'static str,

@@ -1,7 +1,7 @@
 ---
 name: volc-gen
-description: 调用火山引擎 Ark API 生成图片和视频。支持文生图(t2i)、图生图(i2i)、图生视频(i2v)。当用户需要生成图片、编辑图片风格或将图片转为视频时使用。
-metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_KEY"}}
+description: 调用火山引擎 Ark API 生成图片和视频。支持文生图(t2i)、图生图(i2i)、图生视频(i2v)。当用户需要AI生成图片、编辑图片风格或将图片转为视频时使用。
+metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_KEY","emoji":"🎨"}}
 ---
 
 # 火山引擎内容生成
@@ -59,6 +59,8 @@ metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_
 {baseDir}/bin/volc-gen query "cgt-2025xxxx"
 ```
 
-## 注意事项
+## 环境变量
 
-- 确保 `ARK_API_KEY` 已设置且有对应模型的调用权限
+- `ARK_API_KEY`（必需）：API 访问密钥
+- `VOLC_IMAGE_MODEL_ID`（可选）：生图模型 ID，默认 `doubao-seedream-5-0-260128`
+- `VOLC_VIDEO_MODEL_ID`（可选）：视频模型 ID，默认 `doubao-seedance-1-5-pro-251215`
