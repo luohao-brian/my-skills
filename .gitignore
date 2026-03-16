@@ -184,6 +184,20 @@ Temporary Items
 
 # Rust build artifacts
 rust/target/
+rust/.tmp/
+
+# Generated local media from CLI testing
+rust/*.jpg
+rust/*.jpeg
+rust/*.png
+rust/*.gif
+rust/*.webp
+rust/*.bmp
+rust/*.tif
+rust/*.tiff
+rust/*.mp4
+rust/*.mov
+rust/*.webm
 
 # Compiled binaries (built by build-skill-bundle.sh)
 cli/macos/
@@ -191,6 +205,13 @@ cli/linux/
 
 # Skill bundle dist
 dist/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
 
 # Conversation exports
 *.txt

@@ -26,7 +26,9 @@ build_macos() {
 build_linux() {
   local target="x86_64-unknown-linux-gnu"
   echo "==> Building for Linux ($target)..."
-  rustup target add "$target" 2>/dev/null || true
+  if command -v rustup &>/dev/null; then
+    rustup target add "$target" 2>/dev/null || true
+  fi
 
   if cargo zigbuild --help &>/dev/null; then
     cargo zigbuild --release --target "$target"
@@ -39,6 +41,13 @@ build_linux() {
     cross build --release --target "$target"
     for bin in $BINS; do
       cp "target/$target/release/$bin" "$CLI_DIR/linux/$bin"
+    done
+    echo "    Linux binaries:"
+    ls -lh "$CLI_DIR"/linux/volc-*
+  elif [[ "$(uname -s)" == "Linux" ]] && [[ "$(uname -m)" == "x86_64" ]]; then
+    cargo build --release
+    for bin in $BINS; do
+      cp "target/release/$bin" "$CLI_DIR/linux/$bin"
     done
     echo "    Linux binaries:"
     ls -lh "$CLI_DIR"/linux/volc-*
