@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-// ---- Request ----
-
 #[derive(Serialize)]
 pub struct SearchRequest {
     #[serde(rename = "Query")]
@@ -28,8 +26,6 @@ pub struct SearchFilter {
     pub auth_info_level: Option<u32>,
 }
 
-// ---- Response ----
-
 #[derive(Deserialize, Debug)]
 pub struct SearchResponse {
     #[serde(rename = "Result")]
@@ -40,20 +36,12 @@ pub struct SearchResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct SearchResult {
-    #[serde(rename = "ResultCount")]
-    pub result_count: Option<u32>,
-    #[serde(rename = "TimeCost")]
-    pub time_cost: Option<u64>,
     #[serde(rename = "WebResults")]
-    pub web_results: Option<Vec<WebResult>>,
-    #[serde(rename = "ImageResults")]
-    pub image_results: Option<Vec<ImageResult>>,
+    pub web_results: Option<Vec<VolcWebResult>>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct WebResult {
-    #[serde(rename = "SortId")]
-    pub sort_id: Option<u32>,
+pub struct VolcWebResult {
     #[serde(rename = "Title")]
     pub title: Option<String>,
     #[serde(rename = "SiteName")]
@@ -66,28 +54,10 @@ pub struct WebResult {
     pub summary: Option<String>,
     #[serde(rename = "AuthInfoDes")]
     pub auth_info_des: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ImageResult {
-    #[serde(rename = "SortId")]
-    pub sort_id: Option<u32>,
-    #[serde(rename = "Title")]
-    pub title: Option<String>,
-    #[serde(rename = "Image")]
-    pub image: Option<ImageInfo>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ImageInfo {
-    #[serde(rename = "Url")]
-    pub url: Option<String>,
-    #[serde(rename = "Width")]
-    pub width: Option<u32>,
-    #[serde(rename = "Height")]
-    pub height: Option<u32>,
-    #[serde(rename = "Shape")]
-    pub shape: Option<String>,
+    #[serde(rename = "PublishTime")]
+    pub publish_time: Option<String>,
+    #[serde(rename = "RankScore")]
+    pub rank_score: Option<f32>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -113,4 +83,77 @@ impl std::fmt::Display for ApiError {
             self.message.as_deref().unwrap_or("unknown error")
         )
     }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TavilyResponse {
+    pub results: Option<Vec<TavilyResult>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TavilyResult {
+    pub url: Option<String>,
+    pub title: Option<String>,
+    pub score: Option<f32>,
+    pub published_date: Option<String>,
+    pub content: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BochaResponse {
+    pub data: Option<BochaData>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BochaData {
+    #[serde(rename = "webPages")]
+    pub web_pages: Option<BochaWebPages>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BochaWebPages {
+    pub value: Vec<BochaWebPage>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BochaWebPage {
+    pub name: Option<String>,
+    pub url: Option<String>,
+    pub snippet: Option<String>,
+    pub summary: Option<String>,
+    #[serde(rename = "siteName")]
+    pub site_name: Option<String>,
+    #[serde(rename = "datePublished")]
+    pub date_published: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnifiedSearchSource {
+    Tavily,
+    Bocha,
+    Volc,
+}
+
+impl UnifiedSearchSource {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Tavily => "Tavily",
+            Self::Bocha => "Bocha",
+            Self::Volc => "Volc",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct UnifiedSearchResult {
+    pub provider: UnifiedSearchSource,
+    pub title: String,
+    pub site_name: String,
+    pub url: String,
+    pub summary: String,
+    pub auth_info_des: Option<String>,
+    pub published_at: Option<String>,
+    pub provider_score: f32,
+    pub raw_rank: usize,
+    pub fused_score: f32,
 }
