@@ -38,7 +38,7 @@ enum Commands {
     ImageToVideo {
         /// Motion description
         text: String,
-        /// Start image URL
+        /// Start image URL, data URL, or local image path
         image_url: String,
     },
     /// Query task(s) or list recent tasks

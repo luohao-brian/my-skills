@@ -8,9 +8,13 @@ metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_
 
 调用火山引擎 Ark API 进行内容生成，支持文生图、图生图和图生视频。
 
+所有命令成功时默认输出 JSON，便于 agent 直接解析字段；图片生成结果会包含 `local_path` 和 `remote_url`，视频生成结果会包含 `task_id` 和 `remote_url`。
+
 ## 文生图 (t2i)
 
 根据文本提示词生成图片。
+
+命令会在返回远程图片 URL 的同时，将图片默认下载到当前工作目录；在 OpenClaw 会话中通常就是 `~/.openclaw/workspace/`。
 
 ```bash
 {baseDir}/bin/volc-gen t2i "一只赛博朋克风格的猫"
@@ -23,6 +27,8 @@ metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_
 ## 图生图 (i2i)
 
 基于输入图片和提示词生成新图片。
+
+命令会在返回远程图片 URL 的同时，将图片默认下载到当前工作目录；在 OpenClaw 会话中通常就是 `~/.openclaw/workspace/`。
 
 ```bash
 {baseDir}/bin/volc-gen i2i "变成油画风格" "https://example.com/image.png"
@@ -39,10 +45,11 @@ metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_
 
 ```bash
 {baseDir}/bin/volc-gen i2v "女孩微笑着回头" "https://example.com/start.png"
+{baseDir}/bin/volc-gen i2v "女孩微笑着回头" "/path/to/start.png"
 ```
 
 - `text`（必需）：动作描述
-- `image_url`（必需）：起始图片的 URL
+- `image_url`（必需）：起始图片，支持公网 `http(s)` URL、`data:image/...;base64,...` 或本地图片路径（会自动转为 Base64 Data URL）
 
 ## 查询任务 (query)
 
