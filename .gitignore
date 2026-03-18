@@ -203,6 +203,10 @@ rust/*.webm
 cli/macos/
 cli/linux/
 
+# Skill binaries
+volc-websearch/bin/
+volc-gen/bin/
+
 # Skill bundle dist
 dist/
 
