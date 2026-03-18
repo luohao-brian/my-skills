@@ -1,9 +1,6 @@
 mod api;
 mod config;
-mod embedding;
-mod fusion;
 mod models;
-mod output;
 mod providers;
 mod sign;
 
@@ -17,10 +14,13 @@ fn run() -> Result<String, String> {
     let config = Config::from_env_and_cli(cli)?;
     let started_at = Instant::now();
 
-    let provider_results = providers::fetch_all(&config)?;
-    let fused_results = fusion::fuse_results(&config, provider_results)?;
+    let results = providers::fetch_selected(&config)?;
 
-    Ok(output::format_output(&fused_results, started_at.elapsed().as_millis()))
+    Ok(format!("结果数: {} 耗时: {}ms\n\n{}",
+        results.len(),
+        started_at.elapsed().as_millis(),
+        providers::format_raw_results(&results)
+    ))
 }
 
 fn main() {

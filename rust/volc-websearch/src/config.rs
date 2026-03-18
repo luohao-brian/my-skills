@@ -5,7 +5,7 @@ pub const TIME_RANGE_SHORTCUTS: &[&str] = &["OneDay", "OneWeek", "OneMonth", "On
 #[derive(Parser, Debug)]
 #[command(
     name = "volc-websearch",
-    about = "Fused web search across Tavily, Bocha, Brave, and Volc Search"
+    about = "Web search using specified engine (tavily, bocha, brave, or volc)"
 )]
 pub struct Cli {
     /// Search query
@@ -15,8 +15,12 @@ pub struct Cli {
     #[arg(short = 't', long = "type", default_value = "web")]
     pub search_type: String,
 
-    /// Number of final results to return
-    #[arg(short = 'c', long, default_value_t = 15)]
+    /// Search engine to use: tavily, bocha, brave, volc [required]
+    #[arg(long)]
+    pub engine: String,
+
+    /// Number of results to return
+    #[arg(short = 'c', long, default_value_t = 10)]
     pub count: u32,
 
     /// Time range: OneDay/OneWeek/OneMonth/OneYear/YYYY-MM-DD..YYYY-MM-DD
@@ -64,12 +68,12 @@ pub struct Config {
     pub sites: Option<Vec<String>>,
     pub block_hosts: Option<Vec<String>>,
     pub auth_level: u32,
+    pub engine: String,
     pub tavily_api_key: String,
     pub bocha_api_key: String,
     pub brave_api_key: String,
     pub ve_access_key: String,
     pub ve_secret_key: String,
-    pub embedding: EmbeddingConfig,
     pub http_proxy: Option<String>,
     pub https_proxy: Option<String>,
     pub no_proxy: Option<String>,
@@ -83,27 +87,53 @@ impl Config {
         if cli.count == 0 || cli.count > 50 {
             return Err("--count must be between 1 and 50.".to_string());
         }
+
+        // Validate engine
+        let valid_engines = ["tavily", "bocha", "brave", "volc"];
+        if !valid_engines.contains(&cli.engine.as_str()) {
+            return Err("--engine must be one of: tavily, bocha, brave, volc".to_string());
+        }
+        if cli.engine.is_empty() {
+            return Err("--engine is required. Please specify one of: tavily, bocha, brave, volc".to_string());
+        }
+
         if let Some(ref tr) = cli.time_range {
             validate_time_range(tr)?;
         }
 
-        Ok(Self {
+                let engine = cli.engine.clone();
+                Ok(Self {
             query: cli.query,
             count: cli.count as usize,
             time_range: cli.time_range,
             sites: split_domains(cli.sites),
             block_hosts: split_domains(cli.block_hosts),
             auth_level: cli.auth_level,
-            tavily_api_key: required_env("TAVILY_API_KEY")?,
-            bocha_api_key: required_env("BOCHA_API_KEY")?,
-            brave_api_key: required_env("BRAVE_API_KEY")?,
-            ve_access_key: required_env("VE_ACCESS_KEY")?,
-            ve_secret_key: required_env("VE_SECRET_KEY")?,
-            embedding: EmbeddingConfig {
-                provider: required_env("SEARCH_EMBEDDING_PROVIDER")?,
-                model: required_env("SEARCH_EMBEDDING_MODEL")?,
-                base_url: required_env("SEARCH_EMBEDDING_BASE_URL")?,
-                api_key: required_env("SEARCH_EMBEDDING_API_KEY")?,
+            engine: engine.clone(),
+            tavily_api_key: if engine == "tavily" {
+                required_env("TAVILY_API_KEY")?
+            } else {
+                "".to_string()
+            },
+            bocha_api_key: if engine == "bocha" {
+                required_env("BOCHA_API_KEY")?
+            } else {
+                "".to_string()
+            },
+            brave_api_key: if engine == "brave" {
+                required_env("BRAVE_API_KEY")?
+            } else {
+                "".to_string()
+            },
+            ve_access_key: if engine == "volc" {
+                required_env("VE_ACCESS_KEY")?
+            } else {
+                "".to_string()
+            },
+            ve_secret_key: if engine == "volc" {
+                required_env("VE_SECRET_KEY")?
+            } else {
+                "".to_string()
             },
             http_proxy: cli.http_proxy.or(std::env::var("HTTP_PROXY").ok()),
             https_proxy: cli.https_proxy.or(std::env::var("HTTPS_PROXY").ok()),

@@ -1,8 +1,6 @@
 use crate::config::Config;
-use crate::models::{
-    BochaResponse, BraveResponse, SearchResponse, TavilyResponse, UnifiedSearchResult, UnifiedSearchSource,
-};
 use crate::sign;
+use crate::models::*;
 use std::time::Duration;
 use std::env;
 
@@ -52,63 +50,117 @@ fn agent(config: &Config) -> ureq::Agent {
     builder.build()
 }
 
-pub fn fetch_all(config: &Config) -> Result<Vec<UnifiedSearchResult>, String> {
-    let candidate_count = std::cmp::max(config.count * 4, 10) as u32; // Increased for 4 providers
+pub fn fetch_selected(config: &Config) -> Result<Vec<RawSearchResult>, String> {
+    let mut results = Vec::new();
 
-    // Try without proxy first
-    let mut all_results = Vec::new();
-    let mut failed_providers = Vec::new();
-
-    // Try each provider
-    if let Ok(results) = fetch_tavily(config, candidate_count) {
-        all_results.extend(results);
-    } else {
-        failed_providers.push("Tavily");
+    match config.engine.as_str() {
+        "tavily" => {
+            if let Ok(items) = fetch_tavily_raw(config) {
+                results.extend(items.into_iter().map(|item| {
+                    let item_clone = item.clone();
+                    RawSearchResult {
+                        engine: "Tavily".to_string(),
+                        title: item.title.unwrap_or_default(),
+                        url: item.url.unwrap_or_default(),
+                        content: item.content.unwrap_or_default(),
+                        published_date: item.published_date,
+                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+                    }
+                }));
+            }
+        }
+        "bocha" => {
+            if let Ok(items) = fetch_bocha_raw(config) {
+                results.extend(items.into_iter().map(|item| {
+                    let item_clone = item.clone();
+                    RawSearchResult {
+                        engine: "Bocha".to_string(),
+                        title: item.name.unwrap_or_default(),
+                        url: item.url.unwrap_or_default(),
+                        content: item.summary.or(item.snippet).unwrap_or_default(),
+                        published_date: item.date_published,
+                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+                    }
+                }));
+            }
+        }
+        "brave" => {
+            if let Ok(items) = fetch_brave_raw(config) {
+                results.extend(items.into_iter().map(|item| {
+                    let item_clone = item.clone();
+                    RawSearchResult {
+                        engine: "Brave".to_string(),
+                        title: item.title.unwrap_or_default(),
+                        url: item.url.unwrap_or_default(),
+                        content: item.description.or(item.snippet).unwrap_or_default(),
+                        published_date: item.published_at,
+                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+                    }
+                }));
+            }
+        }
+        "volc" => {
+            if let Ok(items) = fetch_volc_raw(config) {
+                results.extend(items.into_iter().map(|item| {
+                    let item_clone = item.clone();
+                    RawSearchResult {
+                        engine: "Volc".to_string(),
+                        title: item.title.unwrap_or_default(),
+                        url: item.url.unwrap_or_default(),
+                        content: item.summary.or(item.snippet).unwrap_or_default(),
+                        published_date: item.publish_time,
+                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+                    }
+                }));
+            }
+        }
+        _ => return Err("Invalid engine specified".to_string()),
     }
 
-    if let Ok(results) = fetch_bocha(config, candidate_count) {
-        all_results.extend(results);
-    } else {
-        failed_providers.push("Bocha");
+    if results.is_empty() {
+        return Err("No results found".to_string());
     }
 
-    if let Ok(results) = fetch_brave(config, candidate_count) {
-        all_results.extend(results);
-    } else {
-        failed_providers.push("Brave");
-    }
-
-    if let Ok(results) = fetch_volc(config, candidate_count) {
-        all_results.extend(results);
-    } else {
-        failed_providers.push("Volc");
-    }
-
-    // If some providers failed and we have proxy configured, try them with proxy
-    if !failed_providers.is_empty() && (config.http_proxy.is_some() || config.https_proxy.is_some()) {
-        let proxy_failed = failed_providers.join(", ");
-        eprintln!("Warning: {} providers failed without proxy, trying with proxy...", proxy_failed);
-
-        // Note: This is a simplified approach. In a real implementation, you might want to
-        // retry only the failed providers with proxy.
-        // For now, we'll just continue with the results we have.
-    }
-
-    if all_results.is_empty() {
-        return Err("All providers failed".to_string());
-    }
-
-    Ok(all_results)
+    // Limit results to count
+    results.truncate(config.count);
+    Ok(results)
 }
 
-fn fetch_tavily(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, String> {
+pub struct RawSearchResult {
+    pub engine: String,
+    pub title: String,
+    pub url: String,
+    pub content: String,
+    pub published_date: Option<String>,
+    pub raw_data: String,
+}
+
+pub fn format_raw_results(results: &[RawSearchResult]) -> String {
+    let mut output = String::new();
+
+    for (i, result) in results.iter().enumerate() {
+        output.push_str(&format!(
+            "[{}] {}\n    {} | {}\n    {}\n    {}\n\n",
+            i + 1,
+            result.title,
+            result.engine,
+            result.url,
+            result.published_date.as_deref().unwrap_or(""),
+            result.content
+        ));
+    }
+
+    output
+}
+
+fn fetch_tavily_raw(config: &Config) -> Result<Vec<TavilyResult>, String> {
     let topic = if is_news_query(&config.time_range) { "news" } else { "general" };
     let body = ureq::json!({
         "query": config.query,
         "topic": topic,
-        "max_results": count,
+        "max_results": config.count,
         "include_answer": false,
-        "include_raw_content": false
+        "include_raw_content": true
     });
 
     let resp: TavilyResponse = agent(config)
@@ -120,35 +172,14 @@ fn fetch_tavily(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>,
         .into_json()
         .map_err(|e| format!("Tavily parse failed: {}", e))?;
 
-    Ok(resp
-        .results
-        .unwrap_or_default()
-        .into_iter()
-        .enumerate()
-        .map(|(idx, item)| UnifiedSearchResult {
-            provider: UnifiedSearchSource::Tavily,
-            title: item.title.unwrap_or_else(|| item.url.clone().unwrap_or_default()),
-            site_name: item
-                .url
-                .as_deref()
-                .and_then(extract_host)
-                .unwrap_or_default(),
-            url: item.url.unwrap_or_default(),
-            summary: item.content.unwrap_or_default(),
-            auth_info_des: None,
-            published_at: item.published_date,
-            provider_score: item.score.unwrap_or(0.0),
-            raw_rank: idx + 1,
-            fused_score: 0.0,
-        })
-        .collect())
+    Ok(resp.results.unwrap_or_default())
 }
 
-fn fetch_bocha(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, String> {
+fn fetch_bocha_raw(config: &Config) -> Result<Vec<BochaWebPage>, String> {
     let body = ureq::json!({
         "query": config.query,
         "summary": true,
-        "count": count
+        "count": config.count
     });
 
     let resp: BochaResponse = agent(config)
@@ -166,33 +197,13 @@ fn fetch_bocha(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, 
         .map(|pages| pages.value)
         .unwrap_or_default();
 
-    Ok(items
-        .into_iter()
-        .enumerate()
-        .map(|(idx, item)| UnifiedSearchResult {
-            provider: UnifiedSearchSource::Bocha,
-            title: item.name.unwrap_or_else(|| item.url.clone().unwrap_or_default()),
-            site_name: item.site_name.unwrap_or_else(|| {
-                item.url
-                    .as_deref()
-                    .and_then(extract_host)
-                    .unwrap_or_default()
-            }),
-            url: item.url.unwrap_or_default(),
-            summary: item.summary.or(item.snippet).unwrap_or_default(),
-            auth_info_des: None,
-            published_at: item.date_published,
-            provider_score: 1.0 / ((idx + 1) as f32),
-            raw_rank: idx + 1,
-            fused_score: 0.0,
-        })
-        .collect())
+    Ok(items)
 }
 
-fn fetch_brave(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, String> {
+fn fetch_brave_raw(config: &Config) -> Result<Vec<BraveWebResult>, String> {
     let body = ureq::json!({
         "q": config.query,
-        "count": count,
+        "count": config.count,
         "text_decorations": false,
         "spell": false
     });
@@ -210,32 +221,13 @@ fn fetch_brave(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, 
         .map(|web| web.results)
         .unwrap_or_default();
 
-    Ok(items
-        .into_iter()
-        .enumerate()
-        .map(|(idx, item)| UnifiedSearchResult {
-            provider: UnifiedSearchSource::Brave,
-            title: item.title.unwrap_or_else(|| item.url.clone().unwrap_or_default()),
-            site_name: item
-                .url
-                .as_deref()
-                .and_then(extract_host)
-                .unwrap_or_default(),
-            url: item.url.unwrap_or_default(),
-            summary: item.description.or(item.snippet).unwrap_or_default(),
-            auth_info_des: None,
-            published_at: item.published_at,
-            provider_score: 1.0 / ((idx + 1) as f32),
-            raw_rank: idx + 1,
-            fused_score: 0.0,
-        })
-        .collect())
+    Ok(items)
 }
 
-fn fetch_volc(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, String> {
+fn fetch_volc_raw(config: &Config) -> Result<Vec<VolcWebResult>, String> {
     let req = crate::api::build_request(
         &config.query,
-        count,
+        config.count as u32,
         config.sites.as_ref(),
         config.block_hosts.as_ref(),
         config.time_range.as_deref(),
@@ -271,33 +263,7 @@ fn fetch_volc(config: &Config, count: u32) -> Result<Vec<UnifiedSearchResult>, S
     Ok(resp
         .result
         .and_then(|result| result.web_results)
-        .unwrap_or_default()
-        .into_iter()
-        .enumerate()
-        .map(|(idx, item)| UnifiedSearchResult {
-            provider: UnifiedSearchSource::Volc,
-            title: item.title.unwrap_or_else(|| item.url.clone().unwrap_or_default()),
-            site_name: item.site_name.unwrap_or_else(|| {
-                item.url
-                    .as_deref()
-                    .and_then(extract_host)
-                    .unwrap_or_default()
-            }),
-            url: item.url.unwrap_or_default(),
-            summary: item.summary.or(item.snippet).unwrap_or_default(),
-            auth_info_des: item.auth_info_des,
-            published_at: item.publish_time,
-            provider_score: item.rank_score.unwrap_or(1.0 / ((idx + 1) as f32)),
-            raw_rank: idx + 1,
-            fused_score: 0.0,
-        })
-        .collect())
-}
-
-fn extract_host(value: &str) -> Option<String> {
-    url::Url::parse(value)
-        .ok()
-        .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+        .unwrap_or_default())
 }
 
 fn is_news_query(time_range: &Option<String>) -> bool {

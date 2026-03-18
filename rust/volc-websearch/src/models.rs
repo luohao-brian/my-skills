@@ -26,7 +26,7 @@ pub struct SearchFilter {
     pub auth_info_level: Option<u32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct SearchResponse {
     #[serde(rename = "Result")]
     pub result: Option<SearchResult>,
@@ -34,13 +34,13 @@ pub struct SearchResponse {
     pub response_metadata: Option<ResponseMetadata>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct SearchResult {
     #[serde(rename = "WebResults")]
     pub web_results: Option<Vec<VolcWebResult>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct VolcWebResult {
     #[serde(rename = "Title")]
     pub title: Option<String>,
@@ -60,13 +60,13 @@ pub struct VolcWebResult {
     pub rank_score: Option<f32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct ResponseMetadata {
     #[serde(rename = "Error")]
     pub error: Option<ApiError>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct ApiError {
     #[serde(rename = "Code")]
     pub code: Option<String>,
@@ -85,12 +85,12 @@ impl std::fmt::Display for ApiError {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct TavilyResponse {
     pub results: Option<Vec<TavilyResult>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct TavilyResult {
     pub url: Option<String>,
     pub title: Option<String>,
@@ -99,23 +99,23 @@ pub struct TavilyResult {
     pub content: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct BochaResponse {
     pub data: Option<BochaData>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct BochaData {
     #[serde(rename = "webPages")]
     pub web_pages: Option<BochaWebPages>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct BochaWebPages {
     pub value: Vec<BochaWebPage>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct BochaWebPage {
     pub name: Option<String>,
     pub url: Option<String>,
@@ -127,17 +127,17 @@ pub struct BochaWebPage {
     pub date_published: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct BraveResponse {
     pub web: Option<BraveWebResults>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct BraveWebResults {
     pub results: Vec<BraveWebResult>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct BraveWebResult {
     pub title: Option<String>,
     pub url: Option<String>,
@@ -146,35 +146,4 @@ pub struct BraveWebResult {
     pub snippet: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-pub enum UnifiedSearchSource {
-    Tavily,
-    Bocha,
-    Volc,
-    Brave,
-}
-
-impl UnifiedSearchSource {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Tavily => "Tavily",
-            Self::Bocha => "Bocha",
-            Self::Volc => "Volc",
-            Self::Brave => "Brave",
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct UnifiedSearchResult {
-    pub provider: UnifiedSearchSource,
-    pub title: String,
-    pub site_name: String,
-    pub url: String,
-    pub summary: String,
-    pub auth_info_des: Option<String>,
-    pub published_at: Option<String>,
-    pub provider_score: f32,
-    pub raw_rank: usize,
-    pub fused_score: f32,
-}
+// All models are now used directly, no need for unified wrapper
