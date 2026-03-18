@@ -5,7 +5,7 @@ pub const TIME_RANGE_SHORTCUTS: &[&str] = &["OneDay", "OneWeek", "OneMonth", "On
 #[derive(Parser, Debug)]
 #[command(
     name = "volc-websearch",
-    about = "Fused web search across Tavily, Bocha, and Volc Search"
+    about = "Fused web search across Tavily, Bocha, Brave, and Volc Search"
 )]
 pub struct Cli {
     /// Search query
