@@ -16,7 +16,7 @@ pub struct Cli {
     pub search_type: String,
 
     /// Number of final results to return
-    #[arg(short = 'c', long, default_value_t = 10)]
+    #[arg(short = 'c', long, default_value_t = 15)]
     pub count: u32,
 
     /// Time range: OneDay/OneWeek/OneMonth/OneYear/YYYY-MM-DD..YYYY-MM-DD

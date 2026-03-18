@@ -51,7 +51,7 @@ websearch技能支持通过以下参数显式设置代理：
 
 ## 常用参数
 
-- `--count <n>`：最终返回条数，默认 10，最多 50 条
+- `--count <n>`：最终返回条数，默认 15，最多 50 条
 - `--type <type>`：当前仅支持 `web`
 - `--time-range <range>`：时间范围，可选 `OneDay`、`OneWeek`、`OneMonth`、`OneYear`，或日期区间 `2024-12-30..2025-12-30`
 - `--sites <a|b>`：限定站点搜索，多个站点用 `|` 分隔
