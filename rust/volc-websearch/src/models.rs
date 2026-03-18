@@ -127,11 +127,31 @@ pub struct BochaWebPage {
     pub date_published: Option<String>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct BraveResponse {
+    pub web: Option<BraveWebResults>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BraveWebResults {
+    pub results: Vec<BraveWebResult>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BraveWebResult {
+    pub title: Option<String>,
+    pub url: Option<String>,
+    pub description: Option<String>,
+    pub published_at: Option<String>,
+    pub snippet: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 pub enum UnifiedSearchSource {
     Tavily,
     Bocha,
     Volc,
+    Brave,
 }
 
 impl UnifiedSearchSource {
@@ -140,6 +160,7 @@ impl UnifiedSearchSource {
             Self::Tavily => "Tavily",
             Self::Bocha => "Bocha",
             Self::Volc => "Volc",
+            Self::Brave => "Brave",
         }
     }
 }

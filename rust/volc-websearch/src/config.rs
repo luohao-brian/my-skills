@@ -16,7 +16,7 @@ pub struct Cli {
     pub search_type: String,
 
     /// Number of final results to return
-    #[arg(short = 'c', long, default_value_t = 15)]
+    #[arg(short = 'c', long, default_value_t = 10)]
     pub count: u32,
 
     /// Time range: OneDay/OneWeek/OneMonth/OneYear/YYYY-MM-DD..YYYY-MM-DD
@@ -34,6 +34,18 @@ pub struct Cli {
     /// Prioritize authoritative sources (0 or 1)
     #[arg(long, default_value_t = 0)]
     pub auth_level: u32,
+
+    /// HTTP proxy URL (overrides HTTP_PROXY env var)
+    #[arg(long)]
+    pub http_proxy: Option<String>,
+
+    /// HTTPS proxy URL (overrides HTTPS_PROXY env var)
+    #[arg(long)]
+    pub https_proxy: Option<String>,
+
+    /// No proxy hosts (overrides NO_PROXY env var)
+    #[arg(long)]
+    pub no_proxy: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,9 +66,13 @@ pub struct Config {
     pub auth_level: u32,
     pub tavily_api_key: String,
     pub bocha_api_key: String,
+    pub brave_api_key: String,
     pub ve_access_key: String,
     pub ve_secret_key: String,
     pub embedding: EmbeddingConfig,
+    pub http_proxy: Option<String>,
+    pub https_proxy: Option<String>,
+    pub no_proxy: Option<String>,
 }
 
 impl Config {
@@ -80,6 +96,7 @@ impl Config {
             auth_level: cli.auth_level,
             tavily_api_key: required_env("TAVILY_API_KEY")?,
             bocha_api_key: required_env("BOCHA_API_KEY")?,
+            brave_api_key: required_env("BRAVE_API_KEY")?,
             ve_access_key: required_env("VE_ACCESS_KEY")?,
             ve_secret_key: required_env("VE_SECRET_KEY")?,
             embedding: EmbeddingConfig {
@@ -88,6 +105,9 @@ impl Config {
                 base_url: required_env("SEARCH_EMBEDDING_BASE_URL")?,
                 api_key: required_env("SEARCH_EMBEDDING_API_KEY")?,
             },
+            http_proxy: cli.http_proxy.or(std::env::var("HTTP_PROXY").ok()),
+            https_proxy: cli.https_proxy.or(std::env::var("HTTPS_PROXY").ok()),
+            no_proxy: cli.no_proxy.or(std::env::var("NO_PROXY").ok()),
         })
     }
 }

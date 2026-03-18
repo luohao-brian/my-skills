@@ -1,8 +1,8 @@
 ---
 name: volc-websearch
-description: 使用 Tavily、Bocha、火山引擎融合搜索做联网检索，并用 embedding 做结果去重和召回重排。当用户需要查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
+description: 使用 Tavily、Bocha、Brave、火山引擎融合搜索做联网检索，并用 embedding 做结果去重和召回重排。当用户需要查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
 homepage: https://www.volcengine.com/docs/85508/1650263
-metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","VE_ACCESS_KEY","VE_SECRET_KEY","SEARCH_EMBEDDING_PROVIDER","SEARCH_EMBEDDING_MODEL","SEARCH_EMBEDDING_BASE_URL","SEARCH_EMBEDDING_API_KEY"]},"emoji":"🔍"}}
+metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","BRAVE_API_KEY","VE_ACCESS_KEY","VE_SECRET_KEY","SEARCH_EMBEDDING_PROVIDER","SEARCH_EMBEDDING_MODEL","SEARCH_EMBEDDING_BASE_URL","SEARCH_EMBEDDING_API_KEY"]},"emoji":"🔍"}}
 ---
 
 # 融合联网搜索
@@ -28,7 +28,19 @@ metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","VE_A
 - `SEARCH_EMBEDDING_BASE_URL`：embedding API Base URL，例如 `https://ark.cn-beijing.volces.com/api/v3`
 - `SEARCH_EMBEDDING_API_KEY`：embedding API Key
 
-这 8 个变量缺一不可。技能不会降级到单一搜索源，也不会在缺少 embedding 配置时继续运行。
+这 9 个变量缺一不可。技能不会降级到单一搜索源，也不会在缺少 embedding 配置时继续运行。
+
+## 代理支持
+
+websearch技能支持通过以下参数显式设置代理：
+
+- `--http-proxy <url>`：HTTP代理URL，会覆盖环境变量HTTP_PROXY
+- `--https-proxy <url>`：HTTPS代理URL，会覆盖环境变量HTTPS_PROXY
+- `--no-proxy <hosts>`：配置了此参数但当前实现中会对所有请求使用代理
+
+代理配置优先级：命令行参数 > 环境变量 > 无代理
+
+注意：当前使用的HTTP客户端对no_proxy的支持有限，代理会对所有请求生效。
 
 ## 基本搜索
 
@@ -39,12 +51,15 @@ metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","VE_A
 
 ## 常用参数
 
-- `--count <n>`：最终返回条数，默认 15，最多 50 条
+- `--count <n>`：最终返回条数，默认 10，最多 50 条
 - `--type <type>`：当前仅支持 `web`
 - `--time-range <range>`：时间范围，可选 `OneDay`、`OneWeek`、`OneMonth`、`OneYear`，或日期区间 `2024-12-30..2025-12-30`
 - `--sites <a|b>`：限定站点搜索，多个站点用 `|` 分隔
 - `--block-hosts <a|b>`：排除站点，多个站点用 `|` 分隔
 - `--auth-level 1`：优先权威来源，主要作用于火山源，同时参与融合重排
+- `--http-proxy <url>`：HTTP代理URL，会覆盖环境变量HTTP_PROXY
+- `--https-proxy <url>`：HTTPS代理URL，会覆盖环境变量HTTPS_PROXY
+- `--no-proxy <hosts>`：不使用代理的主机列表，多个主机用逗号分隔，会覆盖环境变量NO_PROXY
 
 ## 模式选择
 
@@ -64,6 +79,9 @@ metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","VE_A
 
 # 查权威来源
 {baseDir}/bin/volc-websearch "流感疫苗安全性" --auth-level 1
+
+# 使用代理（会覆盖环境变量）
+{baseDir}/bin/volc-websearch "AI 趋势" --http-proxy http://proxy.company.com:8080 --https-proxy http://proxy.company.com:8080 --no-proxy "localhost,127.0.0.1,.internal"
 ```
 
 ## 回答规则
@@ -77,10 +95,23 @@ metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","VE_A
 
 ## 故障排查
 
-- 缺少凭证：检查 3 个搜索源和 embedding 的环境变量是否全部存在
+- 缺少凭证：检查 4 个搜索源和 embedding 的环境变量是否全部存在
 - 需要查 API 参数、字段、错误码：打开 [references/docs-index.md](references/docs-index.md)
 - 如果返回权限错误，优先检查服务是否已开通、凭证是否有效、子账号是否已授权
 - 如果某个第三方搜索源返回结构变化，需要同步更新 Rust 侧 provider 解析逻辑
+- 代理配置：如果某个搜索源无法访问，尝试配置代理参数
+
+## 代理支持
+
+websearch技能支持通过以下参数显式设置代理：
+
+- `--http-proxy <url>`：HTTP代理URL，会覆盖环境变量HTTP_PROXY
+- `--https-proxy <url>`：HTTPS代理URL，会覆盖环境变量HTTPS_PROXY
+- `--no-proxy <hosts>`：配置了此参数但当前实现中会对所有请求使用代理
+
+代理配置优先级：命令行参数 > 环境变量 > 无代理
+
+注意：当前使用的HTTP客户端对no_proxy的支持有限，代理会对所有请求生效。当某些搜索源无法访问时，可以通过代理参数来解决问题。
 
 ## 参考资料
 
