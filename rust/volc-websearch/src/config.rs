@@ -5,7 +5,7 @@ pub const TIME_RANGE_SHORTCUTS: &[&str] = &["OneDay", "OneWeek", "OneMonth", "On
 #[derive(Parser, Debug)]
 #[command(
     name = "volc-websearch",
-    about = "Web search using specified engine (tavily, bocha, brave, or volc)"
+    about = "Fused web search across Tavily, Bocha, Brave, and Volc Search"
 )]
 pub struct Cli {
     /// Search query
@@ -15,12 +15,12 @@ pub struct Cli {
     #[arg(short = 't', long = "type", default_value = "web")]
     pub search_type: String,
 
-    /// Search engine to use: tavily, bocha, brave, volc [required]
-    #[arg(long)]
+    /// Search engine to use: auto, tavily, bocha, brave, volc
+    #[arg(long, default_value = "auto")]
     pub engine: String,
 
     /// Number of results to return
-    #[arg(short = 'c', long, default_value_t = 10)]
+    #[arg(short = 'c', long, default_value_t = 15)]
     pub count: u32,
 
     /// Time range: OneDay/OneWeek/OneMonth/OneYear/YYYY-MM-DD..YYYY-MM-DD
@@ -53,14 +53,6 @@ pub struct Cli {
 }
 
 #[derive(Clone, Debug)]
-pub struct EmbeddingConfig {
-    pub provider: String,
-    pub model: String,
-    pub base_url: String,
-    pub api_key: String,
-}
-
-#[derive(Clone, Debug)]
 pub struct Config {
     pub query: String,
     pub count: usize,
@@ -89,20 +81,17 @@ impl Config {
         }
 
         // Validate engine
-        let valid_engines = ["tavily", "bocha", "brave", "volc"];
+        let valid_engines = ["auto", "tavily", "bocha", "brave", "volc"];
         if !valid_engines.contains(&cli.engine.as_str()) {
-            return Err("--engine must be one of: tavily, bocha, brave, volc".to_string());
-        }
-        if cli.engine.is_empty() {
-            return Err("--engine is required. Please specify one of: tavily, bocha, brave, volc".to_string());
+            return Err("--engine must be one of: auto, tavily, bocha, brave, volc".to_string());
         }
 
         if let Some(ref tr) = cli.time_range {
             validate_time_range(tr)?;
         }
 
-                let engine = cli.engine.clone();
-                Ok(Self {
+        let engine = cli.engine.clone();
+        Ok(Self {
             query: cli.query,
             count: cli.count as usize,
             time_range: cli.time_range,
@@ -113,31 +102,40 @@ impl Config {
             tavily_api_key: if engine == "tavily" {
                 required_env("TAVILY_API_KEY")?
             } else {
-                "".to_string()
+                optional_env("TAVILY_API_KEY")
             },
             bocha_api_key: if engine == "bocha" {
                 required_env("BOCHA_API_KEY")?
             } else {
-                "".to_string()
+                optional_env("BOCHA_API_KEY")
             },
             brave_api_key: if engine == "brave" {
                 required_env("BRAVE_API_KEY")?
             } else {
-                "".to_string()
+                optional_env("BRAVE_API_KEY")
             },
             ve_access_key: if engine == "volc" {
                 required_env("VE_ACCESS_KEY")?
             } else {
-                "".to_string()
+                optional_env("VE_ACCESS_KEY")
             },
             ve_secret_key: if engine == "volc" {
                 required_env("VE_SECRET_KEY")?
             } else {
-                "".to_string()
+                optional_env("VE_SECRET_KEY")
             },
-            http_proxy: cli.http_proxy.or(std::env::var("HTTP_PROXY").ok()),
-            https_proxy: cli.https_proxy.or(std::env::var("HTTPS_PROXY").ok()),
-            no_proxy: cli.no_proxy.or(std::env::var("NO_PROXY").ok()),
+            http_proxy: cli
+                .http_proxy
+                .or(std::env::var("HTTP_PROXY").ok())
+                .or(std::env::var("http_proxy").ok()),
+            https_proxy: cli
+                .https_proxy
+                .or(std::env::var("HTTPS_PROXY").ok())
+                .or(std::env::var("https_proxy").ok()),
+            no_proxy: cli
+                .no_proxy
+                .or(std::env::var("NO_PROXY").ok())
+                .or(std::env::var("no_proxy").ok()),
         })
     }
 }
@@ -147,6 +145,13 @@ fn required_env(name: &str) -> Result<String, String> {
         .ok()
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| format!("Missing required environment variable: {}", name))
+}
+
+fn optional_env(name: &str) -> String {
+    std::env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_default()
 }
 
 fn split_domains(input: Option<String>) -> Option<Vec<String>> {

@@ -1,6 +1,13 @@
 use crate::models::*;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
+use image::codecs::jpeg::JpegEncoder;
+use image::codecs::png::PngEncoder;
+use image::imageops::FilterType;
+use image::ColorType;
+use image::DynamicImage;
+use image::GenericImageView;
+use image::ImageEncoder;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -13,6 +20,35 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const BASE_URL: &str = "https://ark.cn-beijing.volces.com/api/v3";
 const DEFAULT_IMAGE_MODEL: &str = "doubao-seedream-5-0-260128";
 const DEFAULT_VIDEO_MODEL: &str = "doubao-seedance-1-5-pro-251215";
+const DEFAULT_IMAGE_SIZE: &str = "2848x1600";
+const DEFAULT_SIZE_PRESET: &str = "16:9";
+const I2I_MAX_EDGE: u32 = 1600;
+const I2V_MAX_EDGE: u32 = 1280;
+const I2I_MIN_EDGE: u32 = 64;
+const I2V_MIN_EDGE: u32 = 300;
+const JPEG_QUALITY: u8 = 84;
+
+#[derive(Clone, Copy)]
+enum UploadProfile {
+    ImageToImage,
+    ImageToVideo,
+}
+
+impl UploadProfile {
+    fn max_edge(self) -> u32 {
+        match self {
+            UploadProfile::ImageToImage => I2I_MAX_EDGE,
+            UploadProfile::ImageToVideo => I2V_MAX_EDGE,
+        }
+    }
+
+    fn min_edge(self) -> u32 {
+        match self {
+            UploadProfile::ImageToImage => I2I_MIN_EDGE,
+            UploadProfile::ImageToVideo => I2V_MIN_EDGE,
+        }
+    }
+}
 
 fn image_model() -> String {
     std::env::var("VOLC_IMAGE_MODEL_ID").unwrap_or_else(|_| DEFAULT_IMAGE_MODEL.to_string())
@@ -49,9 +85,55 @@ fn get_json(api_key: &str, url: &str) -> Result<String, String> {
     resp.into_string().map_err(|e| format!("Read body failed: {}", e))
 }
 
-fn normalize_image_input(image: &str) -> Result<String, String> {
-    if image.starts_with("http://") || image.starts_with("https://") || image.starts_with("data:image/") {
-        return Ok(image.to_string());
+fn resolve_generation_size(size: &str) -> Result<String, String> {
+    let normalized = size.trim().to_ascii_lowercase();
+    let resolved = match normalized.as_str() {
+        "" | "2k" => DEFAULT_IMAGE_SIZE,
+        "1:1" => "2048x2048",
+        "3:4" => "1728x2304",
+        "4:3" => "2304x1728",
+        DEFAULT_SIZE_PRESET => "2848x1600",
+        "9:16" => "1600x2848",
+        "3:2" => "2496x1664",
+        "2:3" => "1664x2496",
+        "21:9" => "3136x1344",
+        _ if is_explicit_size(&normalized) => size.trim(),
+        _ => {
+            return Err(format!(
+                "Unsupported size '{}'. Use one of 1:1, 3:4, 4:3, 16:9, 9:16, 3:2, 2:3, 21:9, 2K, or an explicit WIDTHxHEIGHT.",
+                size
+            ))
+        }
+    };
+    Ok(resolved.to_string())
+}
+
+fn is_explicit_size(value: &str) -> bool {
+    let Some((w, h)) = value.split_once('x') else {
+        return false;
+    };
+    w.parse::<u32>().is_ok() && h.parse::<u32>().is_ok()
+}
+
+fn normalize_image_input(image: &str, profile: UploadProfile) -> Result<String, String> {
+    let bytes = read_image_input_bytes(image)?;
+    prepare_image_for_upload(&bytes, profile)
+}
+
+fn read_image_input_bytes(image: &str) -> Result<Vec<u8>, String> {
+    if image.starts_with("http://") || image.starts_with("https://") {
+        let resp = agent()
+            .get(image)
+            .call()
+            .map_err(|e| format_ureq_error("GET", image, e))?;
+        let mut reader = resp.into_reader();
+        let mut buf = Vec::new();
+        io::copy(&mut reader, &mut buf).map_err(|e| format!("Failed to read {}: {}", image, e))?;
+        return Ok(buf);
+    }
+
+    if image.starts_with("data:image/") {
+        return decode_data_url(image);
     }
 
     let path = Path::new(image);
@@ -62,28 +144,73 @@ fn normalize_image_input(image: &str) -> Result<String, String> {
         ));
     }
 
-    let bytes = fs::read(path).map_err(|e| format!("Failed to read image file {}: {}", image, e))?;
-    let mime = infer_image_mime(path).ok_or_else(|| {
-        format!(
-            "Unsupported image format for local file {}. Use png, jpg, jpeg, webp, bmp, tiff, or gif.",
-            image
-        )
-    })?;
-    let encoded = BASE64_STANDARD.encode(bytes);
-    Ok(format!("data:{};base64,{}", mime, encoded))
+    fs::read(path).map_err(|e| format!("Failed to read image file {}: {}", image, e))
 }
 
-fn infer_image_mime(path: &Path) -> Option<&'static str> {
-    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
-    match ext.as_str() {
-        "jpg" | "jpeg" => Some("image/jpeg"),
-        "png" => Some("image/png"),
-        "webp" => Some("image/webp"),
-        "bmp" => Some("image/bmp"),
-        "tif" | "tiff" => Some("image/tiff"),
-        "gif" => Some("image/gif"),
-        _ => None,
+fn decode_data_url(value: &str) -> Result<Vec<u8>, String> {
+    let Some((header, payload)) = value.split_once(',') else {
+        return Err("Invalid data URL: missing comma separator".to_string());
+    };
+
+    if !header.ends_with(";base64") {
+        return Err("Invalid data URL: only base64-encoded image data is supported".to_string());
     }
+
+    BASE64_STANDARD
+        .decode(payload)
+        .map_err(|e| format!("Failed to decode image data URL: {}", e))
+}
+
+fn prepare_image_for_upload(bytes: &[u8], profile: UploadProfile) -> Result<String, String> {
+    let image = image::load_from_memory(bytes).map_err(|e| format!("Failed to decode image: {}", e))?;
+    let image = resize_for_profile(image, profile);
+    let has_alpha = image.color().has_alpha();
+
+    let (mime, encoded) = if has_alpha {
+        let rgba = image.to_rgba8();
+        let (w, h) = rgba.dimensions();
+        let mut out = Vec::new();
+        PngEncoder::new(&mut out)
+            .write_image(rgba.as_raw(), w, h, ColorType::Rgba8.into())
+            .map_err(|e| format!("Failed to encode PNG: {}", e))?;
+        ("image/png", out)
+    } else {
+        let rgb = image.to_rgb8();
+        let (w, h) = rgb.dimensions();
+        let mut out = Vec::new();
+        let mut encoder = JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY);
+        encoder
+            .encode(rgb.as_raw(), w, h, ColorType::Rgb8.into())
+            .map_err(|e| format!("Failed to encode JPEG: {}", e))?;
+        ("image/jpeg", out)
+    };
+
+    Ok(format!("data:{};base64,{}", mime, BASE64_STANDARD.encode(encoded)))
+}
+
+fn resize_for_profile(image: DynamicImage, profile: UploadProfile) -> DynamicImage {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return image;
+    }
+
+    let max_edge = profile.max_edge();
+    let min_edge = profile.min_edge();
+    let current_max = width.max(height);
+    let current_min = width.min(height);
+
+    if current_max > max_edge {
+        return image.resize(max_edge, max_edge, FilterType::Lanczos3);
+    }
+
+    if current_min < min_edge {
+        let scale = min_edge as f32 / current_min as f32;
+        let target_w = ((width as f32) * scale).ceil() as u32;
+        let target_h = ((height as f32) * scale).ceil() as u32;
+        return image.resize_exact(target_w, target_h, FilterType::CatmullRom);
+    }
+
+    image
 }
 
 fn save_image_and_format_output(image_url: &str) -> Result<String, String> {
@@ -186,11 +313,12 @@ fn format_ureq_error(method: &str, url: &str, err: ureq::Error) -> String {
 
 pub fn text_to_image(api_key: &str, prompt: &str, size: &str) -> Result<String, String> {
     eprintln!("Generating image (Text-to-Image)...");
+    let size = resolve_generation_size(size)?;
     let req = ImageGenRequest {
         model: image_model(),
         prompt: prompt.to_string(),
         image: None,
-        size: size.to_string(),
+        size,
         watermark: false,
     };
     let body = post_json(api_key, "/images/generations", &req)?;
@@ -206,13 +334,15 @@ pub fn text_to_image(api_key: &str, prompt: &str, size: &str) -> Result<String, 
     save_image_and_format_output(&image_url)
 }
 
-pub fn image_to_image(api_key: &str, prompt: &str, image_url: &str, size: &str) -> Result<String, String> {
+pub fn image_to_image(api_key: &str, prompt: &str, image_input: &str, size: &str) -> Result<String, String> {
     eprintln!("Generating image (Image-to-Image)...");
+    let size = resolve_generation_size(size)?;
+    let image_input = normalize_image_input(image_input, UploadProfile::ImageToImage)?;
     let req = ImageGenRequest {
         model: image_model(),
         prompt: prompt.to_string(),
-        image: Some(image_url.to_string()),
-        size: size.to_string(),
+        image: Some(image_input),
+        size,
         watermark: false,
     };
     let body = post_json(api_key, "/images/generations", &req)?;
@@ -228,9 +358,9 @@ pub fn image_to_image(api_key: &str, prompt: &str, image_url: &str, size: &str) 
     save_image_and_format_output(&image_url)
 }
 
-pub fn image_to_video(api_key: &str, text: &str, image_url: &str) -> Result<String, String> {
+pub fn image_to_video(api_key: &str, text: &str, image_input: &str) -> Result<String, String> {
     eprintln!("Generating video task (Image-to-Video)...");
-    let image_input = normalize_image_input(image_url)?;
+    let image_input = normalize_image_input(image_input, UploadProfile::ImageToVideo)?;
     let req = VideoGenRequest {
         model: video_model(),
         content: vec![
@@ -264,7 +394,7 @@ pub fn image_to_video(api_key: &str, text: &str, image_url: &str) -> Result<Stri
 }
 
 fn wait_for_task(api_key: &str, task_id: &str) -> Result<String, String> {
-    const MAX_RETRIES: u32 = 48; // 4 minutes (48 * 5s)
+    const MAX_RETRIES: u32 = 48;
     const POLL_INTERVAL: Duration = Duration::from_secs(5);
 
     eprintln!("Waiting for task {} to complete...", task_id);
@@ -307,13 +437,11 @@ pub fn query_task(api_key: &str, task_id: &str) -> Result<String, String> {
     let url = format!("{}/contents/generations/tasks/{}", BASE_URL, task_id);
     let body = get_json(api_key, &url)?;
 
-    // Check for errors
     let check: serde_json::Value = serde_json::from_str(&body).map_err(|e| format!("Parse error: {}", e))?;
     if check.get("error").is_some() {
         return Err(format!("API Error: {}", body));
     }
 
-    // Pretty print
     let v: serde_json::Value = serde_json::from_str(&body).unwrap();
     Ok(serde_json::to_string_pretty(&v).unwrap())
 }
@@ -358,8 +486,6 @@ pub fn list_tasks(api_key: &str, page: u32, page_size: u32) -> Result<String, St
 }
 
 fn chrono_from_timestamp(ts: i64) -> String {
-    // Simple UTC timestamp formatting without chrono dependency
-    // Unix timestamp to readable date
     let secs_per_day: i64 = 86400;
     let secs_per_hour: i64 = 3600;
     let secs_per_min: i64 = 60;
@@ -370,13 +496,11 @@ fn chrono_from_timestamp(ts: i64) -> String {
     let min = (remaining % secs_per_hour) / secs_per_min;
     let sec = remaining % secs_per_min;
 
-    // Days since epoch to Y-M-D (simplified)
     let (year, month, day) = days_to_ymd(days);
     format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, day, hour, min, sec)
 }
 
 fn days_to_ymd(days_since_epoch: i64) -> (i64, i64, i64) {
-    // Algorithm from https://howardhinnant.github.io/date_algorithms.html
     let z = days_since_epoch + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
     let doe = z - era * 146097;

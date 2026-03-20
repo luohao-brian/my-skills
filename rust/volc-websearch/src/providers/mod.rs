@@ -1,6 +1,6 @@
+use crate::models::*;
 use crate::config::Config;
 use crate::sign;
-use crate::models::*;
 use std::time::Duration;
 use std::env;
 
@@ -51,79 +51,29 @@ fn agent(config: &Config) -> ureq::Agent {
 }
 
 pub fn fetch_selected(config: &Config) -> Result<Vec<RawSearchResult>, String> {
-    let mut results = Vec::new();
+    let engines = resolve_engines(config)?;
+    let mut errors = Vec::new();
 
-    match config.engine.as_str() {
-        "tavily" => {
-            if let Ok(items) = fetch_tavily_raw(config) {
-                results.extend(items.into_iter().map(|item| {
-                    let item_clone = item.clone();
-                    RawSearchResult {
-                        engine: "Tavily".to_string(),
-                        title: item.title.unwrap_or_default(),
-                        url: item.url.unwrap_or_default(),
-                        content: item.content.unwrap_or_default(),
-                        published_date: item.published_date,
-                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
-                    }
-                }));
+    for engine in engines {
+        let fetched = match engine {
+            "tavily" => fetch_tavily_raw(config).map(map_tavily_results),
+            "bocha" => fetch_bocha_raw(config).map(map_bocha_results),
+            "brave" => fetch_brave_raw(config).map(map_brave_results),
+            "volc" => fetch_volc_raw(config).map(map_volc_results),
+            _ => Err("Invalid engine specified".to_string()),
+        };
+
+        match fetched {
+            Ok(mut results) if !results.is_empty() => {
+                results.truncate(config.count);
+                return Ok(results);
             }
+            Ok(_) => errors.push(format!("{} returned no results", engine)),
+            Err(err) => errors.push(format!("{}: {}", engine, err)),
         }
-        "bocha" => {
-            if let Ok(items) = fetch_bocha_raw(config) {
-                results.extend(items.into_iter().map(|item| {
-                    let item_clone = item.clone();
-                    RawSearchResult {
-                        engine: "Bocha".to_string(),
-                        title: item.name.unwrap_or_default(),
-                        url: item.url.unwrap_or_default(),
-                        content: item.summary.or(item.snippet).unwrap_or_default(),
-                        published_date: item.date_published,
-                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
-                    }
-                }));
-            }
-        }
-        "brave" => {
-            if let Ok(items) = fetch_brave_raw(config) {
-                results.extend(items.into_iter().map(|item| {
-                    let item_clone = item.clone();
-                    RawSearchResult {
-                        engine: "Brave".to_string(),
-                        title: item.title.unwrap_or_default(),
-                        url: item.url.unwrap_or_default(),
-                        content: item.description.or(item.snippet).unwrap_or_default(),
-                        published_date: item.published_at,
-                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
-                    }
-                }));
-            }
-        }
-        "volc" => {
-            if let Ok(items) = fetch_volc_raw(config) {
-                results.extend(items.into_iter().map(|item| {
-                    let item_clone = item.clone();
-                    RawSearchResult {
-                        engine: "Volc".to_string(),
-                        title: item.title.unwrap_or_default(),
-                        url: item.url.unwrap_or_default(),
-                        content: item.summary.or(item.snippet).unwrap_or_default(),
-                        published_date: item.publish_time,
-                        raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
-                    }
-                }));
-            }
-        }
-        _ => return Err("Invalid engine specified".to_string()),
     }
 
-    if results.is_empty() {
-        return Err("No results found".to_string());
-    }
-
-    // Limit results to count
-    results.truncate(config.count);
-    Ok(results)
+    Err(format!("No results found. {}", errors.join(" | ")))
 }
 
 pub struct RawSearchResult {
@@ -201,17 +151,15 @@ fn fetch_bocha_raw(config: &Config) -> Result<Vec<BochaWebPage>, String> {
 }
 
 fn fetch_brave_raw(config: &Config) -> Result<Vec<BraveWebResult>, String> {
-    let body = ureq::json!({
-        "q": config.query,
-        "count": config.count,
-        "text_decorations": false,
-        "spell": false
-    });
-
     let resp: BraveResponse = agent(config)
-        .get(BRAVE_URL)
+        .get(&format!(
+            "{}?q={}&count={}&text_decorations=false&spell=false",
+            BRAVE_URL,
+            urlencoding::encode(&config.query),
+            config.count
+        ))
         .set("X-Subscription-Token", &config.brave_api_key)
-        .send_json(body)
+        .call()
         .map_err(|e| format!("Brave request failed: {}", e))?
         .into_json()
         .map_err(|e| format!("Brave parse failed: {}", e))?;
@@ -268,4 +216,130 @@ fn fetch_volc_raw(config: &Config) -> Result<Vec<VolcWebResult>, String> {
 
 fn is_news_query(time_range: &Option<String>) -> bool {
     matches!(time_range.as_deref(), Some("OneDay" | "OneWeek" | "OneMonth"))
+}
+
+fn resolve_engines(config: &Config) -> Result<Vec<&'static str>, String> {
+    if config.engine != "auto" {
+        return Ok(vec![match config.engine.as_str() {
+            "tavily" => "tavily",
+            "bocha" => "bocha",
+            "brave" => "brave",
+            "volc" => "volc",
+            _ => return Err("Invalid engine specified".to_string()),
+        }]);
+    }
+
+    let mut available = Vec::new();
+    if !config.bocha_api_key.is_empty() {
+        available.push("bocha");
+    }
+    if !config.tavily_api_key.is_empty() {
+        available.push("tavily");
+    }
+    if !config.brave_api_key.is_empty() {
+        available.push("brave");
+    }
+    if !config.ve_access_key.is_empty() && !config.ve_secret_key.is_empty() {
+        available.push("volc");
+    }
+    if available.is_empty() {
+        return Err(
+            "No search provider credentials found. Configure at least one of: TAVILY_API_KEY, BOCHA_API_KEY, BRAVE_API_KEY, VE_ACCESS_KEY + VE_SECRET_KEY"
+                .to_string(),
+        );
+    }
+
+    let mut ordered = Vec::new();
+    let query_lower = config.query.to_lowercase();
+    let has_chinese = config.query.chars().any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch));
+    let looks_like_docs = query_lower.contains("api")
+        || query_lower.contains("sdk")
+        || query_lower.contains("doc")
+        || query_lower.contains("docs")
+        || query_lower.contains("documentation");
+    let looks_like_news = is_news_query(&config.time_range)
+        || query_lower.contains("news")
+        || query_lower.contains("latest")
+        || query_lower.contains("最近")
+        || query_lower.contains("最新")
+        || query_lower.contains("今日")
+        || query_lower.contains("今天");
+
+    if has_chinese {
+        push_engine_if_available(&mut ordered, &available, "bocha");
+    }
+    if looks_like_news {
+        push_engine_if_available(&mut ordered, &available, "tavily");
+    }
+    if looks_like_docs {
+        push_engine_if_available(&mut ordered, &available, "brave");
+    }
+    push_engine_if_available(&mut ordered, &available, "tavily");
+    push_engine_if_available(&mut ordered, &available, "bocha");
+    push_engine_if_available(&mut ordered, &available, "brave");
+    push_engine_if_available(&mut ordered, &available, "volc");
+
+    Ok(ordered)
+}
+
+fn push_engine_if_available(ordered: &mut Vec<&'static str>, available: &[&'static str], engine: &'static str) {
+    if available.contains(&engine) && !ordered.contains(&engine) {
+        ordered.push(engine);
+    }
+}
+
+fn map_tavily_results(items: Vec<TavilyResult>) -> Vec<RawSearchResult> {
+    items.into_iter().map(|item| {
+        let item_clone = item.clone();
+        RawSearchResult {
+            engine: "Tavily".to_string(),
+            title: item.title.unwrap_or_default(),
+            url: item.url.unwrap_or_default(),
+            content: item.content.unwrap_or_default(),
+            published_date: item.published_date,
+            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+        }
+    }).collect()
+}
+
+fn map_bocha_results(items: Vec<BochaWebPage>) -> Vec<RawSearchResult> {
+    items.into_iter().map(|item| {
+        let item_clone = item.clone();
+        RawSearchResult {
+            engine: "Bocha".to_string(),
+            title: item.name.unwrap_or_default(),
+            url: item.url.unwrap_or_default(),
+            content: item.summary.or(item.snippet).unwrap_or_default(),
+            published_date: item.date_published,
+            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+        }
+    }).collect()
+}
+
+fn map_brave_results(items: Vec<BraveWebResult>) -> Vec<RawSearchResult> {
+    items.into_iter().map(|item| {
+        let item_clone = item.clone();
+        RawSearchResult {
+            engine: "Brave".to_string(),
+            title: item.title.unwrap_or_default(),
+            url: item.url.unwrap_or_default(),
+            content: item.description.or(item.snippet).unwrap_or_default(),
+            published_date: item.published_at,
+            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+        }
+    }).collect()
+}
+
+fn map_volc_results(items: Vec<VolcWebResult>) -> Vec<RawSearchResult> {
+    items.into_iter().map(|item| {
+        let item_clone = item.clone();
+        RawSearchResult {
+            engine: "Volc".to_string(),
+            title: item.title.unwrap_or_default(),
+            url: item.url.unwrap_or_default(),
+            content: item.summary.or(item.snippet).unwrap_or_default(),
+            published_date: item.publish_time,
+            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
+        }
+    }).collect()
 }

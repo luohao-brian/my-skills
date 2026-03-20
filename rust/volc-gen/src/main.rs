@@ -18,8 +18,8 @@ enum Commands {
     TextToImage {
         /// Prompt text
         prompt: String,
-        /// Image size
-        #[arg(long, default_value = "2K")]
+        /// Output size preset or exact size, e.g. 16:9, 1:1, 2848x1600
+        #[arg(long, default_value = "16:9")]
         size: String,
     },
     /// Image to Image
@@ -27,10 +27,10 @@ enum Commands {
     ImageToImage {
         /// Prompt text
         prompt: String,
-        /// Reference image URL
-        image_url: String,
-        /// Image size
-        #[arg(long, default_value = "2K")]
+        /// Reference image input: local path or data URL
+        image_input: String,
+        /// Output size preset or exact size, e.g. 16:9, 1:1, 2848x1600
+        #[arg(long, default_value = "16:9")]
         size: String,
     },
     /// Image to Video
@@ -38,8 +38,8 @@ enum Commands {
     ImageToVideo {
         /// Motion description
         text: String,
-        /// Start image URL, data URL, or local image path
-        image_url: String,
+        /// Start image input: local path or data URL
+        image_input: String,
     },
     /// Query task(s) or list recent tasks
     #[command(name = "query", alias = "list")]
@@ -70,11 +70,11 @@ fn run() -> Result<String, String> {
         Commands::TextToImage { prompt, size } => {
             api::text_to_image(&api_key, &prompt, &size)
         }
-        Commands::ImageToImage { prompt, image_url, size } => {
-            api::image_to_image(&api_key, &prompt, &image_url, &size)
+        Commands::ImageToImage { prompt, image_input, size } => {
+            api::image_to_image(&api_key, &prompt, &image_input, &size)
         }
-        Commands::ImageToVideo { text, image_url } => {
-            api::image_to_video(&api_key, &text, &image_url)
+        Commands::ImageToVideo { text, image_input } => {
+            api::image_to_video(&api_key, &text, &image_input)
         }
         Commands::Query { arg1, arg2 } => {
             match arg1 {
