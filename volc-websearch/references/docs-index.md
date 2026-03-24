@@ -58,7 +58,35 @@
 
 ## API 关键参数速查
 
-以下基于官方文档整理，详细说明见融合信息搜索API文档页面。当前 `volc-websearch` 默认只暴露 `web` / `image`、`count`、`time-range`、`sites`、`block-hosts`、`auth-level` 等常用参数；下表仍保留 API 原生字段，便于后续扩展。
+以下基于官方文档整理，详细说明见融合信息搜索 API 文档页面。当前 `volc-websearch` 对外推荐使用统一的结构化参数层：`query`、`engine`、`count`、`freshness`、`date_after`、`date_before`、`country`、`language`、`domain_filter`、`intent`、`result_type`。这些字段会按 provider 能力做原生下推、部分映射或透明忽略；下表保留 Volc 原生请求字段，便于对照。
+
+补充说明：
+
+- 上述 `domain_filter`、`date_after/date_before`、`intent=source_finding` 等到 Volc 的映射已经做过真实联网验证
+- `result_type` 仍是 skill 本地输出层能力，不会把 Volc 切到 `web_summary` 流式接口
+
+### Skill 统一参数与 Volc 字段映射
+
+| Skill 参数 | Volc 请求字段 | 说明 |
+|-----------|---------------|------|
+| `query` | `Query` | 直接映射 |
+| `count` | `Count` | 直接映射 |
+| `freshness` | `TimeRange` | `pd/pw/pm/py` 映射到 `OneDay/OneWeek/OneMonth/OneYear` |
+| `date_after` + `date_before` | `TimeRange` | 同时提供时映射为 `YYYY-MM-DD..YYYY-MM-DD` |
+| `domain_filter` | `Filter.Sites` | 多域名拼成 `a.com|b.com` |
+| `intent=fact/source_finding` | `Filter.AuthInfoLevel=1` | 作为权威性偏好，不是 Volc 原生同名字段 |
+| `country` / `language` | 暂无 | 当前这条接口未下推 |
+| `result_type` | 暂无 | 当前由 skill 本地控制输出形态 |
+
+### 当前实测结论
+
+| Provider | 实测状态 | 备注 |
+|----------|----------|------|
+| Tavily | 已通过 | 验证过 `freshness`、`domain_filter`、`intent`、`result_type=summary` |
+| Brave | 已通过 | 验证过 `country`、`language`；当前代码使用 `/res/v1/web/search` |
+| Bocha | 已通过 | 验证过中文基础搜索链路 |
+| Volc | 已通过 | 验证过 `domain_filter`、`date_after/date_before`、`intent`、`result_type=summary` |
+| auto | 已通过 | 验证过自动选源和 fallback |
 
 ### 请求
 

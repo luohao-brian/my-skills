@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | `volc-gen` | `volc-gen/` | `volc-gen` | 文生图、图生图、图生视频、任务查询 |
 | `volc-speech` | `volc-speech/` | `volc-speech` | 文本转语音（TTS）、语音转文本（STT） |
-| `volc-websearch` | `volc-websearch/` | `volc-websearch` | 多搜索源融合网页搜索 |
+| `volc-websearch` | `volc-websearch/` | `volc-websearch` | 多搜索源网页搜索，支持结构化参数层与自动选源 |
 
 ## 仓库结构
 
@@ -131,6 +131,29 @@ tar xzf dist/volc-speech-macos.tar.gz -C ~/.agents/skills/
 
 最稳妥的做法是：以各 skill 自己的 `SKILL.md` 和 `references/setup-guide.md` 为准。
 
+## `volc-websearch` 当前约定
+
+`volc-websearch` 现在推荐使用统一的结构化参数层：
+
+- `query` 只写主题
+- 时间约束用 `freshness` 或 `date-after/date-before`
+- 地域和语言用 `country/language`
+- 站点限制用 `domain-filter`
+- 搜索目标用 `intent`
+- 输出形态用 `result-type`
+
+这套参数会按 provider 能力做原生下推；当某个 provider 不支持某些字段时，CLI 会给出 warning 或透明忽略，不会偷偷把限制条件塞回 `query`。
+
+已完成真实联网验证的链路包括：
+
+- Tavily：时间、站点过滤、摘要输出
+- Brave：地域、语言
+- Bocha：中文基础搜索
+- Volc：日期范围、站点过滤、摘要输出
+- auto：自动选源与 fallback
+
+更详细的支持矩阵和示例见 [volc-websearch/SKILL.md](/Users/bytedance/Documents/my-skills/volc-websearch/SKILL.md)。
+
 ## 推荐阅读顺序
 
 如果你要维护某个 skill，建议按这个顺序看：
@@ -146,6 +169,6 @@ tar xzf dist/volc-speech-macos.tar.gz -C ~/.agents/skills/
 
 - `volc-gen`：可构建、可打包、可安装
 - `volc-speech`：可构建、可打包、可安装，TTS / STT 都做过真实联调
-- `volc-websearch`：可构建、可打包、可安装
+- `volc-websearch`：可构建、可打包、可安装，结构化参数层和 4 个 provider 均已做过真实联调
 
 如果你只想快速定位语音能力，直接看 [volc-speech/README.md](/Users/bytedance/Documents/my-skills/volc-speech/README.md)。

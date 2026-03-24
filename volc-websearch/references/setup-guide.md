@@ -144,10 +144,16 @@ export VE_SECRET_KEY="your_secret_access_key"
 ## 第五步：验证调用
 
 ```bash
-volc-websearch "北京今日天气"
+volc-websearch "社会新闻" --date-after 2026-03-24 --date-before 2026-03-24 --count 5
 ```
 
 如果看到搜索结果输出，说明配置成功。
+
+如果你想继续验证结构化过滤是否生效，可以再试一条：
+
+```bash
+volc-websearch "Responses API" --engine volc --domain-filter platform.openai.com,openai.com --intent source_finding --result-type summary --count 3
+```
 
 ---
 

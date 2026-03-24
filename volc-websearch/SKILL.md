@@ -1,13 +1,13 @@
 ---
 name: volc-websearch
-description: 使用 Tavily、Bocha、Brave、火山引擎执行网页搜索，支持自动选择最优搜索引擎。当用户需要查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
+description: 使用 Tavily、Bocha、Brave、火山引擎执行网页搜索，支持“query 只写主题、其他约束结构化表达”的统一参数层和自动选源。当用户需要查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
 homepage: https://www.volcengine.com/docs/85508/1650263
 metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","BRAVE_API_KEY","VE_ACCESS_KEY","VE_SECRET_KEY"]},"emoji":"🔍"}}
 ---
 
 # 智能网页搜索
 
-执行来自指定搜索引擎的网页搜索，支持自动选择最优搜索引擎或手动选择特定引擎。
+执行来自 Tavily、Bocha、Brave、火山引擎的网页搜索，支持自动选择最合适的搜索引擎，也支持手动固定某个 provider。
 
 ## 何时使用
 
@@ -29,7 +29,130 @@ metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","BRAV
 
 建议配置所有 API Key，以便 auto 模式能够正常工作。
 
-## 代理支持
+## 核心原则
+
+- `query` 只表达搜索主题本身，不要再把时间、地域、语言、站点限制塞进 `query`
+- 时间、地域、语言、站点、意图、输出形态优先用结构化参数表达
+- `--engine auto` 会优先选择最能原生支持这些结构化约束的 provider
+- 如果强制指定某个 `--engine`，CLI 会只下推该 provider 原生支持的字段；不支持的字段会打印 warning，并被透明忽略，不会偷偷拼回 `query`
+
+## 当前状态
+
+- 这套结构化参数接口已经实装到 CLI 和 `SKILL.md`
+- `tavily`、`brave`、`bocha`、`volc` 都做过真实联网验证
+- `auto` 模式也做过真实回归，能在 provider 失败时自动回退
+- provider 原生能力并不完全一致，所以 skill 采用的是“统一参数层 + 原生下推 + 透明降级”
+
+## 基本搜索
+
+```bash
+{baseDir}/bin/volc-websearch "社会新闻"
+{baseDir}/bin/volc-websearch "AI agent progress" --count 8
+```
+
+## 参数列表
+
+- `query`：搜索主题本身，例如 `社会新闻`、`AI agent progress`
+- `--engine <auto|bocha|brave|tavily|volc>`：指定搜索引擎，默认 `auto`
+- `--count <n>`：返回结果数量，默认 15，最多 50
+- `--freshness <pd|pw|pm|py>`：快捷时间范围，分别表示 1 天、1 周、1 月、1 年
+- `--date-after <YYYY-MM-DD>`：起始日期
+- `--date-before <YYYY-MM-DD>`：结束日期
+- `--country <code>`：地域过滤提示，例如 `CN`、`US`
+- `--language <code>`：语言过滤提示，例如 `zh`、`en`
+- `--domain-filter <a,b>`：域名白名单，可用逗号分隔，也可重复传参
+- `--intent <discover|news|fact|source_finding>`：搜索意图提示
+- `--result-type <list|summary>`：返回列表或摘要形态
+- `--http-proxy <url>`：HTTP 代理
+- `--https-proxy <url>`：HTTPS 代理
+- `--no-proxy <hosts>`：不走代理的主机列表
+
+## Provider 支持矩阵
+
+| 参数 | Tavily | Bocha | Brave | Volc |
+|------|--------|-------|-------|------|
+| `query` | 原生 | 原生 | 原生 | 原生 |
+| `engine` | 调度层 | 调度层 | 调度层 | 调度层 |
+| `count` | 原生 | 原生 | 原生 | 原生 |
+| `freshness` | 原生 | 未下推 | 未下推 | 映射到 `TimeRange` |
+| `date_after` / `date_before` | 原生 | 未下推 | 未下推 | 两端都提供时映射到 `TimeRange` |
+| `country` | 原生（country boost） | 未下推 | 原生 | 未下推 |
+| `language` | 当前未下推 | 未下推 | 原生（`search_lang`） | 未下推 |
+| `domain_filter` | 原生（`include_domains`） | 未下推 | 未下推 | 映射到 `Sites` |
+| `intent` | 部分映射到 `topic` | 主要用于 auto 选源 | 主要用于 auto 选源 | 部分映射到权威性偏好 |
+| `result_type` | 本地输出整形 | 本地输出整形 | 本地输出整形 | 本地输出整形 |
+
+说明：
+
+- `result_type=summary` 当前是 skill 侧的输出形态控制，不是要求每个 provider 都切到自己的原生“总结接口”
+- `country/language/date/domain` 这类结构化字段，只有 provider 有可靠原生字段时才会下推
+- 不支持的字段不会被拼回 `query` 伪装成“支持”
+
+## 自动选择逻辑
+
+auto 模式会优先考虑结构化约束，然后再看 query 本身：
+
+- 有 `country` 或 `language`：优先 Brave，其次 Tavily
+- 有 `domain_filter`：优先 Tavily，其次 Volc
+- 有 `freshness` 或显式日期：优先 Tavily，其次 Volc
+- `intent=news`：优先 Tavily
+- `intent=source_finding` 或 query 像技术文档：优先 Brave
+- 中文主题：在没有更强结构化约束时优先 Bocha
+
+## 推荐用法示例
+
+```bash
+# 搜索 2026-03-24 的中文社会新闻，推荐交给 auto 选最合适 provider
+{baseDir}/bin/volc-websearch "社会新闻" \
+  --date-after 2026-03-24 \
+  --date-before 2026-03-24 \
+  --country CN \
+  --language zh \
+  --intent news \
+  --result-type list \
+  --count 8
+
+# 搜索最近一周的 AI 进展，自动选最合适 provider
+{baseDir}/bin/volc-websearch "AI agent progress" --freshness pw --intent news --count 8
+
+# 限定官网域名查资料，并输出摘要形态
+{baseDir}/bin/volc-websearch "Responses API" \
+  --domain-filter platform.openai.com,openai.com \
+  --intent source_finding \
+  --result-type summary
+
+# 强制使用 Brave 查美国英文资料
+{baseDir}/bin/volc-websearch "interest rates" \
+  --engine brave \
+  --country US \
+  --language en \
+  --intent fact
+
+# 强制使用 Volc 做站点限制搜索
+{baseDir}/bin/volc-websearch "Responses API" \
+  --engine volc \
+  --domain-filter platform.openai.com,openai.com \
+  --intent source_finding \
+  --result-type summary
+
+# 强制使用 Bocha 做中文基础搜索
+{baseDir}/bin/volc-websearch "社会新闻" --engine bocha --count 8
+
+# 使用代理
+{baseDir}/bin/volc-websearch "AI 趋势" \
+  --http-proxy http://proxy.company.com:8080 \
+  --https-proxy http://proxy.company.com:8080 \
+  --no-proxy "localhost,127.0.0.1,.internal"
+```
+
+## 兼容参数
+
+以下旧参数仍可用，但不再推荐写进新 prompt 或新文档：
+
+- `--time-range <OneDay|OneWeek|OneMonth|OneYear|YYYY-MM-DD..YYYY-MM-DD>`
+- `--sites <a|b>`
+- `--block-hosts <a|b>`
+- `--auth-level 1`
 
 websearch技能支持通过以下参数显式设置代理：
 
@@ -40,74 +163,6 @@ websearch技能支持通过以下参数显式设置代理：
 代理配置优先级：命令行参数 > 环境变量 > 无代理
 
 注意：当前使用的HTTP客户端对no_proxy的支持有限，代理会对所有请求生效。
-
-## 基本搜索
-
-```bash
-{baseDir}/bin/volc-websearch "搜索词"
-{baseDir}/bin/volc-websearch "搜索词" --count 15
-```
-
-## 常用参数
-
-- `--count <n>`：返回条数，默认 15，最多 50 条
-- `--type <type>`：当前仅支持 `web`
-- `--time-range <range>`：时间范围，可选 `OneDay`、`OneWeek`、`OneMonth`、`OneYear`，或日期区间 `2024-12-30..2025-12-30`
-- `--sites <a|b>`：限定站点搜索，多个站点用 `|` 分隔
-- `--block-hosts <a|b>`：排除站点，多个站点用 `|` 分隔
-- `--auth-level 1`：优先权威来源，主要作用于火山源，同时参与融合重排
-- `--http-proxy <url>`：HTTP代理URL，会覆盖环境变量HTTP_PROXY
-- `--https-proxy <url>`：HTTPS代理URL，会覆盖环境变量HTTPS_PROXY
-- `--no-proxy <hosts>`：不使用代理的主机列表，多个主机用逗号分隔，会覆盖环境变量NO_PROXY
-
-## 模式选择
-
-- 自动选择引擎：`--engine auto`（默认，智能选择最优搜索引擎）
-- 选择特定引擎：`--engine tavily`、`--engine bocha`、`--engine brave`、`--engine volc`
-- 用 `web`：普通事实查询、网页检索、查官网内容
-- 加 `--time-range`：用户关心最近动态、新闻、时效性内容
-- 加 `--sites`：用户指定官网、官方媒体、文档站或垂直站点
-- 加 `--auth-level 1`：医疗、政策、金融、科研等更看重可信度的主题
-
-### 自动选择逻辑
-
-auto 模式会根据以下因素自动选择最合适的搜索引擎：
-
-- 中文内容：优先选择 Bocha
-- 新闻查询：优先选择 Tavily
-- 技术文档：优先选择 Brave
-- 一般查询：默认选择 Tavily
-
-## 推荐用法示例
-
-```bash
-# 自动选择搜索引擎（推荐）
-{baseDir}/bin/volc-websearch "Claude AI 最新发布"
-
-# 强制使用 Tavily
-{baseDir}/bin/volc-websearch "Claude AI" --engine tavily
-
-# 强制使用 Brave（适合技术文档）
-{baseDir}/bin/volc-websearch "Claude AI API documentation" --engine brave
-
-# 强制使用 Bocha（适合中文内容）
-{baseDir}/bin/volc-websearch "Claude AI 中文介绍" --engine bocha
-
-# 强制使用火山引擎
-{baseDir}/bin/volc-websearch "Claude AI" --engine volc
-
-# 查最近新闻
-{baseDir}/bin/volc-websearch "OpenAI 最新发布" --time-range OneWeek
-
-# 查官网资料
-{baseDir}/bin/volc-websearch "Responses API 文档" --sites "platform.openai.com|openai.com"
-
-# 查权威来源
-{baseDir}/bin/volc-websearch "流感疫苗安全性" --auth-level 1
-
-# 使用代理（会覆盖环境变量）
-{baseDir}/bin/volc-websearch "AI 趋势" --http-proxy http://proxy.company.com:8080 --https-proxy http://proxy.company.com:8080 --no-proxy "localhost,127.0.0.1,.internal"
-```
 
 ## 回答规则
 
@@ -123,21 +178,11 @@ auto 模式会根据以下因素自动选择最合适的搜索引擎：
 - 缺少凭证：检查实际使用的搜索引擎对应的环境变量是否已设置
 - 需要查 API 参数、字段、错误码：打开 [references/docs-index.md](references/docs-index.md)
 - 如果返回权限错误，优先检查服务是否已开通、凭证是否有效、子账号是否已授权
+- 如果看起来“能搜到，但某些过滤条件没生效”，先对照上面的 provider 支持矩阵
 - 如果某个第三方搜索源返回结构变化，需要同步更新 Rust 侧 provider 解析逻辑
+- 如果强制指定 provider 且看到 warning，表示有部分结构化字段未被该 provider 原生支持
 - 代理配置：如果某个搜索源无法访问，尝试配置代理参数
 - 使用特定引擎时只返回该引擎的结果，不会进行融合或去重
-
-## 代理支持
-
-websearch技能支持通过以下参数显式设置代理：
-
-- `--http-proxy <url>`：HTTP代理URL，会覆盖环境变量HTTP_PROXY
-- `--https-proxy <url>`：HTTPS代理URL，会覆盖环境变量HTTPS_PROXY
-- `--no-proxy <hosts>`：配置了此参数但当前实现中会对所有请求使用代理
-
-代理配置优先级：命令行参数 > 环境变量 > 无代理
-
-注意：当前使用的HTTP客户端对no_proxy的支持有限，代理会对所有请求生效。当某个搜索源无法访问时，可以通过代理参数来解决问题。
 
 ## 参考资料
 

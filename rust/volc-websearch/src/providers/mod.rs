@@ -1,15 +1,17 @@
 use crate::models::*;
-use crate::config::Config;
+use crate::config::{Config, SearchIntent};
 use crate::sign;
+use serde_json::{Map, Value, json};
 use std::time::Duration;
 use std::env;
+use url::Url;
 
 const VOLC_HOST: &str = "mercury.volcengineapi.com";
 const VOLC_ACTION: &str = "WebSearch";
 const VOLC_VERSION: &str = "2025-01-01";
 const TAVILY_URL: &str = "https://api.tavily.com/search";
 const BOCHA_URL: &str = "https://api.bochaai.com/v1/web-search";
-const BRAVE_URL: &str = "https://api.search.brave.com/res/v1/web";
+const BRAVE_URL: &str = "https://api.search.brave.com/res/v1/web/search";
 
 fn agent(config: &Config) -> ureq::Agent {
     let mut builder = ureq::AgentBuilder::new()
@@ -82,7 +84,6 @@ pub struct RawSearchResult {
     pub url: String,
     pub content: String,
     pub published_date: Option<String>,
-    pub raw_data: String,
 }
 
 pub fn format_raw_results(results: &[RawSearchResult]) -> String {
@@ -103,21 +104,75 @@ pub fn format_raw_results(results: &[RawSearchResult]) -> String {
     output
 }
 
+pub fn format_summary_results(results: &[RawSearchResult]) -> String {
+    let mut output = String::new();
+    output.push_str("搜索摘要\n");
+
+    for (index, result) in results.iter().take(5).enumerate() {
+        let summary = compact_text(&result.content, 180);
+        output.push_str(&format!(
+            "{}. {}{}\n",
+            index + 1,
+            result.title,
+            if summary.is_empty() {
+                String::new()
+            } else {
+                format!(": {}", summary)
+            }
+        ));
+    }
+
+    output.push_str("\n来源\n");
+    for (index, result) in results.iter().enumerate() {
+        output.push_str(&format!(
+            "[{}] {} | {}\n",
+            index + 1,
+            result.title,
+            result.url
+        ));
+    }
+
+    output
+}
+
 fn fetch_tavily_raw(config: &Config) -> Result<Vec<TavilyResult>, String> {
-    let topic = if is_news_query(&config.time_range) { "news" } else { "general" };
-    let body = ureq::json!({
-        "query": config.query,
-        "topic": topic,
-        "max_results": config.count,
-        "include_answer": false,
-        "include_raw_content": true
-    });
+    let topic = tavily_topic(config);
+    let mut body = Map::new();
+    body.insert("query".to_string(), json!(config.query));
+    body.insert("topic".to_string(), json!(topic));
+    body.insert("max_results".to_string(), json!(config.count));
+    body.insert("include_answer".to_string(), json!(false));
+    body.insert("include_raw_content".to_string(), json!(false));
+
+    if let Some(freshness) = config.freshness {
+        body.insert(
+            "time_range".to_string(),
+            json!(freshness.as_tavily_time_range()),
+        );
+    }
+    if let Some(date_after) = config.date_after.as_deref() {
+        body.insert("start_date".to_string(), json!(date_after));
+    }
+    if let Some(date_before) = config.date_before.as_deref() {
+        body.insert("end_date".to_string(), json!(date_before));
+    }
+    if let Some(domains) = config.domain_filter.as_ref() {
+        body.insert("include_domains".to_string(), json!(domains));
+    }
+    if let Some(domains) = config.block_hosts.as_ref() {
+        body.insert("exclude_domains".to_string(), json!(domains));
+    }
+    if topic == "general" {
+        if let Some(country) = tavily_country_name(config.country.as_deref()) {
+            body.insert("country".to_string(), json!(country));
+        }
+    }
 
     let resp: TavilyResponse = agent(config)
         .post(TAVILY_URL)
         .set("Content-Type", "application/json")
         .set("Authorization", &format!("Bearer {}", config.tavily_api_key))
-        .send_json(body)
+        .send_json(Value::Object(body))
         .map_err(|e| format!("Tavily request failed: {}", e))?
         .into_json()
         .map_err(|e| format!("Tavily parse failed: {}", e))?;
@@ -151,13 +206,24 @@ fn fetch_bocha_raw(config: &Config) -> Result<Vec<BochaWebPage>, String> {
 }
 
 fn fetch_brave_raw(config: &Config) -> Result<Vec<BraveWebResult>, String> {
+    let mut url = Url::parse(BRAVE_URL).map_err(|e| format!("Brave URL parse failed: {}", e))?;
+    {
+        let mut pairs = url.query_pairs_mut();
+        pairs.append_pair("q", &config.query);
+        pairs.append_pair("count", &config.count.to_string());
+        pairs.append_pair("text_decorations", "false");
+        pairs.append_pair("spell", "false");
+
+        if let Some(country) = config.country.as_deref() {
+            pairs.append_pair("country", &country.to_ascii_lowercase());
+        }
+        if let Some(language) = config.language.as_deref() {
+            pairs.append_pair("search_lang", language);
+        }
+    }
+
     let resp: BraveResponse = agent(config)
-        .get(&format!(
-            "{}?q={}&count={}&text_decorations=false&spell=false",
-            BRAVE_URL,
-            urlencoding::encode(&config.query),
-            config.count
-        ))
+        .get(url.as_str())
         .set("X-Subscription-Token", &config.brave_api_key)
         .call()
         .map_err(|e| format!("Brave request failed: {}", e))?
@@ -176,9 +242,9 @@ fn fetch_volc_raw(config: &Config) -> Result<Vec<VolcWebResult>, String> {
     let req = crate::api::build_request(
         &config.query,
         config.count as u32,
-        config.sites.as_ref(),
+        config.domain_filter.as_ref(),
         config.block_hosts.as_ref(),
-        config.time_range.as_deref(),
+        config.volc_time_range().as_deref(),
         config.auth_level,
     );
     let body = serde_json::to_string(&req).map_err(|e| format!("Volc request serialize failed: {}", e))?;
@@ -214,8 +280,19 @@ fn fetch_volc_raw(config: &Config) -> Result<Vec<VolcWebResult>, String> {
         .unwrap_or_default())
 }
 
-fn is_news_query(time_range: &Option<String>) -> bool {
-    matches!(time_range.as_deref(), Some("OneDay" | "OneWeek" | "OneMonth"))
+fn is_news_query(config: &Config) -> bool {
+    matches!(config.intent, SearchIntent::News)
+        || matches!(config.freshness, Some(crate::config::Freshness::Pd | crate::config::Freshness::Pw | crate::config::Freshness::Pm))
+        || config.date_after.is_some()
+        || config.date_before.is_some()
+}
+
+fn tavily_topic(config: &Config) -> &'static str {
+    if matches!(config.intent, SearchIntent::News) || is_news_query(config) {
+        "news"
+    } else {
+        "general"
+    }
 }
 
 fn resolve_engines(config: &Config) -> Result<Vec<&'static str>, String> {
@@ -257,26 +334,53 @@ fn resolve_engines(config: &Config) -> Result<Vec<&'static str>, String> {
         || query_lower.contains("doc")
         || query_lower.contains("docs")
         || query_lower.contains("documentation");
-    let looks_like_news = is_news_query(&config.time_range)
+    let looks_like_news = is_news_query(config)
         || query_lower.contains("news")
         || query_lower.contains("latest")
         || query_lower.contains("最近")
         || query_lower.contains("最新")
         || query_lower.contains("今日")
         || query_lower.contains("今天");
+    let wants_geo = config.country.is_some() || config.language.is_some();
+    let wants_domains = config.domain_filter.is_some() || config.block_hosts.is_some();
+    let wants_dates = config.freshness.is_some() || config.date_after.is_some() || config.date_before.is_some();
+    let wants_sources = matches!(config.intent, SearchIntent::SourceFinding);
+    let wants_fact = matches!(config.intent, SearchIntent::Fact);
+
+    if wants_geo {
+        push_engine_if_available(&mut ordered, &available, "brave");
+        push_engine_if_available(&mut ordered, &available, "tavily");
+    }
+    if wants_domains {
+        push_engine_if_available(&mut ordered, &available, "tavily");
+        push_engine_if_available(&mut ordered, &available, "volc");
+    }
+    if wants_dates {
+        push_engine_if_available(&mut ordered, &available, "tavily");
+        push_engine_if_available(&mut ordered, &available, "volc");
+    }
+    if looks_like_news {
+        push_engine_if_available(&mut ordered, &available, "tavily");
+        push_engine_if_available(&mut ordered, &available, "bocha");
+        push_engine_if_available(&mut ordered, &available, "brave");
+    }
+    if wants_sources || looks_like_docs {
+        push_engine_if_available(&mut ordered, &available, "brave");
+        push_engine_if_available(&mut ordered, &available, "tavily");
+        push_engine_if_available(&mut ordered, &available, "volc");
+    }
+    if wants_fact {
+        push_engine_if_available(&mut ordered, &available, "brave");
+        push_engine_if_available(&mut ordered, &available, "tavily");
+        push_engine_if_available(&mut ordered, &available, "volc");
+    }
 
     if has_chinese {
         push_engine_if_available(&mut ordered, &available, "bocha");
     }
-    if looks_like_news {
-        push_engine_if_available(&mut ordered, &available, "tavily");
-    }
-    if looks_like_docs {
-        push_engine_if_available(&mut ordered, &available, "brave");
-    }
     push_engine_if_available(&mut ordered, &available, "tavily");
-    push_engine_if_available(&mut ordered, &available, "bocha");
     push_engine_if_available(&mut ordered, &available, "brave");
+    push_engine_if_available(&mut ordered, &available, "bocha");
     push_engine_if_available(&mut ordered, &available, "volc");
 
     Ok(ordered)
@@ -288,58 +392,78 @@ fn push_engine_if_available(ordered: &mut Vec<&'static str>, available: &[&'stat
     }
 }
 
+fn compact_text(input: &str, limit: usize) -> String {
+    let collapsed = input.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= limit {
+        return collapsed;
+    }
+    let mut shortened = collapsed.chars().take(limit).collect::<String>();
+    shortened.push_str("...");
+    shortened
+}
+
+fn tavily_country_name(country: Option<&str>) -> Option<&'static str> {
+    match country? {
+        "CN" => Some("china"),
+        "US" => Some("united states"),
+        "GB" => Some("united kingdom"),
+        "UK" => Some("united kingdom"),
+        "JP" => Some("japan"),
+        "KR" => Some("south korea"),
+        "SG" => Some("singapore"),
+        "DE" => Some("germany"),
+        "FR" => Some("france"),
+        "CA" => Some("canada"),
+        "AU" => Some("australia"),
+        "IN" => Some("india"),
+        _ => None,
+    }
+}
+
 fn map_tavily_results(items: Vec<TavilyResult>) -> Vec<RawSearchResult> {
     items.into_iter().map(|item| {
-        let item_clone = item.clone();
         RawSearchResult {
             engine: "Tavily".to_string(),
             title: item.title.unwrap_or_default(),
             url: item.url.unwrap_or_default(),
             content: item.content.unwrap_or_default(),
             published_date: item.published_date,
-            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
         }
     }).collect()
 }
 
 fn map_bocha_results(items: Vec<BochaWebPage>) -> Vec<RawSearchResult> {
     items.into_iter().map(|item| {
-        let item_clone = item.clone();
         RawSearchResult {
             engine: "Bocha".to_string(),
             title: item.name.unwrap_or_default(),
             url: item.url.unwrap_or_default(),
             content: item.summary.or(item.snippet).unwrap_or_default(),
             published_date: item.date_published,
-            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
         }
     }).collect()
 }
 
 fn map_brave_results(items: Vec<BraveWebResult>) -> Vec<RawSearchResult> {
     items.into_iter().map(|item| {
-        let item_clone = item.clone();
         RawSearchResult {
             engine: "Brave".to_string(),
             title: item.title.unwrap_or_default(),
             url: item.url.unwrap_or_default(),
             content: item.description.or(item.snippet).unwrap_or_default(),
             published_date: item.published_at,
-            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
         }
     }).collect()
 }
 
 fn map_volc_results(items: Vec<VolcWebResult>) -> Vec<RawSearchResult> {
     items.into_iter().map(|item| {
-        let item_clone = item.clone();
         RawSearchResult {
             engine: "Volc".to_string(),
             title: item.title.unwrap_or_default(),
             url: item.url.unwrap_or_default(),
             content: item.summary.or(item.snippet).unwrap_or_default(),
             published_date: item.publish_time,
-            raw_data: serde_json::to_string(&item_clone).unwrap_or_default(),
         }
     }).collect()
 }
