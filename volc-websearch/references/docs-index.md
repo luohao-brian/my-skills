@@ -86,7 +86,6 @@
 | Brave | 已通过 | 验证过 `country`、`language`；当前代码使用 `/res/v1/web/search` |
 | Bocha | 已通过 | 验证过中文基础搜索链路 |
 | Volc | 已通过 | 验证过 `domain_filter`、`date_after/date_before`、`intent`、`result_type=summary` |
-| auto | 已通过 | 验证过自动选源和 fallback |
 
 ### 请求
 

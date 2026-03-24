@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | `volc-gen` | `volc-gen/` | `volc-gen` | 文生图、图生图、图生视频、任务查询 |
 | `volc-speech` | `volc-speech/` | `volc-speech` | 文本转语音（TTS）、语音转文本（STT） |
-| `volc-websearch` | `volc-websearch/` | `volc-websearch` | 多搜索源网页搜索，支持结构化参数层与自动选源 |
+| `volc-websearch` | `volc-websearch/` | `volc-websearch` | 多搜索源网页搜索，支持结构化参数层与显式多引擎检索 |
 
 ## 仓库结构
 
@@ -189,7 +189,7 @@ bash scripts/regression/verify-volc-websearch.sh --live
 - Brave：地域、语言
 - Bocha：中文基础搜索
 - Volc：日期范围、站点过滤、摘要输出
-- auto：自动选源与 fallback
+- 手动多引擎：按日期、语言、站点约束显式组合 tavily / bocha / brave / volc
 
 更详细的支持矩阵和示例见 [volc-websearch/SKILL.md](/Users/bytedance/Documents/my-skills/volc-websearch/SKILL.md)。
 

@@ -17,7 +17,6 @@ tavily_out="$(cargo_out volc-websearch-tavily)"
 brave_out="$(cargo_out volc-websearch-brave)"
 bocha_out="$(cargo_out volc-websearch-bocha)"
 volc_out="$(cargo_out volc-websearch-volc)"
-auto_out="$(cargo_out volc-websearch-auto)"
 
 run_capture "unit tests" "$test_out" cargo test -p volc-websearch --manifest-path "$RUST_DIR/Cargo.toml"
 assert_contains "$test_out" "test result: ok." "volc-websearch tests pass"
@@ -58,19 +57,4 @@ if [[ -n "${VE_ACCESS_KEY:-}" && -n "${VE_SECRET_KEY:-}" ]]; then
   assert_contains "$volc_out" "结果数:" "volc smoke returns results"
 else
   skip "VE_ACCESS_KEY/VE_SECRET_KEY missing; skipping Volc smoke"
-fi
-
-has_any_search_creds=0
-if [[ -n "${TAVILY_API_KEY:-}" || -n "${BRAVE_API_KEY:-}" || -n "${BOCHA_API_KEY:-}" ]]; then
-  has_any_search_creds=1
-fi
-if [[ -n "${VE_ACCESS_KEY:-}" && -n "${VE_SECRET_KEY:-}" ]]; then
-  has_any_search_creds=1
-fi
-
-if [[ "$has_any_search_creds" == "1" ]]; then
-  run_capture "live auto smoke" "$auto_out" cargo run -q -p volc-websearch --manifest-path "$RUST_DIR/Cargo.toml" -- --engine auto --freshness pw --country US --language en --count 3 "AI agent progress"
-  assert_contains "$auto_out" "结果数:" "auto smoke returns results"
-else
-  skip "no search credentials found; skipping auto smoke"
 fi

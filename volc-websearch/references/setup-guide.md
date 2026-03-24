@@ -144,7 +144,7 @@ export VE_SECRET_KEY="your_secret_access_key"
 ## 第五步：验证调用
 
 ```bash
-volc-websearch "社会新闻" --date-after 2026-03-24 --date-before 2026-03-24 --count 5
+volc-websearch "社会新闻" --engine tavily --date-after 2026-03-24 --date-before 2026-03-24 --count 5
 ```
 
 如果看到搜索结果输出，说明配置成功。

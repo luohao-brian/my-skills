@@ -296,100 +296,13 @@ fn tavily_topic(config: &Config) -> &'static str {
 }
 
 fn resolve_engines(config: &Config) -> Result<Vec<&'static str>, String> {
-    if config.engine != "auto" {
-        return Ok(vec![match config.engine.as_str() {
-            "tavily" => "tavily",
-            "bocha" => "bocha",
-            "brave" => "brave",
-            "volc" => "volc",
-            _ => return Err("Invalid engine specified".to_string()),
-        }]);
-    }
-
-    let mut available = Vec::new();
-    if !config.bocha_api_key.is_empty() {
-        available.push("bocha");
-    }
-    if !config.tavily_api_key.is_empty() {
-        available.push("tavily");
-    }
-    if !config.brave_api_key.is_empty() {
-        available.push("brave");
-    }
-    if !config.ve_access_key.is_empty() && !config.ve_secret_key.is_empty() {
-        available.push("volc");
-    }
-    if available.is_empty() {
-        return Err(
-            "No search provider credentials found. Configure at least one of: TAVILY_API_KEY, BOCHA_API_KEY, BRAVE_API_KEY, VE_ACCESS_KEY + VE_SECRET_KEY"
-                .to_string(),
-        );
-    }
-
-    let mut ordered = Vec::new();
-    let query_lower = config.query.to_lowercase();
-    let has_chinese = config.query.chars().any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch));
-    let looks_like_docs = query_lower.contains("api")
-        || query_lower.contains("sdk")
-        || query_lower.contains("doc")
-        || query_lower.contains("docs")
-        || query_lower.contains("documentation");
-    let looks_like_news = is_news_query(config)
-        || query_lower.contains("news")
-        || query_lower.contains("latest")
-        || query_lower.contains("最近")
-        || query_lower.contains("最新")
-        || query_lower.contains("今日")
-        || query_lower.contains("今天");
-    let wants_geo = config.country.is_some() || config.language.is_some();
-    let wants_domains = config.domain_filter.is_some() || config.block_hosts.is_some();
-    let wants_dates = config.freshness.is_some() || config.date_after.is_some() || config.date_before.is_some();
-    let wants_sources = matches!(config.intent, SearchIntent::SourceFinding);
-    let wants_fact = matches!(config.intent, SearchIntent::Fact);
-
-    if wants_geo {
-        push_engine_if_available(&mut ordered, &available, "brave");
-        push_engine_if_available(&mut ordered, &available, "tavily");
-    }
-    if wants_domains {
-        push_engine_if_available(&mut ordered, &available, "tavily");
-        push_engine_if_available(&mut ordered, &available, "volc");
-    }
-    if wants_dates {
-        push_engine_if_available(&mut ordered, &available, "tavily");
-        push_engine_if_available(&mut ordered, &available, "volc");
-    }
-    if looks_like_news {
-        push_engine_if_available(&mut ordered, &available, "tavily");
-        push_engine_if_available(&mut ordered, &available, "bocha");
-        push_engine_if_available(&mut ordered, &available, "brave");
-    }
-    if wants_sources || looks_like_docs {
-        push_engine_if_available(&mut ordered, &available, "brave");
-        push_engine_if_available(&mut ordered, &available, "tavily");
-        push_engine_if_available(&mut ordered, &available, "volc");
-    }
-    if wants_fact {
-        push_engine_if_available(&mut ordered, &available, "brave");
-        push_engine_if_available(&mut ordered, &available, "tavily");
-        push_engine_if_available(&mut ordered, &available, "volc");
-    }
-
-    if has_chinese {
-        push_engine_if_available(&mut ordered, &available, "bocha");
-    }
-    push_engine_if_available(&mut ordered, &available, "tavily");
-    push_engine_if_available(&mut ordered, &available, "brave");
-    push_engine_if_available(&mut ordered, &available, "bocha");
-    push_engine_if_available(&mut ordered, &available, "volc");
-
-    Ok(ordered)
-}
-
-fn push_engine_if_available(ordered: &mut Vec<&'static str>, available: &[&'static str], engine: &'static str) {
-    if available.contains(&engine) && !ordered.contains(&engine) {
-        ordered.push(engine);
-    }
+    Ok(vec![match config.engine.as_str() {
+        "tavily" => "tavily",
+        "bocha" => "bocha",
+        "brave" => "brave",
+        "volc" => "volc",
+        _ => return Err("Invalid engine specified".to_string()),
+    }])
 }
 
 fn compact_text(input: &str, limit: usize) -> String {

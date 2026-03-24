@@ -60,8 +60,8 @@ pub struct Cli {
     #[arg(short = 't', long = "type", default_value = "web", hide = true)]
     pub search_type: String,
 
-    /// Search engine to use: auto, tavily, bocha, brave, volc
-    #[arg(long, default_value = "auto")]
+    /// Search engine to use: tavily, bocha, brave, volc
+    #[arg(long)]
     pub engine: String,
 
     /// Number of results to return
@@ -164,9 +164,9 @@ impl Config {
         }
 
         // Validate engine
-        let valid_engines = ["auto", "tavily", "bocha", "brave", "volc"];
+        let valid_engines = ["tavily", "bocha", "brave", "volc"];
         if !valid_engines.contains(&cli.engine.as_str()) {
-            return Err("--engine must be one of: auto, tavily, bocha, brave, volc".to_string());
+            return Err("--engine must be one of: tavily, bocha, brave, volc".to_string());
         }
 
         let query = cli.query.trim().to_string();
@@ -287,10 +287,6 @@ impl Config {
     }
 
     pub fn forced_engine_warnings(&self) -> Vec<String> {
-        if self.engine == "auto" {
-            return Vec::new();
-        }
-
         let mut warnings = Vec::new();
         match self.engine.as_str() {
             "bocha" => {
