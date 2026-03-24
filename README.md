@@ -5,6 +5,7 @@
 ## 项目结构
 
 - `volc-gen/`: 调用火山引擎 Ark API 进行内容生成的技能，支持文生图、图生图及图生视频。
+- `volc-speech/`: 调用火山引擎语音接口的技能，支持文本转语音和语音转文本。
 - `cli/`: 各技能共享的命令行工具目录（如 `volc`）。
 - `install-cli.sh`: 将 `cli/` 下命令安装到 `/usr/local/bin`。
 - `uninstall-cli.sh`: 从 `/usr/local/bin` 卸载 `cli/` 下命令。

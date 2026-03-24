@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CLI_DIR="$SCRIPT_DIR/../cli"
-BINS="volc-gen volc-websearch"
+BINS="volc-gen volc-speech volc-websearch"
 BUILD_MODE="${1:-local}"
 HOST_OS="$(uname -s)"
 

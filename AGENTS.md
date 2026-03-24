@@ -5,6 +5,7 @@
 这是一个本地 Skills 仓库，当前主要包含两个面向 OpenClaw 的技能：
 
 - `volc-gen/`：调用火山引擎 Ark API 进行图像/视频生成
+- `volc-speech/`：调用火山引擎语音接口进行语音合成和语音识别
 - `volc-websearch/`：调用火山引擎联网搜索 API 获取网页结果
 
 仓库同时维护这些技能对应的 Rust 二进制、分发产物和技能规范文档。
@@ -12,11 +13,13 @@
 ## 目录结构
 
 - `volc-gen/`：技能目录，入口是 `SKILL.md`
+- `volc-speech/`：技能目录，入口是 `SKILL.md`
 - `volc-websearch/`：技能目录，入口是 `SKILL.md`
 - `volc-websearch/references/`：该技能的按需参考文档
 - `docs/OPENCLAW-SKILL.md`：本仓库编写技能时遵循的规范摘要
 - `rust/`：Rust workspace
 - `rust/volc-gen/`：`volc-gen` 的 CLI 实现
+- `rust/volc-speech/`：`volc-speech` 的 CLI 实现
 - `rust/volc-websearch/`：`volc-websearch` 的 CLI 实现
 - `cli/macos/`：构建后的 macOS 二进制输出目录
 - `cli/linux/`：构建后的 Linux 二进制输出目录

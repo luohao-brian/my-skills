@@ -35,7 +35,7 @@ bundle_skill() {
 
     # Copy skill files (SKILL.md, references/, etc.)
     # Use rsync to exclude hidden files and strip macOS extended attributes
-    rsync -a --exclude='.*' "$skill_src/" "$staging/"
+    rsync -a --exclude='.*' --exclude='README.md' "$skill_src/" "$staging/"
 
     # Copy binary and strip xattr
     cp "$bin_src" "$staging/bin/$bin"
@@ -59,6 +59,9 @@ bundle_skill() {
 echo ""
 echo "==> Bundling volc-gen..."
 bundle_skill "volc-gen" "volc-gen"
+
+echo "==> Bundling volc-speech..."
+bundle_skill "volc-speech" "volc-speech"
 
 echo "==> Bundling volc-websearch..."
 bundle_skill "volc-websearch" "volc-websearch"
