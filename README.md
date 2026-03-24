@@ -93,6 +93,45 @@ tar xzf dist/volc-speech-macos.tar.gz -C ~/.agents/skills/
 
 如果要覆盖旧版本，先删旧目录再解压。
 
+### 5. 运行仓库级回归脚本
+
+这些脚本只服务仓库维护，不会进入最终 skill 安装包。
+
+静态 smoke：
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+bash scripts/regression/verify-all.sh
+```
+
+只跑某一个 skill：
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+bash scripts/regression/verify-all.sh volc-websearch
+```
+
+带真实凭证跑联调：
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+bash scripts/regression/verify-all.sh --live
+```
+
+也可以单独跑：
+
+```bash
+bash scripts/regression/verify-volc-gen.sh
+bash scripts/regression/verify-volc-speech.sh
+bash scripts/regression/verify-volc-websearch.sh
+```
+
+单独脚本需要联调时，直接追加 `--live`：
+
+```bash
+bash scripts/regression/verify-volc-websearch.sh --live
+```
+
 ## skill 与 README 的关系
 
 每个 skill 至少包含：
