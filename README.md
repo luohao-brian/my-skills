@@ -1,72 +1,151 @@
-# My Skills
+# my-skills
 
-这是一个通用的 Agent 技能（Skills）集合仓库。这里的技能遵循通用的规范，可以通过 `skills` 工具安装并管理，供各种 Code Agents（如 Gemini CLI 等）调用。
+这是一个面向本地 Agent / OpenClaw 生态维护的 skills 仓库。仓库同时包含：
 
-## 项目结构
+- skills 目录：给运行时加载的 `SKILL.md` 和按需参考文档
+- Rust CLI：每个 skill 对应的实际命令实现
+- 平台二进制：输出到 `cli/macos/` 和 `cli/linux/`
+- skill bundle：输出到 `dist/*.tar.gz`，用于安装到技能目录
 
-- `volc-gen/`: 调用火山引擎 Ark API 进行内容生成的技能，支持文生图、图生图及图生视频。
-- `volc-speech/`: 调用火山引擎语音接口的技能，支持文本转语音和语音转文本。
-- `cli/`: 各技能共享的命令行工具目录（如 `volc`）。
-- `install-cli.sh`: 将 `cli/` 下命令安装到 `/usr/local/bin`。
-- `uninstall-cli.sh`: 从 `/usr/local/bin` 卸载 `cli/` 下命令。
+当前这个仓库不是“单纯放说明文档”的仓库，而是完整的技能源码仓库。
 
-## 安装与使用
+## 当前技能
 
-1. 安装 CLI 命令到系统路径：
-   ```bash
-   cd /Users/bytedance/Documents/my-skills
-   ./install-cli.sh
-   ```
-   如果当前用户对 `/usr/local/bin` 没有写权限，请使用：
-   ```bash
-   sudo ./install-cli.sh
-   ```
+| 技能 | 目录 | CLI | 能力 |
+| --- | --- | --- | --- |
+| `volc-gen` | `volc-gen/` | `volc-gen` | 文生图、图生图、图生视频、任务查询 |
+| `volc-speech` | `volc-speech/` | `volc-speech` | 文本转语音（TTS）、语音转文本（STT） |
+| `volc-websearch` | `volc-websearch/` | `volc-websearch` | 多搜索源融合网页搜索 |
 
-2. 安装后即可直接执行命令（以 `volc` 为例）：
-   ```bash
-   volc query
-   volc t2i "一只赛博朋克风格的猫"
-   ```
+## 仓库结构
 
-3. 卸载 CLI 命令：
-   ```bash
-   ./uninstall-cli.sh
-   ```
-   无权限时同样可使用 `sudo ./uninstall-cli.sh`。
-
-## 依赖
-
-当前已包含的 `volc` 命令依赖以下系统工具：
-
-- `curl`
-- `jq`
-
-安装示例：
-
-```bash
-# macOS (Homebrew)
-brew install curl jq
-
-# Ubuntu / Debian
-sudo apt-get update
-sudo apt-get install -y curl jq
+```text
+my-skills/
+├── volc-gen/                  # skill 入口和 references
+├── volc-speech/               # skill 入口和 references
+├── volc-websearch/            # skill 入口和 references
+├── rust/                      # Rust workspace
+│   ├── volc-gen/
+│   ├── volc-speech/
+│   └── volc-websearch/
+├── cli/
+│   ├── macos/                 # 构建后的 macOS 二进制
+│   └── linux/                 # 构建后的 Linux 二进制
+├── dist/                      # skill bundle 输出目录
+├── build-skill-bundle.sh      # 构建并打包 skills
+├── install-cli.sh             # 安装 CLI 到 /usr/local/bin
+└── uninstall-cli.sh           # 从 /usr/local/bin 卸载 CLI
 ```
 
-## 环境变量配置
+## 常用工作流
 
-`volc` 需要设置火山引擎 Ark API Key：
-
-```bash
-export ARK_API_KEY="your-volcengine-api-key"
-```
-
-建议写入 shell 配置文件（如 `~/.bashrc` 或 `~/.zshrc`）：
+### 1. 只构建本机 Rust CLI
 
 ```bash
-echo 'export ARK_API_KEY="your-volcengine-api-key"' >> ~/.bashrc
-source ~/.bashrc
+cd /Users/bytedance/Documents/my-skills/rust
+bash build.sh
 ```
 
-## 兼容性
+输出：
 
-本项目中的技能旨在兼容支持标准 Skill 协议的 AI 助手和 CLI 工具。
+- macOS：`cli/macos/`
+- Linux：`cli/linux/`（依赖 `cargo-zigbuild` 或 `cross`，缺失时会跳过）
+
+### 2. 生成 skill bundle
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+bash build-skill-bundle.sh
+```
+
+输出：
+
+- `dist/volc-gen-*.tar.gz`
+- `dist/volc-speech-*.tar.gz`
+- `dist/volc-websearch-*.tar.gz`
+
+### 3. 安装 CLI 到 `/usr/local/bin`
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+./install-cli.sh
+```
+
+无权限时：
+
+```bash
+sudo ./install-cli.sh
+```
+
+卸载：
+
+```bash
+./uninstall-cli.sh
+```
+
+### 4. 安装 skill 到本地 agent 目录
+
+如果你本地使用的是 `~/.agents/skills`：
+
+```bash
+tar xzf dist/volc-speech-macos.tar.gz -C ~/.agents/skills/
+```
+
+如果要覆盖旧版本，先删旧目录再解压。
+
+## skill 与 README 的关系
+
+每个 skill 至少包含：
+
+- `SKILL.md`：运行时入口，给 agent 看
+- `references/`：按需加载的参考文档
+
+有些 skill 还会额外带一个仓库内 `README.md`，例如 `volc-speech/README.md`。这个 README：
+
+- 只给人看
+- 不应该进入最终 skill 安装包
+- 当前打包脚本已经显式排除了 `README.md`
+
+## 环境变量策略
+
+不同 skill 的环境变量策略不同，不要再假设整个仓库只有一套统一前缀。
+
+### `volc-gen`
+
+- 主要使用：`ARK_API_KEY`
+
+### `volc-speech`
+
+- TTS 使用：`VOLC_TTS_*`
+- STT 使用：`VOLC_STT_*`
+- 兼容 fallback：`VOLC_AUDIO_*` 以及旧版 demo 变量
+
+### `volc-websearch`
+
+- 视所选搜索源决定，常见包括：
+- `TAVILY_API_KEY`
+- `BOCHA_API_KEY`
+- `BRAVE_API_KEY`
+- `VE_ACCESS_KEY`
+- `VE_SECRET_KEY`
+
+最稳妥的做法是：以各 skill 自己的 `SKILL.md` 和 `references/setup-guide.md` 为准。
+
+## 推荐阅读顺序
+
+如果你要维护某个 skill，建议按这个顺序看：
+
+1. 先看对应 skill 的 `SKILL.md`
+2. 再看 skill 自己的 `references/`
+3. 需要改命令行为时，再看 `rust/<skill>/`
+4. 需要改打包行为时，再看 `build-skill-bundle.sh`
+
+## 当前状态
+
+这套仓库当前已经具备：
+
+- `volc-gen`：可构建、可打包、可安装
+- `volc-speech`：可构建、可打包、可安装，TTS / STT 都做过真实联调
+- `volc-websearch`：可构建、可打包、可安装
+
+如果你只想快速定位语音能力，直接看 [volc-speech/README.md](/Users/bytedance/Documents/my-skills/volc-speech/README.md)。
