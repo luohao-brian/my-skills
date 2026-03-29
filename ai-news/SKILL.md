@@ -9,10 +9,17 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 
 产出中文版 AI 新闻简报。核心不是“搜到一些链接”，而是按稳定 workflow 获取一手来源、用搜索补漏和交叉验证，再按统一格式成稿。
 
-先读：
+开始执行前，必须先读：
 
 - [sources.md](sources.md)：官方优先源、媒体补充源、搜索引擎分工
 - [format.md](format.md)：最终输出格式
+
+硬规则：
+
+1. 没有先读 `sources.md`，不要开始抓取。
+2. 没有先读 `format.md`，不要开始写结果。
+3. 开始写最终 markdown 前，必须再读一遍 [format.md](format.md)。
+4. 如果入口失败、跳转、返回 landing page、返回壳页面或信息价值存疑，先回到 [sources.md](sources.md) 查对应的访问说明、权重和替代入口，不要自己临时决定。
 
 ## 基本原则
 
@@ -57,7 +64,7 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 
 ### 1. 先扫官方源
 
-先读 [sources.md](sources.md) 里的“官方一级优先源矩阵”，优先看这些公司的官方页面：
+先读 [sources.md](sources.md) 里的“官方一级优先源矩阵”和“信息源价值排序”，优先看这些公司的官方页面：
 
 - OpenAI
 - Anthropic
@@ -80,7 +87,7 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 
 ### 2. 再扫媒体与聚合源
 
-再读 [sources.md](sources.md) 里的“媒体与聚合补充源矩阵”。
+再读 [sources.md](sources.md) 里的“媒体与聚合补充源矩阵”和“低权重源处理建议”。
 
 这些源只做三件事：
 
@@ -93,6 +100,8 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 ### 3. 用搜索做补漏和交叉验证
 
 固定源之后，必须再做搜索补漏。不要停留在“官网 + 媒体”两层。
+
+开始搜索前，先回看 [sources.md](sources.md) 里的“搜索引擎分工”和“最低搜索覆盖要求”，不要临时发明搜索策略。
 
 搜索引擎使用要求：
 
