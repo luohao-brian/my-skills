@@ -11,7 +11,7 @@ fi
 
 skills=("$@")
 if [[ "${#skills[@]}" == 0 ]]; then
-  skills=(volc-gen volc-speech volc-websearch)
+  skills=(volc-gen volc-speech volc-websearch ai-news)
 fi
 
 run_skill() {
@@ -25,6 +25,9 @@ run_skill() {
       ;;
     volc-websearch)
       LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-websearch/verify.sh"
+      ;;
+    ai-news)
+      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/ai-news/verify.sh"
       ;;
     *)
       printf 'Unknown skill: %s\n' "$skill" >&2
