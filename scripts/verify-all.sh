@@ -18,13 +18,13 @@ run_skill() {
   local skill="$1"
   case "$skill" in
     volc-gen)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/verify-volc-gen.sh"
+      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-gen/verify.sh"
       ;;
     volc-speech)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/verify-volc-speech.sh"
+      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-speech/verify.sh"
       ;;
     volc-websearch)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/verify-volc-websearch.sh"
+      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-websearch/verify.sh"
       ;;
     *)
       printf 'Unknown skill: %s\n' "$skill" >&2
@@ -37,4 +37,4 @@ for skill in "${skills[@]}"; do
   run_skill "$skill"
 done
 
-printf '\nAll requested regression checks completed.\n'
+printf '\nAll requested verification checks completed.\n'

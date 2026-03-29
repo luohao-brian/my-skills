@@ -1,7 +1,7 @@
 ---
 name: volc-speech
 description: 使用火山引擎语音能力完成语音合成和语音识别，支持文本转语音(TTS)与本地音频转文本(STT)。当用户需要把文本生成语音、把录音转成文字、做字幕初稿、语音播报或验证语音接口时使用。
-homepage: https://www.volcengine.com/docs/6561/1354871
+homepage: https://github.com/luohao-brian/my-skills/tree/main/volc-speech
 metadata: {"openclaw":{"emoji":"🎙️"}}
 ---
 

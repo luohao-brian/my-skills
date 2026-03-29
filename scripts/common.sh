@@ -2,9 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 RUST_DIR="$ROOT_DIR/rust"
-TMP_DIR="${TMPDIR:-/tmp}/my-skills-regression"
+TMP_DIR="${TMPDIR:-/tmp}/my-skills-verification"
 mkdir -p "$TMP_DIR"
 
 LIVE_MODE="${LIVE_MODE:-0}"

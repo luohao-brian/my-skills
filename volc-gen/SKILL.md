@@ -1,6 +1,7 @@
 ---
 name: volc-gen
 description: 调用火山引擎 Ark API 生成图片和视频。支持文生图(t2i)、图生图(i2i)、图生视频(i2v)。当用户需要AI生成图片、编辑图片风格或将图片转为视频时使用。
+homepage: https://github.com/luohao-brian/my-skills/tree/main/volc-gen
 metadata: {"openclaw":{"requires":{"env":["ARK_API_KEY"]},"primaryEnv":"ARK_API_KEY","emoji":"🎨"}}
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: volc-websearch
 description: 使用 Tavily、Bocha、Brave、火山引擎执行网页搜索，支持“query 只写主题、其他约束结构化表达”的统一参数层与多引擎交叉检索。当用户需要查询最新资讯、搜索新闻、查官网资料、限定站点搜索或需要有来源支撑的回答时使用。
-homepage: https://www.volcengine.com/docs/85508/1650263
+homepage: https://github.com/luohao-brian/my-skills/tree/main/volc-websearch
 metadata: {"openclaw":{"requires":{"env":["TAVILY_API_KEY","BOCHA_API_KEY","BRAVE_API_KEY","VE_ACCESS_KEY","VE_SECRET_KEY"]},"emoji":"🔍"}}
 ---
 
