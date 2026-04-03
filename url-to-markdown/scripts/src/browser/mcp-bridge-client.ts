@@ -8,7 +8,7 @@ const SOCKET_PATH = path.join(os.tmpdir(), "url-to-markdown-mcp-bridge.sock");
 const BRIDGE_STARTUP_TIMEOUT_MS = 30_000;
 const BRIDGE_POLL_INTERVAL_MS = 250;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BRIDGE_SCRIPT_PATH = path.resolve(__dirname, "../../../../mcp-bridge.mjs");
+const BRIDGE_SCRIPT_PATH = path.resolve(__dirname, "../../mcp-bridge.mjs");
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

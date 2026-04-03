@@ -16,7 +16,7 @@ metadata: {"openclaw":{"skillKey":"url-to-markdown","emoji":"📝","os":["darwin
 - 已经有明确 URL，需要把网页正文转成 markdown 或 json
 - 需要抓文章页、帖子页、专栏页、讨论串或单个页面内容
 - 页面依赖 JavaScript 渲染，普通 HTTP 抓取不稳定
-- headless 抓取失败后，希望自动回退到日常 Chrome 复用登录态
+- headless 抓取失败后，希望自动回退到本机浏览器，通过本地 MCP bridge 和 `chrome-devtools-mcp --autoConnect` 复用你正在使用的浏览器登录态
 
 ## When Not to Use
 
@@ -28,8 +28,8 @@ metadata: {"openclaw":{"skillKey":"url-to-markdown","emoji":"📝","os":["darwin
 默认行为已经内置，不要求用户配置浏览器参数：
 
 1. 默认先用 skill 自己的无头后台浏览器抓取
-2. 如果检测到登录、验证码、Cloudflare 或无头抓取失败，再自动切到用户日常 Chrome
-3. 日常 Chrome 模式通过 skill 内部的本地 bridge 按需启动并短时常驻，减少重复授权弹窗
+2. 如果检测到登录、验证码、Cloudflare 或无头抓取失败，再自动切到交互回退链路
+3. 交互回退链路会按需启动 skill 内部的本地 MCP bridge，再由 `chrome-devtools-mcp --autoConnect` 连接你当前正在使用、已开启 remote debugging 的浏览器，减少重复授权弹窗
 
 ## CLI Setup
 
@@ -63,20 +63,20 @@ metadata: {"openclaw":{"skillKey":"url-to-markdown","emoji":"📝","os":["darwin
 - 自动保存目录：`./url-to-markdown/`
 - 默认输出格式：`markdown`
 - 默认先走无头后台浏览器
-- 需要用户介入时自动切到日常 Chrome
+- 需要用户介入时自动切到交互回退链路
 - 本地 MCP bridge 自动按需启动，空闲后自动退出
 
 如果只是把网页转成 markdown/json，通常不需要设置任何环境变量。
 
 ## Features
 
-- Chrome CDP 渲染完整页面 JavaScript
-- 默认无头后台抓取，失败后自动切到日常 Chrome
+- Chrome 渲染完整页面 JavaScript
+- 默认无头后台抓取，失败后自动切到 `local MCP bridge -> chrome-devtools-mcp --autoConnect -> 当前浏览器`
 - 站点适配器：X/Twitter、YouTube、Hacker News、generic(Defuddle)
 - 可检测并等待登录、验证码、Cloudflare 等交互门槛
 - 默认输出 markdown，支持 `--format json`
 - 可下载图片和视频到本地目录并重写 markdown 链接
-- 日常 Chrome 模式带本地 bridge 复用，减少重复授权
+- 交互回退模式带本地 bridge 复用，减少重复授权
 - 支持输出调试产物
 
 ## Usage
@@ -113,7 +113,7 @@ metadata: {"openclaw":{"skillKey":"url-to-markdown","emoji":"📝","os":["darwin
 | `--interaction-poll-interval <ms>` | 轮询间隔，默认 1500 |
 | `--download-media` | 下载图片/视频并重写 markdown 链接，需要配合 `--output` |
 | `--media-dir <dir>` | 媒体资源目录，默认与输出文件同级 |
-| `--cdp-url <url>` | 复用现有 Chrome CDP endpoint |
+| `--cdp-url <url>` | 显式复用现有 Chrome CDP endpoint；仅用于 direct CDP 模式，不影响自动交互回退链路 |
 | `--browser-path <path>` | 自定义 Chrome / Chromium 可执行文件 |
 | `--chrome-profile-dir <path>` | Chrome user data 目录 |
 | `--debug-dir <dir>` | 输出调试产物 |
@@ -136,8 +136,24 @@ metadata: {"openclaw":{"skillKey":"url-to-markdown","emoji":"📝","os":["darwin
 
 1. 默认先 headless 抓取
 2. 立刻检查 markdown 质量
-3. 如发现登录/CAPTCHA/Cloudflare 或内容明显不对，skill 会自动尝试切到日常 Chrome
+3. 如发现登录/CAPTCHA/Cloudflare 或内容明显不对，skill 会自动尝试切到交互回退链路
 4. 只有在自动恢复仍不够时，才手动使用 `--wait-for interaction` 或 `--wait-for force`
+
+## Interactive Fallback
+
+自动交互回退的预期链路是：
+
+```text
+headless -> local MCP bridge -> chrome-devtools-mcp --autoConnect -> 当前浏览器
+```
+
+说明：
+
+- 这里默认不是直连 `http://127.0.0.1:9222`
+- 你需要先手动打开自己的浏览器，并在 `chrome://inspect/#remote-debugging` 中开启 remote debugging
+- 当 headless 失败时，skill 会按需启动本地 MCP bridge，再由 `chrome-devtools-mcp --autoConnect` 请求接入当前浏览器
+- 如出现登录、验证码、授权确认或其他交互门槛，需要你在该浏览器中手动处理
+- `--cdp-url` 只用于你明确指定 direct CDP 模式，不会替代默认的自动交互回退机制
 
 ## Output Path Generation
 

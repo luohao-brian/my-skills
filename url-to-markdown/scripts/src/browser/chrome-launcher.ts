@@ -83,7 +83,9 @@ export async function connectChrome(options: ChromeConnectOptions): Promise<Chro
     return reused;
   }
 
-  options.logger?.warn(`No running Chrome debugger found for profile ${profileDir}. Launching Chrome with that profile.`);
+  options.logger?.warn(
+    `No reusable Chrome debugger was found for the configured skill profile ${profileDir}. Launching Chrome with that profile for this skill.`,
+  );
 
   const launchedChrome: LaunchedChrome = await launch({
     chromePath: options.browserPath,

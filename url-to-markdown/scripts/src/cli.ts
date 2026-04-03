@@ -9,7 +9,7 @@ import {
 import { normalizeUrl } from "./utils/url";
 
 export const HELP_TEXT = `
-web-fetch - Read a URL into Markdown or JSON with Chrome CDP
+web-fetch - Read a URL into Markdown or JSON with Chrome rendering
 
 Usage:
   web-fetch <url> [options]
@@ -22,12 +22,12 @@ Options:
   --download-media      Download adapter-reported media into ./imgs and ./videos, then rewrite markdown links
   --media-dir <dir>     Base directory for downloaded media. Defaults to the output directory
   --debug-dir <dir>     Write debug artifacts
-  --cdp-url <url>       Reuse an existing Chrome DevTools endpoint
+  --cdp-url <url>       Reuse an existing Chrome DevTools endpoint for direct CDP mode
   --browser-path <path> Explicit Chrome binary path
   --chrome-profile-dir <path>
                         Chrome user data dir. Defaults to WEB_FETCH_CHROME_PROFILE_DIR
                         or web-fetch/chrome-profile.
-  --headless            Launch a temporary headless Chrome if needed
+  --headless            Launch a temporary headless Chrome for the initial extraction pass
   --wait-for <mode>     Wait mode: interaction | force
                         interaction: start visible Chrome and auto-wait only when login or verification is required
                         force: start visible Chrome, then auto-continue after it detects login/challenge progress
@@ -58,7 +58,7 @@ Environment:
   URL_TO_MARKDOWN_ADAPTER                    Force adapter
   URL_TO_MARKDOWN_MEDIA_DIR                  Default media dir
   URL_TO_MARKDOWN_DEBUG_DIR                  Default debug dir
-  URL_TO_MARKDOWN_CDP_URL                    Default CDP endpoint
+  URL_TO_MARKDOWN_CDP_URL                    Default CDP endpoint for direct CDP mode
   URL_TO_MARKDOWN_BROWSER_PATH               Default browser path
   URL_TO_MARKDOWN_CHROME_PROFILE_DIR         Default Chrome profile dir
   WEB_FETCH_CHROME_PROFILE_DIR              Default Chrome profile dir alias
@@ -67,6 +67,7 @@ Examples:
   web-fetch https://example.com
   web-fetch https://example.com --format markdown --output article.md --download-media
   web-fetch https://example.com --format json --output article.json
+  web-fetch https://example.com --cdp-url http://127.0.0.1:9222
   web-fetch https://x.com/lennysan/status/2036483059407810640 --wait-for interaction
   web-fetch https://x.com/lennysan/status/2036483059407810640 --wait-for force
 `.trim();

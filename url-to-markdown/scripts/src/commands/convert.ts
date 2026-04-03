@@ -181,7 +181,7 @@ async function openCdpRuntime(
 
 async function openMcpRuntime(debugEnabled: boolean): Promise<RuntimeResources> {
   const logger = createLogger(debugEnabled);
-  logger.info("Switching to the user's daily Chrome session for interactive fallback.");
+  logger.info("Switching to interactive fallback via the local MCP bridge and Chrome DevTools MCP auto-connect.");
   const browser = await McpBrowserSession.open();
   await browser.bringToFront().catch(() => {});
   const network = new NoopNetworkJournal();
@@ -239,7 +239,11 @@ function createAdapterContext(
   };
 }
 
-function shouldSwitchToDailyChrome(runtime: RuntimeResources, result: { status: string } | null, error?: unknown): boolean {
+function shouldSwitchToInteractiveFallback(
+  runtime: RuntimeResources,
+  result: { status: string } | null,
+  error?: unknown,
+): boolean {
   if (runtime.kind !== "cdp" || runtime.interactive) {
     return false;
   }
@@ -425,8 +429,8 @@ export async function runConvertCommand(options: ConvertCommandOptions): Promise
     try {
       result = await activeAdapter.process(context);
     } catch (error) {
-      if (shouldSwitchToDailyChrome(runtime, null, error)) {
-        logger.info("Headless extraction failed; retrying in the user's daily Chrome session.");
+      if (shouldSwitchToInteractiveFallback(runtime, null, error)) {
+        logger.info("Headless extraction failed; retrying via the local MCP bridge and Chrome DevTools MCP auto-connect.");
         runtime = await reopenInteractiveRuntime(runtime, options, Boolean(options.debugDir));
         activeAdapter = genericAdapter;
         context = createAdapterContext(runtime, url, options, logger);
@@ -447,8 +451,8 @@ export async function runConvertCommand(options: ConvertCommandOptions): Promise
       }
     }
 
-    if (shouldSwitchToDailyChrome(runtime, result)) {
-      logger.info("Headless extraction needs user assistance; retrying in the user's daily Chrome session.");
+    if (shouldSwitchToInteractiveFallback(runtime, result)) {
+      logger.info("Headless extraction needs user assistance; retrying via the local MCP bridge and Chrome DevTools MCP auto-connect.");
       runtime = await reopenInteractiveRuntime(runtime, options, Boolean(options.debugDir));
       activeAdapter = genericAdapter;
       context = createAdapterContext(runtime, url, options, logger);
