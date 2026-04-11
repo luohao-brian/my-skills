@@ -57,6 +57,10 @@ bundle_skill() {
 
 # ---- Bundle each skill ----
 echo ""
+echo "==> Bundling my-fetch..."
+bundle_skill "my-fetch" "my-fetch"
+
+echo ""
 echo "==> Bundling volc-gen..."
 bundle_skill "volc-gen" "volc-gen"
 
@@ -73,5 +77,6 @@ ls -lh "$DIST_DIR"/*.tar.gz
 
 echo ""
 echo "To install a skill, extract the tarball:"
+echo "  tar xzf dist/my-fetch-macos.tar.gz -C ~/.openclaw/skills/"
 echo "  tar xzf dist/volc-gen-macos.tar.gz -C ~/.openclaw/skills/"
 echo "  tar xzf dist/volc-websearch-linux.tar.gz -C /path/to/workspace/skills/"

@@ -6,6 +6,7 @@
 
 | 技能 | 目录 | 实现入口 | 说明 |
 | --- | --- | --- | --- |
+| `my-fetch` | `my-fetch/` | `rust/my-fetch/` | 轻量网页抓取与正文提取 |
 | `volc-gen` | `volc-gen/` | `rust/volc-gen/` | 火山引擎图片与视频生成 |
 | `volc-speech` | `volc-speech/` | `rust/volc-speech/` | 火山引擎 TTS / STT |
 | `volc-websearch` | `volc-websearch/` | `rust/volc-websearch/` | 多搜索源网页搜索 |
@@ -17,6 +18,7 @@
 - [README_VOLC_SPEECH.md](/Users/hluo/Documents/my-skills/README_VOLC_SPEECH.md)
 - [README_VOLC_WEBSEARCH.md](/Users/hluo/Documents/my-skills/README_VOLC_WEBSEARCH.md)
 - [README_AI_NEWS.md](/Users/hluo/Documents/my-skills/README_AI_NEWS.md)
+- [README_MY_FETCH.md](/Users/bytedance/Documents/my-skills/README_MY_FETCH.md)
 
 
 ## 目录约定
@@ -30,6 +32,7 @@
 ```text
 scripts/
 ├── common.sh
+├── my-fetch/verify.sh
 ├── verify-all.sh
 ├── ai-news/verify.sh
 ├── volc-gen/verify.sh
@@ -65,6 +68,7 @@ bash scripts/verify-all.sh
 ```bash
 cd /Users/hluo/Documents/my-skills
 bash scripts/verify-all.sh volc-websearch
+bash scripts/verify-all.sh my-fetch
 ```
 
 带真实凭证联调：
@@ -76,5 +80,5 @@ bash scripts/verify-all.sh --live
 
 ## 安装说明
 
-- `volc-gen`、`volc-speech`、`volc-websearch`：通过 `build-skill-bundle.sh` 生成 bundle 后安装
+- `my-fetch`、`volc-gen`、`volc-speech`、`volc-websearch`：通过 `build-skill-bundle.sh` 生成 bundle 后安装
 - `ai-news`：推荐通过 GitHub 安装到 `my-cowork`，命令为 `skills add https://github.com/luohao-brian/my-skills --skill ai-news`

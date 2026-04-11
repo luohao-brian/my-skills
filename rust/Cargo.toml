@@ -1,3 +1,3 @@
 [workspace]
-members = ["volc-gen", "volc-speech", "volc-websearch"]
+members = ["my-fetch", "volc-gen", "volc-speech", "volc-websearch"]
 resolver = "2"
