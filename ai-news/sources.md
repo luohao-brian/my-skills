@@ -10,6 +10,14 @@
 4. 没有官网公告时，至少补两个独立详情页；社区和聚合站命中后，继续追官网或权威新闻站正文。
 5. 长期低质量入口不保留在固定清单里，直接改用品牌官方域名搜索。
 6. 不稳定入口直接用 `tavily` 搜索官方域名、品牌名、产品名。
+7. 抓不稳的入口，不放进固定来源清单。
+
+## 抓取失败策略
+
+1. 列表页抓不到时，用 `tavily` 搜索官方域名、品牌名、产品名。
+2. 详情页抓不到时，用 `tavily` 搜索文章标题、品牌名、站点域名。
+3. 补不到带明确发布时间的详情页时，跳过。
+4. 只有聚合摘要、没有正文支撑时，跳过。
 
 ## 官网 / 官方发布入口
 
@@ -19,7 +27,6 @@
 
 - `https://help.openai.com/en/articles/9624314-model-release-notes`
 - `https://help.openai.com/en/articles/6825453-chatgpt-release-notes`
-- `https://platform.openai.com/docs/changelog`
 - `https://openai.com/index/`
 - 使用方式
   - 用 Help Center release notes 和 `openai.com/index/`。
@@ -34,16 +41,13 @@
 
 ### Google AI / Gemini / DeepMind
 
-- `https://blog.google/innovation-and-ai/technology/ai/`
-- `https://blog.google/products/gemini/`
-- `https://deepmind.google/blog/`
+- `site:blog.google Gemini OR Google AI`
+- `site:deepmind.google Gemini OR Gemma OR DeepMind`
 - 使用方式
-  - 用 Google Blog 和 DeepMind Blog。
   - 用 `tavily` 搜索 `site:blog.google` 或 `site:deepmind.google`。
 
 ### xAI
 
-- `https://x.com/xai`
 - `site:x.ai Grok`
 - `site:grok.com Grok`
 - 使用方式
@@ -96,7 +100,6 @@
 
 ### DeepSeek
 
-- `https://www.deepseek.com/`
 - `site:deepseek.com DeepSeek`
 - 使用方式
   - 用 `tavily` 搜索 `site:deepseek.com DeepSeek`。
@@ -110,10 +113,10 @@
   - 国际产品发布、行业动态
 - `https://www.wired.com/feed/tag/ai/latest/rss`
   - 深度稿、趋势与治理
-- `https://techcrunch.com/feed/`
-  - 融资、创业、产品更新
 - `https://www.technologyreview.com/feed/`
   - 深度报道、安全 / 治理
+- `site:techcrunch.com AI startup funding model launch`
+  - 融资、创业、产品更新
 - 使用方式
   - 用 `tavily` 搜索站点结果，再打开详情页。
 

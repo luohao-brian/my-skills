@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CLI_DIR="$SCRIPT_DIR/../cli"
-BINS="volc-gen volc-speech volc-websearch"
+BINS="my-fetch volc-gen volc-speech volc-websearch"
 BUILD_MODE="${1:-local}"
 HOST_OS="$(uname -s)"
 
@@ -20,7 +20,7 @@ build_macos() {
     cp "target/$target/release/$bin" "$CLI_DIR/macos/$bin"
   done
   echo "    macOS binaries:"
-  ls -lh "$CLI_DIR"/macos/volc-*
+  ls -lh "$CLI_DIR"/macos/my-fetch "$CLI_DIR"/macos/volc-* 2>/dev/null || true
 }
 
 build_linux() {
@@ -36,21 +36,21 @@ build_linux() {
       cp "target/$target/release/$bin" "$CLI_DIR/linux/$bin"
     done
     echo "    Linux binaries:"
-    ls -lh "$CLI_DIR"/linux/volc-*
+    ls -lh "$CLI_DIR"/linux/my-fetch "$CLI_DIR"/linux/volc-* 2>/dev/null || true
   elif command -v cross &>/dev/null; then
     cross build --release --target "$target"
     for bin in $BINS; do
       cp "target/$target/release/$bin" "$CLI_DIR/linux/$bin"
     done
     echo "    Linux binaries:"
-    ls -lh "$CLI_DIR"/linux/volc-*
+    ls -lh "$CLI_DIR"/linux/my-fetch "$CLI_DIR"/linux/volc-* 2>/dev/null || true
   elif [[ "$(uname -s)" == "Linux" ]] && [[ "$(uname -m)" == "x86_64" ]]; then
     cargo build --release
     for bin in $BINS; do
       cp "target/release/$bin" "$CLI_DIR/linux/$bin"
     done
     echo "    Linux binaries:"
-    ls -lh "$CLI_DIR"/linux/volc-*
+    ls -lh "$CLI_DIR"/linux/my-fetch "$CLI_DIR"/linux/volc-* 2>/dev/null || true
   else
     echo "    SKIP: Install cargo-zigbuild or cross for Linux builds."
     echo "      cargo install cargo-zigbuild && brew install zig"

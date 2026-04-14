@@ -11,12 +11,15 @@ fi
 
 skills=("$@")
 if [[ "${#skills[@]}" == 0 ]]; then
-  skills=(volc-gen volc-speech volc-websearch ai-news)
+  skills=(my-fetch volc-gen volc-speech volc-websearch ai-news)
 fi
 
 run_skill() {
   local skill="$1"
   case "$skill" in
+    my-fetch)
+      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/my-fetch/verify.sh"
+      ;;
     volc-gen)
       LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-gen/verify.sh"
       ;;
