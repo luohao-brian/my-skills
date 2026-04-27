@@ -76,7 +76,7 @@ echo "==> Done. Bundles:"
 ls -lh "$DIST_DIR"/*.tar.gz
 
 echo ""
-echo "To install a skill, extract the tarball:"
-echo "  tar xzf dist/my-fetch-macos.tar.gz -C ~/.openclaw/skills/"
-echo "  tar xzf dist/volc-gen-macos.tar.gz -C ~/.openclaw/skills/"
-echo "  tar xzf dist/volc-websearch-linux.tar.gz -C /path/to/workspace/skills/"
+echo "To install a skill with OpenClaw, run:"
+echo "  openclaw plugins install $DIST_DIR/my-fetch-macos.tar.gz"
+echo "  openclaw plugins install $DIST_DIR/volc-gen-macos.tar.gz"
+echo "  openclaw plugins install $DIST_DIR/volc-websearch-linux.tar.gz"

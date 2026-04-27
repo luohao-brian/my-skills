@@ -4,14 +4,14 @@
 
 ## 目录与入口
 
-- skill：[`/Users/hluo/Documents/my-skills/ai-news/SKILL.md`](/Users/hluo/Documents/my-skills/ai-news/SKILL.md)
-- 新闻源配置：[`/Users/hluo/Documents/my-skills/ai-news/sources.md`](/Users/hluo/Documents/my-skills/ai-news/sources.md)
-- 输出格式：[`/Users/hluo/Documents/my-skills/ai-news/format.md`](/Users/hluo/Documents/my-skills/ai-news/format.md)
-- 仓库级验证：[`/Users/hluo/Documents/my-skills/scripts/ai-news/verify.sh`](/Users/hluo/Documents/my-skills/scripts/ai-news/verify.sh)
+- skill：[`/Users/bytedance/Documents/my-skills/ai-news/SKILL.md`](/Users/bytedance/Documents/my-skills/ai-news/SKILL.md)
+- 新闻源配置：[`/Users/bytedance/Documents/my-skills/ai-news/sources.md`](/Users/bytedance/Documents/my-skills/ai-news/sources.md)
+- 输出格式：[`/Users/bytedance/Documents/my-skills/ai-news/format.md`](/Users/bytedance/Documents/my-skills/ai-news/format.md)
+- 仓库级验证：[`/Users/bytedance/Documents/my-skills/scripts/ai-news/verify.sh`](/Users/bytedance/Documents/my-skills/scripts/ai-news/verify.sh)
 
 ## 安装
 
-### my-cowork GitHub 安装
+### 推荐安装方式
 
 ```bash
 skills add https://github.com/luohao-brian/my-skills --skill ai-news
@@ -23,9 +23,7 @@ skills add https://github.com/luohao-brian/my-skills --skill ai-news
 skills update https://github.com/luohao-brian/my-skills --skill ai-news
 ```
 
-### OpenClaw / 本地 Agent
-
-直接复制 [`/Users/hluo/Documents/my-skills/ai-news`](/Users/hluo/Documents/my-skills/ai-news) 到技能目录即可。
+这个 skill 本身不依赖单独 Rust 二进制，当前更推荐直接通过 GitHub 安装到 `my-cowork`，而不是手工复制目录。
 
 ## 输出约束
 
@@ -39,13 +37,13 @@ skills update https://github.com/luohao-brian/my-skills --skill ai-news
 静态校验：
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/ai-news/verify.sh
 ```
 
 带在线源检查：
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/ai-news/verify.sh --live
 ```

@@ -2,12 +2,15 @@
 
 ## 项目概览
 
-这是一个面向 OpenClaw / 本地 Agent 的 skills 源码仓库。当前包含四个主要技能：
+这是一个面向 OpenClaw / 本地 Agent 的 skills 源码仓库。当前主要包含这些技能：
 
+- `my-fetch/`：轻量网页抓取与正文提取
 - `volc-gen/`：火山引擎图片与视频生成
 - `volc-speech/`：火山引擎语音合成与语音识别
 - `volc-websearch/`：多搜索源网页搜索
 - `ai-news/`：中文版 AI 新闻简报编排
+- `ai-labs-tracker/`：追踪 OpenAI、Anthropic、Google DeepMind 最新动态
+- `reddit-oss-models/`：Reddit 开源模型热门讨论 weekly 简报
 
 仓库同时维护这些技能的：
 
@@ -18,12 +21,16 @@
 
 ## 当前目录结构
 
+- `my-fetch/`：skill 目录，入口是 `SKILL.md`
 - `volc-gen/`：skill 目录，入口是 `SKILL.md`
 - `volc-speech/`：skill 目录，入口是 `SKILL.md`
 - `volc-websearch/`：skill 目录，入口是 `SKILL.md`
 - `ai-news/`：skill 目录，入口是 `SKILL.md`
+- `ai-labs-tracker/`：skill 目录，入口是 `SKILL.md`
+- `reddit-oss-models/`：skill 目录，入口是 `SKILL.md`
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要
 - `rust/`：Rust workspace
+- `rust/my-fetch/`：`my-fetch` CLI
 - `rust/volc-gen/`：`volc-gen` CLI
 - `rust/volc-speech/`：`volc-speech` CLI
 - `rust/volc-websearch/`：`volc-websearch` CLI
@@ -46,9 +53,90 @@
 ## 工作方式
 
 - 如果任务是新增或修改某个技能，先读对应目录下的 `SKILL.md`。
+- 如果用户要找某个 skill，先在仓库根目录下匹配技能目录名，再确认该目录下存在 `SKILL.md`；不要凭记忆猜路径。
 - 如果任务是调整技能元信息、触发描述、OpenClaw metadata、安装方式或首页链接，优先修改对应 skill 的 `SKILL.md`。
 - 如果任务是调整 Rust CLI 参数、API 调用、签名逻辑、输出 JSON 或错误处理，修改 `rust/` 下对应 crate。
 - 如果任务涉及 skill 标准或前台展示字段，先参考 `docs/OPENCLAW-SKILL.md`，并以 OpenClaw 当前实际支持的 metadata 字段为准。
+
+## 当用户要求安装 skill 到 OpenClaw
+
+先确认用户要装的是哪个 skill，再按下面流程执行。
+
+### 1. 先定位目标 skill
+
+- 在仓库根目录查找 `*/SKILL.md`
+- 优先按目录名匹配用户给出的 skill 名
+- 命中后，先读该 skill 的 `SKILL.md`
+- 如果用户只描述功能、不知道 skill 名，先根据 `description` 和目录名判断最接近的 skill，再向用户说明你的匹配结果
+
+当前可直接定位的 skill 目录有：
+
+- `my-fetch/`
+- `volc-gen/`
+- `volc-speech/`
+- `volc-websearch/`
+- `ai-news/`
+- `ai-labs-tracker/`
+- `reddit-oss-models/`
+
+### 2. 判断安装路径
+
+- `my-fetch`、`volc-gen`、`volc-speech`、`volc-websearch`：先 build，再打 bundle，再安装到 OpenClaw
+- `ai-news`：优先通过 GitHub 安装到 `my-cowork`
+- `ai-labs-tracker`、`reddit-oss-models`：当前仓库里主要是规则型 skill，没有单独 Rust bundle；如果用户要求直接安装到 OpenClaw，先说明当前仓库未维护独立 bundle，再和用户确认要不要补本地安装流程或改成 GitHub / 技能目录安装
+
+### 3. Rust skill 的标准安装流程
+
+适用于：
+
+- `my-fetch`
+- `volc-gen`
+- `volc-speech`
+- `volc-websearch`
+
+执行顺序：
+
+1. 确认 Rust 环境可用：`rustup`、`cargo`
+2. 需要 Linux bundle 时，再确认 `cargo-zigbuild` 或 `cross`
+3. 在仓库根目录运行 `bash build-skill-bundle.sh`
+4. 在 `dist/` 下找到目标 skill 对应平台的 tarball
+5. 使用 OpenClaw 安装 tarball
+
+常用命令：
+
+```bash
+cd /Users/bytedance/Documents/my-skills
+bash build-skill-bundle.sh
+openclaw plugins install /Users/bytedance/Documents/my-skills/dist/my-fetch-macos.tar.gz
+```
+
+安装时按目标平台选择文件名：
+
+- macOS：`dist/<skill>-macos.tar.gz`
+- Linux：`dist/<skill>-linux.tar.gz`
+
+不要再让用户手工解压 `tar.gz` 到技能目录，优先用 OpenClaw 的安装命令。
+
+### 4. `ai-news` 的推荐安装流程
+
+`ai-news` 当前推荐直接安装到 `my-cowork`：
+
+```bash
+skills add https://github.com/luohao-brian/my-skills --skill ai-news
+```
+
+如果用户要更新：
+
+```bash
+skills update https://github.com/luohao-brian/my-skills --skill ai-news
+```
+
+### 5. 安装前后的检查点
+
+- 安装前确认目标 skill 对应的 `SKILL.md`、二进制、bundle 路径都存在
+- Rust skill 安装前，确认 `dist/` 里已经生成目标平台 tarball
+- 安装后，向用户明确你安装的是哪个 skill、用的是哪个文件或命令
+- 如果因为缺少 Rust、`cargo-zigbuild`、`cross`、OpenClaw CLI、外部凭证而没法完整安装，要明确卡点，不要笼统说“安装失败”
 
 ## Skill 约定
 
@@ -109,20 +197,32 @@
 
 ## 构建与打包
 
+按用途区分常用命令，不要只罗列命令本身：
+
+- `cargo build`
+  - 作用：编译整个 Rust workspace
+  - 适用场景：改了 Rust 逻辑后做最基础构建检查
+- `bash rust/build.sh`
+  - 作用：输出当前主机平台的 CLI 二进制到 `cli/`
+  - 适用场景：需要检查本机平台二进制，或为后续 bundle 打包做准备
+- `bash build-skill-bundle.sh`
+  - 作用：重新构建 Rust 二进制，并把对应 skill 和二进制一起打包到 `dist/*.tar.gz`
+  - 适用场景：需要把 `my-fetch`、`volc-gen`、`volc-speech`、`volc-websearch` 安装到 OpenClaw
+
 常用命令：
 
 ```bash
-cd /Users/hluo/Documents/my-skills/rust
+cd /Users/bytedance/Documents/my-skills/rust
 cargo build
 ```
 
 ```bash
-cd /Users/hluo/Documents/my-skills/rust
+cd /Users/bytedance/Documents/my-skills/rust
 bash build.sh
 ```
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash build-skill-bundle.sh
 ```
 
@@ -131,6 +231,7 @@ bash build-skill-bundle.sh
 - `rust/build.sh` 会输出 macOS 二进制到 `cli/macos/`。
 - Linux 二进制依赖 `cargo-zigbuild` 或 `cross`；缺少时脚本会跳过。
 - `build-skill-bundle.sh` 会重新构建 Rust 二进制，并把对应 skill 和二进制一起打包到 `dist/*.tar.gz`。
+
 ## 验证约定
 
 按改动范围选择最小可行验证：
@@ -154,6 +255,8 @@ bash build-skill-bundle.sh
 ```text
 scripts/
 ├── common.sh
+├── ai-news/verify.sh
+├── my-fetch/verify.sh
 ├── verify-all.sh
 ├── volc-gen/verify.sh
 ├── volc-speech/verify.sh

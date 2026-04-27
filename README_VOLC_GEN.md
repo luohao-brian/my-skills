@@ -1,6 +1,6 @@
 # README_VOLC_GEN
 
-`volc-gen` 是火山引擎 Ark 图像/视频生成 skill，对应实现位于 [`/Users/hluo/Documents/my-skills/rust/volc-gen`](/Users/hluo/Documents/my-skills/rust/volc-gen)。
+`volc-gen` 是火山引擎 Ark 图像/视频生成 skill，对应实现位于 [`/Users/bytedance/Documents/my-skills/rust/volc-gen`](/Users/bytedance/Documents/my-skills/rust/volc-gen)。
 
 ## 能力范围
 
@@ -11,8 +11,8 @@
 
 ## 运行入口
 
-- skill：[`/Users/hluo/Documents/my-skills/volc-gen/SKILL.md`](/Users/hluo/Documents/my-skills/volc-gen/SKILL.md)
-- Rust CLI：[`/Users/hluo/Documents/my-skills/rust/volc-gen/src/main.rs`](/Users/hluo/Documents/my-skills/rust/volc-gen/src/main.rs)
+- skill：[`/Users/bytedance/Documents/my-skills/volc-gen/SKILL.md`](/Users/bytedance/Documents/my-skills/volc-gen/SKILL.md)
+- Rust CLI：[`/Users/bytedance/Documents/my-skills/rust/volc-gen/src/main.rs`](/Users/bytedance/Documents/my-skills/rust/volc-gen/src/main.rs)
 
 ## 关键环境变量
 
@@ -23,13 +23,13 @@
 ## 最小验证
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/volc-gen/verify.sh
 ```
 
 带真实凭证：
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/volc-gen/verify.sh --live
 ```

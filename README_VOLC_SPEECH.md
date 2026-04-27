@@ -1,6 +1,6 @@
 # README_VOLC_SPEECH
 
-`volc-speech` 是火山引擎语音 skill，覆盖 TTS 和 STT，对应实现位于 [`/Users/hluo/Documents/my-skills/rust/volc-speech`](/Users/hluo/Documents/my-skills/rust/volc-speech)。
+`volc-speech` 是火山引擎语音 skill，覆盖 TTS 和 STT，对应实现位于 [`/Users/bytedance/Documents/my-skills/rust/volc-speech`](/Users/bytedance/Documents/my-skills/rust/volc-speech)。
 
 ## 能力范围
 
@@ -11,9 +11,9 @@
 
 ## 运行入口
 
-- skill：[`/Users/hluo/Documents/my-skills/volc-speech/SKILL.md`](/Users/hluo/Documents/my-skills/volc-speech/SKILL.md)
-- Rust CLI：[`/Users/hluo/Documents/my-skills/rust/volc-speech/src/main.rs`](/Users/hluo/Documents/my-skills/rust/volc-speech/src/main.rs)
-- 参考文档索引：[`/Users/hluo/Documents/my-skills/volc-speech/references/docs-index.md`](/Users/hluo/Documents/my-skills/volc-speech/references/docs-index.md)
+- skill：[`/Users/bytedance/Documents/my-skills/volc-speech/SKILL.md`](/Users/bytedance/Documents/my-skills/volc-speech/SKILL.md)
+- Rust CLI：[`/Users/bytedance/Documents/my-skills/rust/volc-speech/src/main.rs`](/Users/bytedance/Documents/my-skills/rust/volc-speech/src/main.rs)
+- 参考文档索引：[`/Users/bytedance/Documents/my-skills/volc-speech/references/docs-index.md`](/Users/bytedance/Documents/my-skills/volc-speech/references/docs-index.md)
 
 ## 推荐环境变量
 
@@ -32,13 +32,13 @@ STT：
 ## 最小验证
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/volc-speech/verify.sh
 ```
 
 带真实凭证：
 
 ```bash
-cd /Users/hluo/Documents/my-skills
+cd /Users/bytedance/Documents/my-skills
 bash scripts/volc-speech/verify.sh --live
 ```
