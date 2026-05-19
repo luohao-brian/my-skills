@@ -81,8 +81,15 @@ assert_contains "$AI_NEWS_DIR/format.md" "## 技术博客 / 工程实践" "forma
 assert_contains "$AI_NEWS_DIR/format.md" "## 产品 / 应用" "format defines product and application category"
 assert_contains "$AI_NEWS_DIR/format.md" "## 商业 / 融资" "format defines business and funding category"
 assert_contains "$AI_NEWS_DIR/format.md" "## 安全 / 治理" "format defines safety and governance category"
+assert_contains "$AI_NEWS_DIR/format.md" "## 排版规则" "format focuses on presentation rules"
 assert_contains "$AI_NEWS_DIR/format.md" "发布时间" "format requires published time"
 assert_contains "$AI_NEWS_DIR/format.md" "来源链接" "format requires source link"
+
+if rg -q '时间窗|只保留|覆盖不足|字段完整|来源提供|聚合日期页|重要性排序|候选|不要求严格按时间倒序' "$AI_NEWS_DIR/format.md"; then
+  fail "format.md must not duplicate source, screening, or workflow rules"
+else
+  pass "format.md only describes output structure and presentation"
+fi
 
 if rg -q 'bocha|brave|tavily|volc-websearch|搜索引擎分工|检索入口分工|抓取失败策略|来源补漏边界|官方回源|当前来源质量评估|不稳定入口|固定来源清单|来源质量|正文支撑|用 `tavily`|每次都覆盖|每次日报都要|候选集应覆盖中文来源|官方发布入口和技术来源|至少覆盖 Hugging Face|至少使用一个官方来源|重点品牌是否使用|追官方|回源原则|详情页和回源|按需入口' "$AI_NEWS_DIR/SKILL.md" "$AI_NEWS_DIR/sources.md" "$AI_NEWS_DIR/format.md" "$ROOT_DIR/README_AI_NEWS.md"; then
   fail "ai-news docs must not prescribe search engine behavior or old full-matrix coverage"
