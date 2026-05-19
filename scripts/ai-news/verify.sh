@@ -44,12 +44,16 @@ assert_contains "$AI_NEWS_DIR/SKILL.md" "记录来源不可用或候选字段不
 assert_contains "$AI_NEWS_DIR/SKILL.md" "是否先筛选候选，再核对入稿字段" "SKILL.md checks candidate filtering before field validation"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 日报扫描入口" "sources define daily scan entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "### 新闻 Feed" "sources define news feed entries"
+assert_contains "$AI_NEWS_DIR/sources.md" "### 英文聚合 Feed" "sources define English aggregation feed entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "### 中文聚合页" "sources define Chinese aggregation entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 用户点名时使用" "sources separate user-requested entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 官网和官博入口" "sources keep official and blog entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 技术博客入口" "sources define technical blog entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" "sources use The Verge AI RSS"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://techcrunch.com/category/artificial-intelligence/feed/" "sources use TechCrunch AI RSS"
+assert_contains "$AI_NEWS_DIR/sources.md" "https://tensorfeed.ai/api/news" "sources include TensorFeed JSON"
+assert_contains "$AI_NEWS_DIR/sources.md" "https://www.dailydoseofai.tech/rss.xml" "sources include AI Dose RSS"
+assert_contains "$AI_NEWS_DIR/sources.md" "只有 \`Article URL\` / \`Comments URL\` / \`Points\` 时不满足摘要字段" "sources document TensorFeed metadata-only snippets"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://maomu.com/news" "sources include maomu"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://daily.xiaohu.ai/" "sources include Xiaohu daily"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://hex2077.dev/docs/" "sources include Hex2077 daily docs"
@@ -77,7 +81,7 @@ else
   pass "ai-news docs do not prescribe search engine behavior or old full-matrix coverage"
 fi
 
-if rg -q 'github.com|qwenlm.github.io|help.openai.com/en/articles/9624314|help.openai.com/en/articles/6825453-chatgpt-release-notes|https://x.ai/|https://grok.com/|https://moonshot.cn/|https://deepseek.com/|https://cloud.tencent.com/document/product/1729/104753|tensorfeed.ai|aggyai.com|clawdigest.live|bensbites.com|chatbotnews.ai|ainewshub.io|littleworld.win' "$AI_NEWS_DIR/sources.md"; then
+if rg -q 'github.com|qwenlm.github.io|help.openai.com/en/articles/9624314|help.openai.com/en/articles/6825453-chatgpt-release-notes|https://x.ai/|https://grok.com/|https://moonshot.cn/|https://deepseek.com/|https://cloud.tencent.com/document/product/1729/104753|aggyai.com|clawdigest.live|bensbites.com|chatbotnews.ai|ainewshub.io|ainewsguru.com|rundown.ai|littleworld.win' "$AI_NEWS_DIR/sources.md"; then
   fail "sources must not include stale official entries or GitHub organization sources"
 else
   pass "sources exclude stale official entries, noisy aggregators, and GitHub organization sources"
@@ -93,6 +97,8 @@ urls=(
   "https://www.wired.com/feed/tag/ai/latest/rss"
   "https://www.technologyreview.com/feed/"
   "https://techcrunch.com/category/artificial-intelligence/feed/"
+  "https://tensorfeed.ai/api/news"
+  "https://www.dailydoseofai.tech/rss.xml"
   "https://maomu.com/news"
   "https://daily.xiaohu.ai/"
   "https://hex2077.dev/docs/"

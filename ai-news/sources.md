@@ -23,6 +23,18 @@
   - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
   - 覆盖：融资、创业、产品更新、公司事件
 
+### 英文聚合 Feed
+
+- `https://tensorfeed.ai/api/news`
+  - 取数：JSON `articles[]`
+  - 字段：`title`、`url`、`publishedAt`、`source` / `sourceDomain`、`snippet`、`categories`
+  - 摘要：使用 `snippet` 中的自然语言内容；`snippet` 只有 `Article URL` / `Comments URL` / `Points` 时不满足摘要字段
+  - 覆盖：模型、产品、研究、社区和工程动态
+- `https://www.dailydoseofai.tech/rss.xml`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
+  - 覆盖：研究论文、Agent、开发者动态、社区热点
+
 ### 中文聚合页
 
 - `https://maomu.com/news`
