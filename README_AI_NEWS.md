@@ -1,6 +1,6 @@
 # README_AI_NEWS
 
-`ai-news` 是一个面向 OpenClaw / `my-cowork` 的编排型 skill，用于生成中文版 AI 新闻简报。它不自带单独 CLI，只定义固定来源、回源原则、候选筛选和成稿格式；具体执行路径由运行时 agent 自行规划。
+`ai-news` 是一个面向 OpenClaw / `my-cowork` 的编排型 skill，用于生成中文版 AI 新闻简报。它不自带单独 CLI，只定义日报扫描入口、字段获取方式、候选筛选和成稿格式；具体执行路径由运行时 agent 自行规划。
 
 ## 目录与入口
 
