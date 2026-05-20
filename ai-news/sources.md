@@ -34,6 +34,10 @@
   - 取数：RSS `<item>`
   - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
   - 覆盖：研究论文、Agent、开发者动态、社区热点
+- `https://planet-ai.net/rss.xml`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
+  - 覆盖：AI 公司博客、研究实验室、开发者博客和技术新闻聚合
 
 ### 中文聚合页
 
@@ -49,53 +53,44 @@
   - 取数：按目标日期进入日报页，路径形如 `https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/`
   - 字段：页面 `<title>` / canonical URL / `meta description` 提供日期与总摘要；正文段落中的加粗标题、链接和段落文本提供条目标题、来源 URL 和摘要内容
   - 覆盖：中文热点、AI 工具、模型发布、社区动向
+- `https://www.littleworld.win/data/ai-news/arxiv-cs-ai-latest.json`
+  - 取数：JSON `articles[]`
+  - 字段：`title`、`date`、`summary`、`url`、`category`
+  - 覆盖：arXiv CS.AI 论文、模型研究、工程研究
+- `https://www.littleworld.win/data/ai-news/every-latest.json`
+  - 取数：JSON `articles[]`
+  - 字段：`title`、`date`、`summary`、`url`、`category`
+  - 覆盖：AI 产品、创业、商业和行业分析
+- `https://www.littleworld.win/data/ai-news/moltbook-latest.json`
+  - 取数：JSON `articles[]`
+  - 字段：`title`、`date`、`summary`、`url`、`category`
+  - 覆盖：大模型行为、Agent、评测、产品和技术讨论
 
 ## 定向取数入口
 
 下面入口用于获取官网、官博和技术博客内容。按列出的页面和字段取数；这些页面应能直接提供成稿需要的标题、发布时间、来源 URL 和摘要内容。不要把这些入口扩展成未列页面、厂商矩阵或额外来源。
 
-### 官网和官博入口
+### 官网和技术博客入口
 
-- `https://openai.com/news/product/`
-  - 取数：列表卡片或文章页
-  - 字段：标题、文章 URL、发布时间、卡片描述或文章开头摘要
-- `https://openai.com/news/research/`
-  - 取数：列表卡片或文章页
-  - 字段：标题、文章 URL、发布时间、卡片描述或文章开头摘要
-- `https://openai.com/news/engineering/`
-  - 取数：列表卡片或文章页
-  - 字段：标题、文章 URL、发布时间、卡片描述或文章开头摘要
+- `https://openai.com/news/rss.xml`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`、`<category>`
 - `https://www.anthropic.com/news`
   - 取数：列表页 HTML / Next 数据
-  - 字段：标题、文章 URL、发布时间、卡片描述
+  - 字段：标题、文章 URL、发布时间、卡片描述；只收录摘要内容存在的条目
 - `https://www.anthropic.com/engineering`
   - 取数：列表页 HTML / Next 数据
-  - 字段：标题、文章 URL、发布时间、卡片描述
-- `https://blog.google/innovation-and-ai/technology/ai/`
-  - 取数：列表页卡片
-  - 字段：标题、文章 URL、发布时间、卡片描述
-- `https://deepmind.google/blog/`
-  - 取数：列表页卡片
-  - 字段：标题、文章 URL、发布时间、卡片描述
-- `https://www.minimax.io/news`
-  - 取数：列表页 HTML / Next 数据
-  - 字段：标题、文章 URL、发布时间、卡片描述
-- `https://www.zhipuai.cn/zh/news`
-  - 取数：列表页 HTML / Next 数据
-  - 字段：标题、文章 URL、发布时间、卡片描述
-- `https://www.zhipuai.cn/zh/research`
-  - 取数：列表页 HTML / Next 数据
-  - 字段：标题、文章 URL、发布时间、摘要或研究简介
-- `https://developer.volcengine.com/articles`
-  - 取数：文章列表页
-  - 字段：标题、文章 URL、发布时间、卡片描述
-
-### 技术博客入口
-
-- `https://huggingface.co/blog/feed.xml`
-  - 取数：RSS `<item>` 建立技术博客候选；候选入稿时使用 `<link>` 指向的 Hugging Face Blog 文章
-  - 字段：Feed 提供标题、文章 URL、发布时间；文章页提供摘要所需内容
-  - 覆盖：模型、SDK、工具链、平台能力和社区发布
+  - 字段：标题、文章 URL、发布时间、卡片描述；只收录摘要内容存在的条目
+- `https://blog.google/innovation-and-ai/technology/ai/rss/`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
+- `https://deepmind.google/blog/rss.xml`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
+- `https://www.interconnects.ai/feed`
+  - 取数：RSS `<item>`
+  - 字段：`<title>`、`<link>`、`<pubDate>`、`<description>`
+  - 覆盖：开源模型生态、模型发布、评测、训练和研究分析
 
 ## 入稿字段
 
