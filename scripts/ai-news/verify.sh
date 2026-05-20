@@ -38,7 +38,7 @@ assert_contains "$AI_NEWS_DIR/SKILL.md" "不要判断固定来源内容的真伪
 assert_contains "$AI_NEWS_DIR/SKILL.md" "读取 [sources.md](sources.md) 的日报扫描入口" "SKILL.md uses daily scan sources"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "只使用 [sources.md](sources.md) 列出的入口" "SKILL.md only uses listed sources"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "不为了补数量扩展来源范围" "SKILL.md avoids quantity-driven expansion"
-assert_contains "$AI_NEWS_DIR/SKILL.md" "用户点名官网、官博、技术博客、具体厂商或具体来源时，再使用对应入口" "SKILL.md gates official and technical sources by user request"
+assert_contains "$AI_NEWS_DIR/SKILL.md" "任务范围包含官网、官博或技术博客内容时，只按 [sources.md](sources.md) 的定向取数入口取数" "SKILL.md uses targeted source entries without expansion"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "Feed、列表页、日期页或聚合页字段完整时可以直接成稿" "SKILL.md allows complete feed, list, date, and aggregation pages as final sources"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "记录来源不可用或候选字段不完整" "SKILL.md reports unavailable sources and incomplete fields"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "是否先筛选候选，再核对入稿字段" "SKILL.md checks candidate filtering before field validation"
@@ -46,7 +46,9 @@ assert_contains "$AI_NEWS_DIR/sources.md" "## 日报扫描入口" "sources defin
 assert_contains "$AI_NEWS_DIR/sources.md" "### 新闻 Feed" "sources define news feed entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "### 英文聚合 Feed" "sources define English aggregation feed entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "### 中文聚合页" "sources define Chinese aggregation entries"
-assert_contains "$AI_NEWS_DIR/sources.md" "## 用户点名时使用" "sources separate user-requested entries"
+assert_contains "$AI_NEWS_DIR/sources.md" "## 定向取数入口" "sources define targeted source entries"
+assert_contains "$AI_NEWS_DIR/sources.md" "按列出的页面和字段取数" "sources keep targeted entries field-oriented"
+assert_contains "$AI_NEWS_DIR/sources.md" "不要把这些入口扩展成未列页面、厂商矩阵或额外来源" "sources forbid expanding targeted entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 官网和官博入口" "sources keep official and blog entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 技术博客入口" "sources define technical blog entries"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" "sources use The Verge AI RSS"
@@ -91,7 +93,7 @@ else
   pass "format.md only describes output structure and presentation"
 fi
 
-if rg -q 'bocha|brave|tavily|volc-websearch|搜索引擎分工|检索入口分工|抓取失败策略|来源补漏边界|官方回源|当前来源质量评估|不稳定入口|固定来源清单|来源质量|正文支撑|用 `tavily`|每次都覆盖|每次日报都要|候选集应覆盖中文来源|官方发布入口和技术来源|至少覆盖 Hugging Face|至少使用一个官方来源|重点品牌是否使用|追官方|回源原则|详情页和回源|按需入口' "$AI_NEWS_DIR/SKILL.md" "$AI_NEWS_DIR/sources.md" "$AI_NEWS_DIR/format.md" "$ROOT_DIR/README_AI_NEWS.md"; then
+if rg -q 'bocha|brave|tavily|volc-websearch|搜索引擎分工|检索入口分工|抓取失败策略|来源补漏边界|官方回源|当前来源质量评估|不稳定入口|固定来源清单|来源质量|正文支撑|用 `tavily`|每次都覆盖|每次日报都要|候选集应覆盖中文来源|官方发布入口和技术来源|至少覆盖 Hugging Face|至少使用一个官方来源|重点品牌是否使用|追官方|回源原则|详情页和回源|按需入口|用户点名' "$AI_NEWS_DIR/SKILL.md" "$AI_NEWS_DIR/sources.md" "$AI_NEWS_DIR/format.md" "$ROOT_DIR/README_AI_NEWS.md"; then
   fail "ai-news docs must not prescribe search engine behavior or old full-matrix coverage"
 else
   pass "ai-news docs do not prescribe search engine behavior or old full-matrix coverage"

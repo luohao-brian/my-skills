@@ -59,7 +59,7 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 1. 读取 [sources.md](sources.md) 的日报扫描入口，建立候选集。
    - 只使用 [sources.md](sources.md) 列出的入口
    - 不为了补数量扩展来源范围
-   - 用户点名官网、官博、技术博客、具体厂商或具体来源时，再使用对应入口
+   - 任务范围包含官网、官博或技术博客内容时，只按 [sources.md](sources.md) 的定向取数入口取数
 2. 筛选候选。
    - 删除过期、重复、非 AI、营销软文和字段不完整的条目
    - 同一事件只保留一条
