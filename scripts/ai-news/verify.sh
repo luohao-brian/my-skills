@@ -84,8 +84,11 @@ assert_contains "$AI_NEWS_DIR/sources.md" "https://blog.google/innovation-and-ai
 assert_contains "$AI_NEWS_DIR/sources.md" "https://deepmind.google/blog/rss.xml" "sources include DeepMind RSS entry"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.interconnects.ai/feed" "sources include Interconnects technical feed"
 assert_contains "$AI_NEWS_DIR/sources.md" "## 入稿字段" "sources include field expectations"
-assert_contains "$AI_NEWS_DIR/sources.md" "入口页、Feed 或日期页直接提供标题" "sources require field-friendly source surfaces"
+assert_contains "$AI_NEWS_DIR/sources.md" "入口页、Feed、JSON 或日期页的解码后内容中直接提供标题" "sources require field-friendly decoded source surfaces"
 assert_contains "$AI_NEWS_DIR/sources.md" "只给标题或只给跳转链接的聚合入口不放进扫描入口" "sources exclude aggregation pages without summary fields"
+assert_contains "$AI_NEWS_DIR/sources.md" "日期页型入口的目标日期页不存在时，可以使用目标日期前后 \`1-2\` 天内最近的已发布日期页建立候选" "sources allow nearby date pages for date-page sources"
+assert_contains "$AI_NEWS_DIR/sources.md" "入稿仍按条目的发布时间、页面日期和目标时间窗筛选" "sources keep time window strict when using nearby date pages"
+assert_contains "$AI_NEWS_DIR/sources.md" "Littleworld 三个 JSON 入口彼此独立" "sources treat Littleworld JSON entries independently"
 assert_contains "$AI_NEWS_DIR/sources.md" "没有单条原文链接时可使用聚合日期页链接" "sources allow date pages as final source links when needed"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "- 模型 / 研究" "SKILL.md defines model and research category"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "- Agent / 开发者工具" "SKILL.md defines agent and developer tooling category"
@@ -144,7 +147,15 @@ urls=(
 
 for url in "${urls[@]}"; do
   info "checking $url"
-  if curl -L --fail --silent --show-error --max-time 20 -A "Mozilla/5.0" -o /dev/null "$url"; then
+  ok=0
+  for attempt in 1 2; do
+    if curl -L --compressed --fail --silent --show-error --max-time 40 --connect-timeout 10 -A "Mozilla/5.0" -o /dev/null "$url"; then
+      ok=1
+      break
+    fi
+    info "retrying $url"
+  done
+  if [[ "$ok" == 1 ]]; then
     pass "$url is reachable"
   else
     fail "$url is not reachable"
