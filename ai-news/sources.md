@@ -2,7 +2,7 @@
 
 这份文档列出可消费入口、字段取得位置和覆盖边界。日报扫描入口应能在入口页、Feed、JSON 或日期页的解码后内容中直接提供标题、发布时间 / 展示时间、来源 URL、摘要 / 描述 / 正文片段；只给标题或只给跳转链接的聚合入口不放进扫描入口。
 
-日期页型入口的目标日期页不存在时，可以使用目标日期前后 `1-2` 天内最近的已发布日期页建立候选；入稿仍按条目的发布时间、页面日期和目标时间窗筛选。
+日期页型入口的目标日期页不存在时，可以使用目标日期前后 `72` 小时内最近的已发布日期页建立候选；入稿仍按条目的发布时间、页面日期和目标时间窗筛选。
 
 ## 日报扫描入口
 
@@ -48,11 +48,11 @@
   - 字段：`title`、`sourceLink`、`publishedAtDate` + `publishedAt`、`subtitle`，页面卡片里的 `.title`、`.desc`、`.source-name` 也可使用
   - 覆盖：中文热点、快讯发现
 - `https://daily.xiaohu.ai/`
-  - 取数：先从首页最新卡片或归档卡片取得日期页；日期页形如 `https://daily.xiaohu.ai/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `1-2` 天内最近的已发布日期页
+  - 取数：先从首页最新卡片或归档卡片取得日期页；日期页形如 `https://daily.xiaohu.ai/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页
   - 字段：日期页 `.date-meta .date`，头条 `.headline-title` / `.headline-summary` / `.read-more`，列表 `.point-title a` / `.point-summary`，深度项 `.deep-title` / `.deep-summary`，分类项 `.cat-item-title` / `.cat-item-summary`
   - 覆盖：中文日报、产品发布、技术突破、行业观察
 - `https://hex2077.dev/docs/`
-  - 取数：按目标日期进入日报页，路径形如 `https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `1-2` 天内最近的已发布日期页
+  - 取数：按目标日期进入日报页，路径形如 `https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页
   - 字段：页面 `<title>` / canonical URL / `meta description` 提供日期与总摘要；正文段落中的加粗标题、链接和段落文本提供条目标题、来源 URL 和摘要内容
   - 覆盖：中文热点、AI 工具、模型发布、社区动向
 - `https://www.littleworld.win/data/ai-news/arxiv-cs-ai-latest.json`
