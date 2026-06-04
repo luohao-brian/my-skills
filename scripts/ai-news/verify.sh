@@ -72,14 +72,17 @@ assert_contains "$AI_NEWS_DIR/sources.md" "https://tensorfeed.ai/api/news" "sour
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.dailydoseofai.tech/rss.xml" "sources include AI Dose RSS"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://planet-ai.net/rss.xml" "sources include Planet AI RSS"
 assert_contains "$AI_NEWS_DIR/sources.md" "只有 \`Article URL\` / \`Comments URL\` / \`Points\` 时不满足摘要字段" "sources document TensorFeed metadata-only snippets"
+assert_contains "$AI_NEWS_DIR/sources.md" "https://www.tmtpost.com/user/7944025" "sources include TMT Edge AI Daily"
+assert_contains "$AI_NEWS_DIR/sources.md" "详情页 \`<blockquote>\` 小节可拆成多条新闻" "sources document TMT blockquote item extraction"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://maomu.com/news" "sources include maomu"
+assert_contains "$AI_NEWS_DIR/sources.md" "优先读取页面嵌入的结构化对象" "sources document maomu structured extraction"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://daily.xiaohu.ai/" "sources include Xiaohu daily"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://hex2077.dev/docs/" "sources include Hex2077 daily docs"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://daily.xiaohu.ai/YYYY-MM-DD/" "sources document Xiaohu date page pattern"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/" "sources document Hex2077 date page pattern"
-assert_contains "$AI_NEWS_DIR/sources.md" "https://www.littleworld.win/data/ai-news/arxiv-cs-ai-latest.json" "sources include Littleworld arXiv feed"
-assert_contains "$AI_NEWS_DIR/sources.md" "https://www.littleworld.win/data/ai-news/every-latest.json" "sources include Littleworld Every feed"
-assert_contains "$AI_NEWS_DIR/sources.md" "https://www.littleworld.win/data/ai-news/moltbook-latest.json" "sources include Littleworld Moltbook feed"
+assert_contains "$AI_NEWS_DIR/sources.md" "按标题和摘要区块配对" "sources document Xiaohu title summary pairing"
+assert_contains "$AI_NEWS_DIR/sources.md" "拆不到独立条目时，使用页面 title / description 成稿一条" "sources document Hex2077 fallback item"
+assert_contains "$AI_NEWS_DIR/sources.md" "剔除非公开文章链接、无效摘要、消费品 / 电商噪音" "sources document Chinese source screening"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://openai.com/news/rss.xml" "sources include OpenAI RSS entry"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.anthropic.com/news" "sources include Anthropic official entry"
 assert_contains "$AI_NEWS_DIR/sources.md" "https://www.anthropic.com/engineering" "sources include Anthropic engineering entry"
@@ -92,7 +95,6 @@ assert_contains "$AI_NEWS_DIR/sources.md" "入口页、Feed、JSON 或日期页�
 assert_contains "$AI_NEWS_DIR/sources.md" "只给标题或只给跳转链接的聚合入口不放进扫描入口" "sources exclude aggregation pages without summary fields"
 assert_contains "$AI_NEWS_DIR/sources.md" "日期页型入口的目标日期页不存在时，可以使用目标日期前后 \`72\` 小时内最近的已发布日期页建立候选" "sources allow nearby date pages for date-page sources"
 assert_contains "$AI_NEWS_DIR/sources.md" "入稿仍按条目的发布时间、页面日期和目标时间窗筛选" "sources keep time window strict when using nearby date pages"
-assert_contains "$AI_NEWS_DIR/sources.md" "Littleworld 三个 JSON 入口彼此独立" "sources treat Littleworld JSON entries independently"
 assert_contains "$AI_NEWS_DIR/sources.md" "没有单条原文链接时可使用聚合日期页链接" "sources allow date pages as final source links when needed"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "- 模型 / 研究" "SKILL.md defines model and research category"
 assert_contains "$AI_NEWS_DIR/SKILL.md" "- Agent / 开发者工具" "SKILL.md defines agent and developer tooling category"
@@ -123,7 +125,7 @@ else
   pass "ai-news docs do not prescribe search engine behavior or old full-matrix coverage"
 fi
 
-if rg -q 'github.com|qwenlm.github.io|help.openai.com/en/articles/9624314|help.openai.com/en/articles/6825453-chatgpt-release-notes|https://x.ai/|https://grok.com/|https://moonshot.cn/|https://deepseek.com/|https://cloud.tencent.com/document/product/1729/104753|https://openai.com/news/product/|https://openai.com/news/research/|https://openai.com/news/engineering/|https://blog.google/innovation-and-ai/technology/ai/`|https://deepmind.google/blog/`|https://www.minimax.io/news|https://www.zhipuai.cn/zh/news|https://www.zhipuai.cn/zh/research|https://developer.volcengine.com/articles|https://huggingface.co/blog/feed.xml|aggyai.com|clawdigest.live|bensbites.com|chatbotnews.ai|ainewshub.io|ainewsguru.com|rundown.ai' "$AI_NEWS_DIR/sources.md"; then
+if rg -q 'github.com|qwenlm.github.io|help.openai.com/en/articles/9624314|help.openai.com/en/articles/6825453-chatgpt-release-notes|https://x.ai/|https://grok.com/|https://moonshot.cn/|https://deepseek.com/|https://cloud.tencent.com/document/product/1729/104753|https://openai.com/news/product/|https://openai.com/news/research/|https://openai.com/news/engineering/|https://blog.google/innovation-and-ai/technology/ai/`|https://deepmind.google/blog/`|https://www.minimax.io/news|https://www.zhipuai.cn/zh/news|https://www.zhipuai.cn/zh/research|https://developer.volcengine.com/articles|https://huggingface.co/blog/feed.xml|www.littleworld.win|aggyai.com|clawdigest.live|bensbites.com|chatbotnews.ai|ainewshub.io|ainewsguru.com|rundown.ai' "$AI_NEWS_DIR/sources.md"; then
   fail "sources must not include stale official entries or GitHub organization sources"
 else
   pass "sources exclude stale official entries, noisy aggregators, and GitHub organization sources"
@@ -142,12 +144,10 @@ urls=(
   "https://tensorfeed.ai/api/news"
   "https://www.dailydoseofai.tech/rss.xml"
   "https://planet-ai.net/rss.xml"
+  "https://www.tmtpost.com/user/7944025"
   "https://maomu.com/news"
   "https://daily.xiaohu.ai/"
   "https://hex2077.dev/docs/"
-  "https://www.littleworld.win/data/ai-news/arxiv-cs-ai-latest.json"
-  "https://www.littleworld.win/data/ai-news/every-latest.json"
-  "https://www.littleworld.win/data/ai-news/moltbook-latest.json"
 )
 
 for url in "${urls[@]}"; do

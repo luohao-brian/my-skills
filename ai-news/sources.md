@@ -43,32 +43,24 @@
 
 ### 中文聚合页
 
+- `https://www.tmtpost.com/user/7944025`
+  - 取数：先从作者页找到目标日期的 `Edge AI Daily` 文章，再进入详情页
+  - 字段：作者页文章卡片提供标题、文章 URL、发布时间和摘要；详情页 `<blockquote>` 小节可拆成多条新闻
+  - 覆盖：中文 AI 早报、模型、产品、基础设施、商业和治理事件
 - `https://maomu.com/news`
-  - 取数：页面 HTML 和 Nuxt SSR 数据中的新闻列表
-  - 字段：`title`、`sourceLink`、`publishedAtDate` + `publishedAt`、`subtitle`，页面卡片里的 `.title`、`.desc`、`.source-name` 也可使用
+  - 取数：优先读取页面嵌入的结构化对象；失败时读取页面 HTML 链接块；仍失败时使用 title / desc / link 宽松配对
+  - 字段：`title`、`subtitle`、`sourceLink`、`publishedAtDate` + `publishedAt`；页面卡片里的 `.title`、`.desc`、`.source-name` 也可使用
   - 覆盖：中文热点、快讯发现
 - `https://daily.xiaohu.ai/`
-  - 取数：先从首页最新卡片或归档卡片取得日期页；日期页形如 `https://daily.xiaohu.ai/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页
-  - 字段：日期页 `.date-meta .date`，头条 `.headline-title` / `.headline-summary` / `.read-more`，列表 `.point-title a` / `.point-summary`，深度项 `.deep-title` / `.deep-summary`，分类项 `.cat-item-title` / `.cat-item-summary`
+  - 取数：优先读取目标日期页 `https://daily.xiaohu.ai/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页；仍失败时读取首页
+  - 字段：日期页 `.date-meta .date`，头条 `.headline-title` / `.headline-summary` / `.read-more`，列表 `.point-title a` / `.point-summary`，深度项 `.deep-title` / `.deep-summary`，分类项 `.cat-item-title` / `.cat-item-summary`；按标题和摘要区块配对
   - 覆盖：中文日报、产品发布、技术突破、行业观察
 - `https://hex2077.dev/docs/`
-  - 取数：按目标日期进入日报页，路径形如 `https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页
-  - 字段：页面 `<title>` / canonical URL / `meta description` 提供日期与总摘要；正文段落中的加粗标题、链接和段落文本提供条目标题、来源 URL 和摘要内容
+  - 取数：优先读取目标日期页 `https://hex2077.dev/docs/YYYY-MM/YYYY-MM-DD/`；目标日期页不存在时，使用目标日期前后 `72` 小时内最近的已发布日期页
+  - 字段：页面 `<title>` / canonical URL / `meta description` 提供日期与总摘要；正文段落、加粗标题和链接提供条目标题、来源 URL 和摘要内容；拆不到独立条目时，使用页面 title / description 成稿一条
   - 覆盖：中文热点、AI 工具、模型发布、社区动向
-- `https://www.littleworld.win/data/ai-news/arxiv-cs-ai-latest.json`
-  - 取数：JSON `articles[]`
-  - 字段：`title`、`date`、`summary`、`url`、`category`
-  - 覆盖：arXiv CS.AI 论文、模型研究、工程研究
-- `https://www.littleworld.win/data/ai-news/every-latest.json`
-  - 取数：JSON `articles[]`
-  - 字段：`title`、`date`、`summary`、`url`、`category`
-  - 覆盖：AI 产品、创业、商业和行业分析
-- `https://www.littleworld.win/data/ai-news/moltbook-latest.json`
-  - 取数：JSON `articles[]`
-  - 字段：`title`、`date`、`summary`、`url`、`category`
-  - 覆盖：大模型行为、Agent、评测、产品和技术讨论
 
-Littleworld 三个 JSON 入口彼此独立；某个 JSON 入口不可访问或响应体无法解析时，只记录该入口不可用，不影响其他 Littleworld 入口的候选。
+中文入口取出的条目与其他入口一起进入候选筛选：剔除非公开文章链接、无效摘要、消费品 / 电商噪音，按 URL 和标题去重；无法归入简报分类的条目不入稿。
 
 ## 定向取数入口
 
