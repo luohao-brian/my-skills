@@ -1,46 +1,117 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-LIVE_MODE=0
-if [[ "${1:-}" == "--live" ]]; then
-  LIVE_MODE=1
-  shift
-fi
-
-skills=("$@")
-if [[ "${#skills[@]}" == 0 ]]; then
-  skills=(my-fetch volc-gen volc-speech volc-websearch ai-news)
-fi
-
-run_skill() {
-  local skill="$1"
-  case "$skill" in
-    my-fetch)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/my-fetch/verify.sh"
-      ;;
-    volc-gen)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-gen/verify.sh"
-      ;;
-    volc-speech)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-speech/verify.sh"
-      ;;
-    volc-websearch)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/volc-websearch/verify.sh"
-      ;;
-    ai-news)
-      LIVE_MODE="$LIVE_MODE" bash "$SCRIPT_DIR/ai-news/verify.sh"
-      ;;
-    *)
-      printf 'Unknown skill: %s\n' "$skill" >&2
-      exit 1
-      ;;
-  esac
+fail() {
+  printf 'FAIL: %s\n' "$*" >&2
+  exit 1
 }
 
+pass() {
+  printf 'OK: %s\n' "$*"
+}
+
+assert_no_path() {
+  local path="$1"
+  [[ ! -e "$path" ]] || fail "$path should not exist"
+}
+
+assert_file() {
+  local path="$1"
+  [[ -f "$path" ]] || fail "$path missing"
+}
+
+assert_contains() {
+  local path="$1"
+  local text="$2"
+  rg -q --fixed-strings -- "$text" "$path" || fail "$path missing: $text"
+}
+
+assert_metadata_single_line() {
+  local path="$1"
+  if rg -q '^metadata: \{.*\}$' "$path"; then
+    return
+  fi
+  if rg -q '^metadata:' "$path"; then
+    fail "$path metadata must be single-line JSON"
+  fi
+}
+
+assert_no_path rust
+assert_no_path cli
+assert_no_path dist
+assert_no_path build-skill-bundle.sh
+assert_no_path my-fetch
+assert_no_path volc-gen
+assert_no_path volc-speech
+assert_no_path volc-websearch
+
+skills=(
+  info-track/ai-news
+  info-track/ai-labs-tracker
+  info-track/reddit-oss-models
+  openclaw-skills/tts
+  openclaw-skills/stt
+  openclaw-skills/image-gen
+  openclaw-skills/video-gen
+  openclaw-skills/volc-search
+)
+
 for skill in "${skills[@]}"; do
-  run_skill "$skill"
+  assert_file "$skill/SKILL.md"
+  assert_contains "$skill/SKILL.md" "description:"
+  assert_metadata_single_line "$skill/SKILL.md"
 done
 
-printf '\nAll requested verification checks completed.\n'
+assert_file hermes-plugins/hermes-ark-plugin/plugin.yaml
+assert_file hermes-plugins/hermes-ark-plugin/cli.py
+assert_file hermes-plugins/hermes-ark-plugin/providers/text_to_speech.py
+assert_file hermes-plugins/hermes-ark-plugin/providers/transcribe_audio.py
+assert_file hermes-plugins/hermes-ark-plugin/providers/image_generate.py
+assert_file hermes-plugins/hermes-ark-plugin/providers/video_generate.py
+
+assert_file pyproject.toml
+assert_file uv.lock
+assert_contains pyproject.toml "requests>=2.32,<3"
+assert_contains uv.lock 'name = "requests"'
+
+assert_contains openclaw-skills/tts/SKILL.md "references/ark-tts.md"
+assert_contains openclaw-skills/stt/SKILL.md "references/ark-stt.md"
+assert_contains openclaw-skills/image-gen/SKILL.md "references/ark-image-gen.md"
+assert_contains openclaw-skills/video-gen/SKILL.md "references/ark-video-gen.md"
+assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
+assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
+
+python_bin=""
+if command -v python3 >/dev/null 2>&1; then
+  python_bin=python3
+elif command -v python >/dev/null 2>&1; then
+  python_bin=python
+else
+  fail "python3 or python is required for syntax checks"
+fi
+
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_compile \
+  openclaw-skills/tts/scripts/volc_tts.py \
+  openclaw-skills/stt/scripts/volc_stt.py \
+  openclaw-skills/image-gen/scripts/volc_image_gen.py \
+  openclaw-skills/video-gen/scripts/volc_video_gen.py \
+  openclaw-skills/volc-search/scripts/web_search.py
+
+if command -v uv >/dev/null 2>&1; then
+  uv lock --check >/dev/null
+else
+  fail "uv is required to verify locked Python dependencies"
+fi
+
+if rg -n 'build-skill-bundle|cli/macos|cli/linux|volc-websearch|volc-gen/|volc-speech/|my-fetch/' README.md AGENTS.md docs/OPENCLAW-SKILL.md openclaw-skills info-track; then
+  fail "new docs should not reference removed Rust/CLI skill paths"
+fi
+
+if rg -n 'Tavily|Bocha|Brave|tavily|bocha|brave|TORCHLIGHT_API_KEY|api-key|VeFaaS|vefaas|VE_ACCESS_KEY|VE_SECRET_KEY|setup-guide|多引擎|multi-engine' openclaw-skills/volc-search README.md AGENTS.md; then
+  fail "volc-search must use only Volcengine WebSearch"
+fi
+
+pass "repository structure and skill files verified"
