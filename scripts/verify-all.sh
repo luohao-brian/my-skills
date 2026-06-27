@@ -84,6 +84,19 @@ assert_contains openclaw-skills/video-gen/SKILL.md "references/ark-video-gen.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
 
+assert_file info-track/ai-news/references/sources.json
+assert_file info-track/ai-news/references/source-contract.md
+assert_file info-track/ai-news/references/output-schema.md
+assert_file info-track/ai-news/references/example-candidates.json
+assert_file info-track/ai-news/templates/brief.md.tpl
+assert_file info-track/ai-news/templates/item.md.tpl
+assert_file info-track/ai-news/templates/summarize-prompt.md.tpl
+assert_file info-track/ai-news/scripts/ai_news.py
+assert_file info-track/ai-news/scripts/adapters/__init__.py
+assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py run"
+assert_contains info-track/ai-news/SKILL.md "references/sources.json"
+assert_contains info-track/ai-news/SKILL.md "source_coverage"
+
 python_bin=""
 if command -v python3 >/dev/null 2>&1; then
   python_bin=python3
@@ -94,11 +107,23 @@ else
 fi
 
 PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_compile \
+  info-track/ai-news/scripts/ai_news.py \
+  info-track/ai-news/scripts/adapters/__init__.py \
+  info-track/ai-news/scripts/adapters/common.py \
+  info-track/ai-news/scripts/adapters/rss.py \
+  info-track/ai-news/scripts/adapters/json_api.py \
+  info-track/ai-news/scripts/adapters/html_index.py \
   openclaw-skills/tts/scripts/volc_tts.py \
   openclaw-skills/stt/scripts/volc_stt.py \
   openclaw-skills/image-gen/scripts/volc_image_gen.py \
   openclaw-skills/video-gen/scripts/volc_video_gen.py \
   openclaw-skills/volc-search/scripts/web_search.py
+
+"$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
+"$python_bin" info-track/ai-news/scripts/ai_news.py validate --input info-track/ai-news/references/example-candidates.json >/dev/null
+"$python_bin" info-track/ai-news/scripts/ai_news.py collect --dry-run --date 2026-06-27 >/dev/null
+"$python_bin" info-track/ai-news/scripts/ai_news.py render --input info-track/ai-news/references/example-candidates.json >/dev/null
+"$python_bin" info-track/ai-news/scripts/ai_news.py run --dry-run --date 2026-06-27 >/dev/null
 
 if command -v uv >/dev/null 2>&1; then
   uv lock --check >/dev/null
