@@ -85,17 +85,22 @@ assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
 
 assert_file info-track/ai-news/references/sources.json
-assert_file info-track/ai-news/references/source-contract.md
 assert_file info-track/ai-news/references/output-schema.md
-assert_file info-track/ai-news/references/example-candidates.json
-assert_file info-track/ai-news/templates/brief.md.tpl
-assert_file info-track/ai-news/templates/item.md.tpl
-assert_file info-track/ai-news/templates/summarize-prompt.md.tpl
+assert_file info-track/ai-news/references/brief-format.md
+assert_no_path info-track/ai-news/format.md
+assert_no_path info-track/ai-news/sources.md
+assert_no_path info-track/ai-news/references/source-contract.md
+assert_no_path info-track/ai-news/references/brief-rules.md
+assert_no_path info-track/ai-news/templates/brief.md.tpl
+assert_no_path info-track/ai-news/templates/item.md.tpl
 assert_file info-track/ai-news/scripts/ai_news.py
 assert_file info-track/ai-news/scripts/adapters/__init__.py
-assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py run"
+assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py collect"
+assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py render"
 assert_contains info-track/ai-news/SKILL.md "references/sources.json"
-assert_contains info-track/ai-news/SKILL.md "source_coverage"
+assert_contains info-track/ai-news/SKILL.md '`title`、`url`、`summary`'
+assert_contains info-track/ai-news/SKILL.md "## 来源与候选"
+assert_contains info-track/ai-news/SKILL.md "## 成稿规则"
 
 python_bin=""
 if command -v python3 >/dev/null 2>&1; then
@@ -120,10 +125,15 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   openclaw-skills/volc-search/scripts/web_search.py
 
 "$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py validate --input info-track/ai-news/references/example-candidates.json >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py collect --dry-run --date 2026-06-27 >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py render --input info-track/ai-news/references/example-candidates.json >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py run --dry-run --date 2026-06-27 >/dev/null
+ai_news_verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-news-verify.XXXXXX")"
+trap 'rm -rf "$ai_news_verify_dir"' EXIT
+"$python_bin" info-track/ai-news/scripts/ai_news.py verify-sources --window 72h --out "$ai_news_verify_dir/candidates.json"
+"$python_bin" info-track/ai-news/scripts/ai_news.py validate --input "$ai_news_verify_dir/candidates.json" >/dev/null
+"$python_bin" info-track/ai-news/scripts/ai_news.py render --input "$ai_news_verify_dir/candidates.json" >"$ai_news_verify_dir/brief.md"
+[[ -s "$ai_news_verify_dir/brief.md" ]] || fail "ai-news live render produced an empty brief"
+if rg -n '^\[ai-news\]|^ERROR:|Traceback|Article URL:|Comments URL:|Points:' "$ai_news_verify_dir/brief.md"; then
+  fail "ai-news live markdown contains logs, tracebacks, or uncleaned aggregator fields"
+fi
 
 if command -v uv >/dev/null 2>&1; then
   uv lock --check >/dev/null

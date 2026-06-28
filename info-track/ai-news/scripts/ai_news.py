@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Executable workflow for the ai-news skill."""
+"""Executable collector for the ai-news skill."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,53 +16,15 @@ BASE_DIR = SCRIPT_DIR.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from adapters import ADAPTERS  # noqa: E402
+from adapters import ADAPTERS as FETCHERS  # noqa: E402
 
 
 TZ = timezone(timedelta(hours=8))
-CATEGORIES = [
-    "模型 / 研究",
-    "Agent / 开发者工具",
-    "技术博客 / 工程实践",
-    "产品 / 应用",
-    "商业 / 融资",
-    "安全 / 治理",
-]
-REQUIRED_TOP_LEVEL = ["window", "source_coverage", "candidates", "excluded", "missing"]
+REQUIRED_TOP_LEVEL = ["window", "candidates"]
 REQUIRED_CANDIDATE_FIELDS = [
-    "id",
     "title",
-    "published_at",
-    "published_display",
-    "source_url",
-    "source_id",
-    "summary_basis",
-    "category",
-    "zh_summary",
-    "needs_model_review",
-]
-AI_KEYWORDS = [
-    "ai",
-    "artificial intelligence",
-    "llm",
-    "model",
-    "agent",
-    "openai",
-    "anthropic",
-    "gemini",
-    "deepmind",
-    "claude",
-    "chatgpt",
-    "gpt",
-    "llama",
-    "qwen",
-    "diffusion",
-    "生成式",
-    "人工智能",
-    "模型",
-    "大模型",
-    "智能体",
-    "推理",
+    "url",
+    "summary",
 ]
 
 
@@ -79,6 +39,7 @@ def load_json(path: Path) -> dict[str, Any]:
 def dump_json(data: dict[str, Any], out: Path | None) -> None:
     payload = json.dumps(data, ensure_ascii=False, indent=2)
     if out:
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(payload + "\n", encoding="utf-8")
     else:
         print(payload)
@@ -125,233 +86,180 @@ def parse_datetime(value: str) -> datetime | None:
             return parsed.astimezone(TZ)
         except ValueError:
             pass
-    try:
-        parsed = parsedate_to_datetime(text)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=TZ)
-        return parsed.astimezone(TZ)
-    except (TypeError, ValueError):
-        return None
+    text = re.sub(r"\s+GMT$", " +0000", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+UTC$", " +0000", text, flags=re.IGNORECASE)
+    for fmt in (
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M %z",
+        "%d %b %Y %H:%M:%S %z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%d",
+        "%b %d, %Y",
+        "%B %d, %Y",
+    ):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=TZ)
+            return parsed.astimezone(TZ)
+        except ValueError:
+            pass
+    return None
 
 
-def is_ai_related(item: dict[str, str]) -> bool:
-    text = f"{item.get('title', '')} {item.get('summary_basis', '')}".lower()
-    return any(keyword.lower() in text for keyword in AI_KEYWORDS)
+def clean_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("&#8217;", "'")).strip()
 
 
-def classify(item: dict[str, str], coverage: list[str]) -> str:
-    text = f"{item.get('title', '')} {item.get('summary_basis', '')}".lower()
-    if any(word in text for word in ["funding", "raises", "acquires", "ipo", "融资", "收购"]):
-        return "商业 / 融资"
-    if any(word in text for word in ["safety", "policy", "copyright", "regulation", "安全", "治理", "监管"]):
-        return "安全 / 治理"
-    if any(word in text for word in ["agent", "sdk", "developer", "tool", "ide", "智能体", "开发者", "工具"]):
-        return "Agent / 开发者工具"
-    if any(word in text for word in ["paper", "research", "benchmark", "model", "llm", "模型", "研究", "评测"]):
-        return "模型 / 研究"
-    if any(word in text for word in ["engineering", "infrastructure", "训练", "推理", "工程"]):
-        return "技术博客 / 工程实践"
-    return coverage[0] if coverage else "产品 / 应用"
+def is_noisy_summary(text: str) -> bool:
+    lowered = text.lower()
+    return "article url:" in lowered and ("comments url:" in lowered or "points:" in lowered)
 
 
-def make_summary(item: dict[str, str]) -> str:
-    basis = item.get("summary_basis", "").strip()
+def is_noise_entry(item: dict[str, str], source_id: str, window: dict[str, Any]) -> bool:
     title = item.get("title", "").strip()
-    source = basis or title
-    source = re.sub(r"\s+", " ", source)
-    if len(source) > 160:
-        source = source[:157].rstrip() + "..."
-    return source or title
+    url = item.get("source_url", "").strip()
+    lowered_url = url.lower()
+    lowered_title = title.lower()
+
+    if not url.startswith(("http://", "https://")):
+        return True
+    if any(token in lowered_url for token in ["javascript:", "mailto:", "beian.miit.gov.cn", "12377.cn"]):
+        return True
+    if re.search(r"[\w.+-]+@[\w.-]+", title):
+        return True
+    if any(token in title for token in ["ICP备", "公网安备", "iOS & Android", "创投家CLUB", "网上有害信息举报"]):
+        return True
+    if title.startswith("Edge AI Daily 早报"):
+        return True
+    if title.startswith("Hex 2077 AI资讯"):
+        return True
+    if title.startswith((">>", "Skip to ", "Try Claude", "Start building")):
+        return True
+    if re.match(r"^\d+\s*天前", title):
+        return True
+    if source_id == "tmtpost-edge-ai-daily" and window.get("date"):
+        month = int(str(window["date"])[5:7])
+        day = int(str(window["date"])[8:10])
+        if f"{month}月{day}日" not in title:
+            return True
+    if lowered_title in {"research", "product", "announcements", "policy"}:
+        return True
+    return False
 
 
-def stable_id(item: dict[str, str]) -> str:
-    seed = f"{item.get('source_url', '')}|{item.get('title', '')}"
-    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+def resolve_fetcher(source: dict[str, Any]):
+    source_id = str(source.get("id", ""))
+    kind = str(source.get("kind", ""))
+    if kind == "rss":
+        return FETCHERS["rss"]
+    if kind == "json":
+        return FETCHERS["tensorfeed_json"]
+    if source_id in {"anthropic-news", "anthropic-engineering"}:
+        return FETCHERS["anthropic"]
+    if source_id == "tmtpost-edge-ai-daily":
+        return FETCHERS["tmtpost"]
+    if source_id == "maomu-news":
+        return FETCHERS["maomu"]
+    if source_id == "xiaohu-daily":
+        return FETCHERS["xiaohu"]
+    if source_id == "hex2077":
+        return FETCHERS["hex2077"]
+    return FETCHERS["html"]
 
 
-def dry_run_document(window: dict[str, Any], sources: list[dict[str, Any]]) -> dict[str, Any]:
-    first = sources[0]
-    second = sources[1] if len(sources) > 1 else sources[0]
-    published = window["start"] + timedelta(hours=10)
-    return {
-        "window": serialize_window(window),
-        "source_coverage": [
-            {
-                "source_id": first["id"],
-                "name": first["name"],
-                "status": "ok",
-                "raw_count": 1,
-                "candidate_count": 1,
-                "missing_reason": None,
-            },
-            {
-                "source_id": second["id"],
-                "name": second["name"],
-                "status": "partial",
-                "raw_count": 1,
-                "candidate_count": 0,
-                "missing_reason": "missing published_at",
-            },
-        ],
-        "candidates": [
-            {
-                "id": "dry-run-agent-platform",
-                "title": "OpenAI 发布 Agent 平台更新",
-                "published_at": published.isoformat(timespec="seconds"),
-                "published_display": published.strftime("%Y-%m-%d %H:%M"),
-                "source_url": "https://example.com/openai-agent-platform",
-                "source_id": first["id"],
-                "summary_basis": "OpenAI released an update to its agent platform with improved tool orchestration and developer controls.",
-                "category": "Agent / 开发者工具",
-                "zh_summary": "OpenAI 发布 Agent 平台更新，重点改进工具编排和开发者控制能力，面向复杂自动化工作流。",
-                "needs_model_review": False,
-            }
-        ],
-        "excluded": [
-            {
-                "title": "Unrelated consumer gadget launch",
-                "source_url": "https://example.com/gadget",
-                "source_id": first["id"],
-                "reason": "not_ai_related",
-            }
-        ],
-        "missing": [
-            {
-                "source_id": second["id"],
-                "url": str(second["url"]),
-                "missing_fields": ["published_at"],
-                "reason": "missing_required_fields",
-            }
-        ],
-    }
-
-
-def collect_document(args: argparse.Namespace) -> dict[str, Any]:
+def collect_data(args: argparse.Namespace) -> dict[str, Any]:
     registry = load_json(BASE_DIR / "references" / "sources.json")
     sources = registry.get("sources", [])
     if not isinstance(sources, list):
         raise ValueError("references/sources.json must contain sources[]")
+    source_filter = set(getattr(args, "source", None) or [])
+    if source_filter:
+        known = {str(source.get("id", "")) for source in sources if isinstance(source, dict)}
+        unknown = sorted(source_filter - known)
+        if unknown:
+            raise ValueError("unknown source id: " + ", ".join(unknown))
+        sources = [source for source in sources if str(source.get("id", "")) in source_filter]
     window = build_window(args)
-    if getattr(args, "dry_run", False):
-        return dry_run_document(window, sources)
+    limit_per_source = getattr(args, "limit_per_source", None)
+    limit_per_source = int(limit_per_source) if limit_per_source is not None else None
+    if limit_per_source is not None and limit_per_source < 1:
+        raise ValueError("--limit-per-source must be >= 1")
 
     candidates: list[dict[str, Any]] = []
-    excluded: list[dict[str, Any]] = []
-    missing: list[dict[str, Any]] = []
-    coverage: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    source_rows: list[dict[str, Any]] = []
 
     for source in sources:
         source_id = str(source["id"])
         source_name = str(source["name"])
-        adapter_name = str(source["adapter"])
-        adapter = ADAPTERS.get(adapter_name)
-        if adapter is None:
-            coverage.append(
-                {
-                    "source_id": source_id,
-                    "name": source_name,
-                    "status": "failed",
-                    "raw_count": 0,
-                    "candidate_count": 0,
-                    "missing_reason": f"unknown adapter: {adapter_name}",
-                }
-            )
-            continue
+        fetcher = resolve_fetcher(source)
 
         try:
-            raw_items = adapter(source, window)
+            raw_items = fetcher(source, window)
         except Exception as exc:  # pragma: no cover - network sources drift.
-            print(f"[ai-news] {source_id} failed: {exc}", file=sys.stderr)
-            coverage.append(
+            source_rows.append(
                 {
                     "source_id": source_id,
                     "name": source_name,
-                    "status": "failed",
-                    "raw_count": 0,
-                    "candidate_count": 0,
-                    "missing_reason": str(exc),
+                    "ok": False,
+                    "raw": 0,
+                    "candidates": 0,
+                    "error": str(exc),
                 }
             )
             continue
 
         source_candidate_count = 0
-        source_missing_reason = None
         for raw in raw_items:
-            item = {key: str(raw.get(key, "") or "").strip() for key in ["title", "source_url", "published_at", "summary_basis"]}
+            item = {key: clean_text(str(raw.get(key, "") or "")) for key in ["title", "source_url", "published_at", "summary_basis"]}
             required_missing = [key for key in ["title", "source_url", "published_at", "summary_basis"] if not item[key]]
             if required_missing:
-                missing.append(
-                    {
-                        "source_id": source_id,
-                        "url": item.get("source_url") or str(source["url"]),
-                        "missing_fields": required_missing,
-                        "reason": "missing_required_fields",
-                    }
-                )
-                source_missing_reason = "missing required fields"
                 continue
 
             published = parse_datetime(item["published_at"])
             if published is None:
-                missing.append(
-                    {
-                        "source_id": source_id,
-                        "url": item["source_url"],
-                        "missing_fields": ["published_at"],
-                        "reason": "unparseable_published_at",
-                    }
-                )
-                source_missing_reason = "unparseable published_at"
+                continue
+            if is_noise_entry(item, source_id, window):
+                continue
+            if is_noisy_summary(item["summary_basis"]):
                 continue
             if published < window["start"] or published > window["end"]:
-                excluded.append({**item, "source_id": source_id, "reason": "outside_window"})
-                continue
-            if not is_ai_related(item):
-                excluded.append({**item, "source_id": source_id, "reason": "not_ai_related"})
                 continue
 
-            item_id = stable_id(item)
-            if item_id in seen:
-                excluded.append({**item, "source_id": source_id, "reason": "duplicate"})
-                continue
-            seen.add(item_id)
-
-            category = classify(item, list(source.get("coverage", [])))
             candidates.append(
                 {
-                    "id": item_id,
                     "title": item["title"],
-                    "published_at": published.isoformat(timespec="seconds"),
-                    "published_display": published.strftime("%Y-%m-%d %H:%M"),
-                    "source_url": item["source_url"],
-                    "source_id": source_id,
-                    "summary_basis": item["summary_basis"],
-                    "category": category,
-                    "zh_summary": make_summary(item),
-                    "needs_model_review": False,
+                    "url": item["source_url"],
+                    "summary": item["summary_basis"],
                 }
             )
             source_candidate_count += 1
+            if limit_per_source is not None and source_candidate_count >= limit_per_source:
+                break
 
-        status = "ok" if source_candidate_count else "partial" if source_missing_reason else "ok"
-        coverage.append(
+        source_rows.append(
             {
                 "source_id": source_id,
                 "name": source_name,
-                "status": status,
-                "raw_count": len(raw_items),
-                "candidate_count": source_candidate_count,
-                "missing_reason": source_missing_reason,
+                "ok": True,
+                "raw": len(raw_items),
+                "candidates": source_candidate_count,
+                "error": None,
             }
         )
 
     return {
         "window": serialize_window(window),
-        "source_coverage": coverage,
         "candidates": candidates,
-        "excluded": excluded,
-        "missing": missing,
+        "_sources": source_rows,
+    }
+
+
+def collect_document(args: argparse.Namespace) -> dict[str, Any]:
+    data = collect_data(args)
+    return {
+        "window": data["window"],
+        "candidates": data["candidates"],
     }
 
 
@@ -363,32 +271,20 @@ def validate_document(data: dict[str, Any]) -> list[str]:
     if errors:
         return errors
 
-    if not isinstance(data["source_coverage"], list):
-        errors.append("source_coverage must be a list")
     if not isinstance(data["candidates"], list):
         errors.append("candidates must be a list")
-    if not isinstance(data["excluded"], list):
-        errors.append("excluded must be a list")
-    if not isinstance(data["missing"], list):
-        errors.append("missing must be a list")
-
-    for index, coverage in enumerate(data.get("source_coverage", [])):
-        for field in ["source_id", "name", "status", "raw_count", "candidate_count", "missing_reason"]:
-            if field not in coverage:
-                errors.append(f"source_coverage[{index}] missing {field}")
-        if coverage.get("status") not in {"ok", "partial", "failed", "skipped"}:
-            errors.append(f"source_coverage[{index}] has invalid status")
 
     for index, candidate in enumerate(data.get("candidates", [])):
         for field in REQUIRED_CANDIDATE_FIELDS:
             if field not in candidate:
                 errors.append(f"candidates[{index}] missing {field}")
-        if candidate.get("category") not in CATEGORIES:
-            errors.append(f"candidates[{index}] has invalid category")
-        if candidate.get("needs_model_review") is False:
-            for field in ["title", "published_at", "published_display", "source_url", "summary_basis", "zh_summary"]:
-                if not candidate.get(field):
-                    errors.append(f"candidates[{index}] missing render field {field}")
+            elif not candidate.get(field):
+                errors.append(f"candidates[{index}] has empty {field}")
+        url = str(candidate.get("url", "") or "")
+        if not url.startswith(("http://", "https://")):
+            errors.append(f"candidates[{index}] has invalid url")
+        if is_noisy_summary(str(candidate.get("summary", ""))):
+            errors.append(f"candidates[{index}] contains uncleaned aggregator summary")
 
     return errors
 
@@ -401,59 +297,62 @@ def validate_sources() -> list[str]:
         return ["sources.json must contain sources[]"]
     seen: set[str] = set()
     for index, source in enumerate(sources):
-        for field in ["id", "name", "kind", "url", "adapter", "coverage"]:
+        for field in ["id", "name", "kind", "url"]:
             if field not in source:
                 errors.append(f"sources[{index}] missing {field}")
         source_id = str(source.get("id", ""))
         if source_id in seen:
-            errors.append(f"duplicate source id: {source_id}")
+            errors.append(f"repeated source id: {source_id}")
         seen.add(source_id)
-        adapter = source.get("adapter")
-        if adapter not in ADAPTERS:
-            errors.append(f"sources[{index}] unknown adapter: {adapter}")
-        coverage = source.get("coverage")
-        if not isinstance(coverage, list) or not coverage:
-            errors.append(f"sources[{index}] coverage must be a non-empty list")
-        elif any(category not in CATEGORIES for category in coverage):
-            errors.append(f"sources[{index}] contains invalid coverage category")
     return errors
 
 
-def render_markdown(data: dict[str, Any]) -> str:
+def clamp_render_window(total: int, offset: int, limit: int | None) -> tuple[int, int]:
+    start = max(0, offset)
+    if start > total:
+        start = total
+    if limit is None:
+        end = total
+    else:
+        end = min(total, start + max(0, limit))
+    return start, end
+
+
+def format_candidate(item: dict[str, Any], index: int, show_index: bool, compact: bool) -> str:
+    title = str(item.get("title", ""))
+    summary = str(item.get("summary", ""))
+    url = str(item.get("url", ""))
+    prefix = f"[{index}] " if show_index else ""
+    if compact:
+        return f"- {prefix}{title}\n  摘要：{summary}\n  来源链接：{url}"
+    return f"### {prefix}{title}\n摘要：{summary}\n来源链接：{url}"
+
+
+def render_markdown(data: dict[str, Any], args: argparse.Namespace | None = None) -> str:
     errors = validate_document(data)
     if errors:
         raise ValueError("invalid ai-news document:\n" + "\n".join(errors))
 
-    brief_template = (BASE_DIR / "templates" / "brief.md.tpl").read_text(encoding="utf-8")
-    item_template = (BASE_DIR / "templates" / "item.md.tpl").read_text(encoding="utf-8")
-    sections: list[str] = []
+    candidates = data["candidates"]
+    offset = int(getattr(args, "offset", 0) or 0)
+    limit = getattr(args, "limit", None)
+    limit = int(limit) if limit is not None else None
+    start, end = clamp_render_window(len(candidates), offset, limit)
+    show_index = bool(getattr(args, "show_index", False))
+    compact = bool(getattr(args, "compact", False))
+    rendered_items = [
+        format_candidate(item, index, show_index, compact)
+        for index, item in enumerate(candidates[start:end], start=start)
+    ]
+    if len(candidates) and (start != 0 or end != len(candidates)):
+        range_note = f"候选范围：{start + 1}-{end} / {len(candidates)}"
+    else:
+        range_note = f"候选数量：{len(candidates)}"
+    sections = [range_note, *rendered_items]
 
-    for category in CATEGORIES:
-        items = [
-            item
-            for item in data["candidates"]
-            if item.get("category") == category and item.get("needs_model_review") is False
-        ]
-        if not items:
-            continue
-        sections.append(f"## {category_heading(category)}")
-        for item in items:
-            sections.append(item_template.format(**item))
-
-    rendered = brief_template.format(date_label=data["window"]["label"], sections="\n\n".join(sections).strip())
+    body = "\n\n".join(sections).strip()
+    rendered = f"# AI 新闻候选｜{data['window']['label']}\n\n{body}"
     return rendered.rstrip() + "\n"
-
-
-def category_heading(category: str) -> str:
-    icons = {
-        "模型 / 研究": "🧠",
-        "Agent / 开发者工具": "🛠️",
-        "技术博客 / 工程实践": "🧪",
-        "产品 / 应用": "🚀",
-        "商业 / 融资": "💼",
-        "安全 / 治理": "🛡️",
-    }
-    return f"{icons[category]} {category}"
 
 
 def cmd_collect(args: argparse.Namespace) -> int:
@@ -475,7 +374,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_render(args: argparse.Namespace) -> int:
-    print(render_markdown(load_json(args.input)), end="")
+    print(render_markdown(load_json(args.input), args), end="")
     return 0
 
 
@@ -490,30 +389,91 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify_sources(args: argparse.Namespace) -> int:
+    document = collect_data(args)
+    registry = load_json(BASE_DIR / "references" / "sources.json")
+    source_min_raw: dict[str, int] = {}
+    for source in registry.get("sources", []):
+        if isinstance(source, dict):
+            verify = source.get("verify", {})
+            if isinstance(verify, dict) and "minRaw" in verify:
+                source_min_raw[str(source.get("id"))] = int(verify["minRaw"])
+    if args.out:
+        dump_json({"window": document["window"], "candidates": document["candidates"]}, args.out)
+    errors = validate_document({"window": document["window"], "candidates": document["candidates"]})
+    for row in document["_sources"]:
+        raw_count = int(row.get("raw", 0))
+        if row.get("ok") is not True:
+            errors.append(f"source {row.get('source_id')} failed: {row.get('error')}")
+        min_raw = source_min_raw.get(str(row.get("source_id")), args.min_raw)
+        if raw_count < min_raw:
+            errors.append(f"source {row.get('source_id')} raw_count={raw_count} < {min_raw}")
+
+    if errors:
+        print("AI_NEWS_SOURCE_VERIFY_FAILED", file=sys.stderr)
+        for row in document["_sources"]:
+            print(
+                f"{row['source_id']}\tok={row.get('ok')}\traw={row.get('raw')}\t"
+                f"candidates={row.get('candidates')}\terror={row.get('error')}",
+                file=sys.stderr,
+            )
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
+    for row in document["_sources"]:
+        print(
+            f"{row['source_id']}\tok={row.get('ok')}\traw={row.get('raw')}\t"
+            f"candidates={row.get('candidates')}"
+        )
+    return 0
+
+
+def add_hidden_subparser(subparsers: argparse._SubParsersAction, name: str) -> argparse.ArgumentParser:
+    parser = subparsers.add_parser(name, help=argparse.SUPPRESS)
+    subparsers._choices_actions = [action for action in subparsers._choices_actions if action.dest != name]
+    return parser
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Collect, validate, and render AI news briefs.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(description="Collect and render AI news candidates.")
+    subparsers = parser.add_subparsers(dest="command", required=True, metavar="{collect,render}")
 
     collect = subparsers.add_parser("collect", help="Collect candidate news into JSON.")
     collect.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
     collect.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
-    collect.add_argument("--dry-run", action="store_true", help="Use deterministic offline fixture data.")
+    collect.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
+    collect.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
     collect.add_argument("--out", type=Path, help="Write JSON to this path instead of stdout.")
     collect.set_defaults(func=cmd_collect)
 
-    validate = subparsers.add_parser("validate", help="Validate sources and optionally a candidate JSON file.")
+    validate = add_hidden_subparser(subparsers, "validate")
     validate.add_argument("--input", type=Path, help="Candidate JSON to validate.")
     validate.set_defaults(func=cmd_validate)
 
-    render = subparsers.add_parser("render", help="Render a validated candidate JSON file to markdown.")
+    render = subparsers.add_parser("render", help="Render a candidate JSON file to readable markdown.")
     render.add_argument("--input", type=Path, required=True, help="Candidate JSON to render.")
+    render.add_argument("--limit", type=int, help="Maximum number of candidates to render.")
+    render.add_argument("--offset", type=int, default=0, help="Zero-based candidate offset.")
+    render.add_argument("--show-index", action="store_true", help="Show candidate indexes in rendered items.")
+    render.add_argument("--compact", action="store_true", help="Use a compact list view.")
     render.set_defaults(func=cmd_render)
 
-    run = subparsers.add_parser("run", help="Collect and render a markdown brief.")
+    run = add_hidden_subparser(subparsers, "run")
     run.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
     run.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
-    run.add_argument("--dry-run", action="store_true", help="Use deterministic offline fixture data.")
+    run.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
+    run.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
     run.set_defaults(func=cmd_run)
+
+    verify_sources = add_hidden_subparser(subparsers, "verify-sources")
+    verify_sources.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
+    verify_sources.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
+    verify_sources.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
+    verify_sources.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
+    verify_sources.add_argument("--min-raw", type=int, default=0, help="Default minimum raw items required per source.")
+    verify_sources.add_argument("--out", type=Path, help="Write collected JSON to this path.")
+    verify_sources.set_defaults(func=cmd_verify_sources)
 
     return parser
 

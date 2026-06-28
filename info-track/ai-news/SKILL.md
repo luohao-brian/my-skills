@@ -1,68 +1,57 @@
 ---
 name: ai-news
-description: 生成中文版 AI 新闻简报。消费高产新闻和聚合入口，按来源数据规则筛选候选、核对入稿字段，输出按分类组织的 markdown 日报。适用于 AI 日报、今日快讯、行业动态汇总和持续追踪最新进展。
+description: 采集固定 AI 新闻源并输出候选文章。适用于生成 AI 日报、今日快讯、行业动态汇总和持续追踪最新进展。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-news
 metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-news","requires":{"anyBins":["python3","python"]}}}
 ---
 
 # AI 新闻简报
 
-产出中文版 AI 新闻简报。优先运行本 skill 自带脚本完成来源采集、候选筛选、合同校验和模板渲染；模型只在脚本标记需要审阅时补全分类、中文摘要或入稿判断。
+运行脚本从固定来源采集 AI 新闻候选，并把候选渲染成便于阅读的素材。脚本只输出 `title`、`url`、`summary`；分类、筛选、去重、标题翻译、摘要改写和最终中文简报由 agent 完成。
 
 执行依赖：
 
 - [references/sources.json](references/sources.json)：可执行来源注册表
-- [references/source-contract.md](references/source-contract.md)：来源字段和边界说明
-- [references/output-schema.md](references/output-schema.md)：候选 JSON 和 coverage 合同
-- [templates/brief.md.tpl](templates/brief.md.tpl)：最终简报模板
-- [templates/item.md.tpl](templates/item.md.tpl)：单条新闻模板
-- [templates/summarize-prompt.md.tpl](templates/summarize-prompt.md.tpl)：模型审阅模板
+- [references/output-schema.md](references/output-schema.md)：输出字段
+- [references/brief-format.md](references/brief-format.md)：最终 markdown 格式
 
-最小命令：
+采集规划：
 
 ```bash
-python3 {baseDir}/scripts/ai_news.py run --window 72h
-python3 {baseDir}/scripts/ai_news.py collect --date YYYY-MM-DD --out candidates.json
-python3 {baseDir}/scripts/ai_news.py validate --input candidates.json
-python3 {baseDir}/scripts/ai_news.py render --input candidates.json
+# 对每个 source_id 单独采集，保留量由目标稿件规模决定
+python3 {baseDir}/scripts/ai_news.py collect --window 72h --source <source_id> --limit-per-source <candidate_budget> --out candidates/<source_id>.json
+
+# 对每个 source 文件分页阅读；offset 按 page_size 递增
+python3 {baseDir}/scripts/ai_news.py render --input candidates/<source_id>.json --limit <page_size> --offset <offset> --show-index
+python3 {baseDir}/scripts/ai_news.py render --input candidates/<source_id>.json --limit <page_size> --offset <offset> --compact --show-index
 ```
 
-执行合同：
+执行：
 
-1. 优先运行 `scripts/ai_news.py run`。只有需要人工审阅或二次加工时，才拆成 `collect`、审阅 JSON、`validate`、`render`。
-2. 脚本 stdout 只输出机器可消费 JSON 或最终 markdown；采集日志、来源失败和诊断信息写 stderr。
-3. 采集结果必须包含 `window`、`source_coverage`、`candidates`、`excluded`、`missing`。
-4. 入稿条目必须有 `title`、`published_at`、`source_url`、`summary_basis`、`category`、`zh_summary`。
-5. 最终 markdown 必须由 `render` 读取候选 JSON 和模板生成，不手写结构。
+1. 先读取 `references/sources.json`，列出全部 `source_id`，建立 source 覆盖清单。
+2. 根据目标简报规模给每个 source 分配 `candidate_budget`；高产 source 可提高预算，低产 source 保持完整覆盖。
+3. 按 source 单独运行 `collect`，每个 source 写一个 `candidates/<source_id>.json`。
+4. 对每个 source 文件用 `render --limit/--offset` 分页阅读；保留候选索引，便于回看和去重。
+5. 按本文件的成稿规则和 `references/brief-format.md` 输出最终 markdown。
 
-## Agent 边界
+## 来源与候选
 
-1. [references/sources.json](references/sources.json) 中的固定来源是输入边界，不在执行中排序、替换或扩展。
-2. 内容真实性不在 skill 内裁决；只检查字段是否满足成稿要求。
-3. 来源不可用或字段不完整时，写入 `source_coverage` 和 `missing`，不要让上层从日志推断。
-4. `candidate_count` 不是完成依据；只有通过 `validate` 的业务字段合同才可进入 `render`。
+1. `references/sources.json` 是唯一来源注册表；按其中的全部 `source_id` 建立 source 覆盖清单。
+2. 来源集合以注册表为准；执行中保持来源集合和顺序稳定。
+3. `kind` 只表示来源格式。
+4. 脚本输出的文章候选只保留 `title`、`url`、`summary`。
+5. `render` 只把候选 JSON 渲染成阅读素材，不使用外部模板生成最终简报。
 
-## 时间窗口
+## 成稿规则
 
-- 未指定日期、自然日或自然周时，目标时间窗是最近 `72` 小时。
-- “今日 / 今天 / 昨日”按本地完整自然日计算，不按执行时刻截断。
-- 目标时间窗确定后，不因候选不足而切换、扩展或回退；只说明覆盖不足。
-- 发布时间写相对时间；有绝对时间时补在括号里。
+1. 读取一个或多个 `collect` 产出的 `candidates[]`，按候选的 `title`、`summary`、`url` 判断主题。
+2. 合并同一 URL、转载或重复事件；同主题下的不同进展保持独立。
+3. 将英文标题和摘要改写成中文。
+4. 固定来源默认可信，不做来源质量打分；剔除明显非 AI、纯导航、纯推广、缺少有效摘要或无法定位事件主体的候选。
+5. 优先保留模型发布、研究进展、Agent / 开发者工具、重要产品发布、融资并购、安全治理事件。
+6. 不为补量放宽时间窗、来源或字段要求。
 
-## 分类
-
-- 模型 / 研究
-- Agent / 开发者工具
-- 技术博客 / 工程实践
-- 产品 / 应用
-- 商业 / 融资
-- 安全 / 治理
-
-没有有效候选的分类可以省略；有有效候选的分类按篇幅规则保留代表性条目。
-
-## 分类容量
-
-以下区间只控制篇幅，未超上限不压缩。
+分类：
 
 - 模型 / 研究：18-28 条
 - Agent / 开发者工具：12-20 条
@@ -71,15 +60,16 @@ python3 {baseDir}/scripts/ai_news.py render --input candidates.json
 - 商业 / 融资：4-7 条
 - 安全 / 治理：6-10 条
 
-去重合并同一 URL、转载或重复事件；同主题下的不同进展保持独立。
+达到分类上限后，按来源、子主题和事件类型分散保留，再比较时间、重要性、字段完整性和重复度。
 
-达到区间上限后，按来源、子主题和事件类型分散保留，再比较时间、重要性、字段完整性和重复度。
+## 边界
 
-## 召回与入稿
+1. 固定来源是输入边界，固定时间窗是时间边界。
+2. 脚本负责采集和候选渲染；agent 负责分类、筛选、去重、翻译、改写和成稿。
 
-优先利用入口中已有字段，避免把已召回的信息再压缩掉。
+## 时间窗口
 
-1. 字段完整、分类明确、中文摘要已补全的入口候选可以入稿。
-2. 同一入口中的独立条目可以分别入稿。
-3. 没有单条原文链接时，可以使用入口链接作为来源链接，并在 `summary_basis` 中保留依据。
-4. 容量不足时先回看已读候选，不为补量放宽时间窗、来源或字段要求。
+- 默认目标时间窗是最近 `72` 小时。
+- 用户说“今日 / 今天 / 最新 / 日报”但未指定绝对日期或自然日时，仍使用最近 `72` 小时。
+- 只有用户明确指定绝对日期 `YYYY-MM-DD` 或明确要求自然日时，才使用 `--date YYYY-MM-DD`。
+- 目标时间窗确定后，不因候选不足而切换、扩展或回退。

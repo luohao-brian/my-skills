@@ -5,73 +5,49 @@
       "id": "theverge-ai",
       "name": "The Verge AI",
       "kind": "rss",
-      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-      "adapter": "rss",
-      "coverage": ["产品 / 应用", "商业 / 融资"]
+      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"
     },
     {
       "id": "wired-ai",
       "name": "Wired AI",
       "kind": "rss",
-      "url": "https://www.wired.com/feed/tag/ai/latest/rss",
-      "adapter": "rss",
-      "coverage": ["安全 / 治理", "产品 / 应用"]
+      "url": "https://www.wired.com/feed/tag/ai/latest/rss"
     },
     {
       "id": "technologyreview",
       "name": "MIT Technology Review",
       "kind": "rss",
-      "url": "https://www.technologyreview.com/feed/",
-      "adapter": "rss",
-      "coverage": ["模型 / 研究", "安全 / 治理"]
+      "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/"
     },
     {
       "id": "techcrunch-ai",
       "name": "TechCrunch AI",
       "kind": "rss",
-      "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
-      "adapter": "rss",
-      "coverage": ["商业 / 融资", "产品 / 应用"]
+      "url": "https://techcrunch.com/category/artificial-intelligence/feed/"
     },
     {
       "id": "tensorfeed",
       "name": "TensorFeed",
       "kind": "json",
-      "url": "https://tensorfeed.ai/api/news",
-      "adapter": "tensorfeed_json",
-      "coverage": ["模型 / 研究", "Agent / 开发者工具", "产品 / 应用"]
-    },
-    {
-      "id": "dailydoseofai",
-      "name": "Daily Dose of AI",
-      "kind": "rss",
-      "url": "https://www.dailydoseofai.tech/rss.xml",
-      "adapter": "rss",
-      "coverage": ["模型 / 研究", "Agent / 开发者工具"]
+      "url": "https://tensorfeed.ai/api/news"
     },
     {
       "id": "planet-ai",
       "name": "Planet AI",
       "kind": "rss",
-      "url": "https://planet-ai.net/rss.xml",
-      "adapter": "rss",
-      "coverage": ["技术博客 / 工程实践", "模型 / 研究"]
+      "url": "https://planet-ai.net/rss.xml"
     },
     {
       "id": "tmtpost-edge-ai-daily",
       "name": "TMTPost Edge AI Daily",
       "kind": "html_index",
-      "url": "https://www.tmtpost.com/user/7944025",
-      "adapter": "tmtpost",
-      "coverage": ["模型 / 研究", "产品 / 应用", "商业 / 融资", "安全 / 治理"]
+      "url": "https://www.tmtpost.com/user/7944025"
     },
     {
       "id": "maomu-news",
       "name": "猫目 AI 快讯",
       "kind": "html_index",
-      "url": "https://maomu.com/news",
-      "adapter": "maomu",
-      "coverage": ["产品 / 应用", "模型 / 研究"]
+      "url": "https://maomu.com/news"
     },
     {
       "id": "xiaohu-daily",
@@ -79,8 +55,7 @@
       "kind": "html_daily",
       "url": "https://daily.xiaohu.ai/",
       "date_url": "https://daily.xiaohu.ai/{YYYY-MM-DD}/",
-      "adapter": "xiaohu",
-      "coverage": ["模型 / 研究", "产品 / 应用", "技术博客 / 工程实践"]
+      "verify": {"minRaw": 1}
     },
     {
       "id": "hex2077",
@@ -88,56 +63,43 @@
       "kind": "html_daily",
       "url": "https://hex2077.dev/docs/",
       "date_url": "https://hex2077.dev/docs/{YYYY-MM}/{YYYY-MM-DD}/",
-      "adapter": "hex2077",
-      "coverage": ["产品 / 应用", "Agent / 开发者工具", "模型 / 研究"]
+      "verify": {"minRaw": 1}
     },
     {
       "id": "openai-news",
       "name": "OpenAI News",
       "kind": "rss",
-      "url": "https://openai.com/news/rss.xml",
-      "adapter": "rss",
-      "coverage": ["模型 / 研究", "产品 / 应用", "安全 / 治理"]
+      "url": "https://openai.com/news/rss.xml"
     },
     {
       "id": "anthropic-news",
       "name": "Anthropic News",
       "kind": "html_index",
-      "url": "https://www.anthropic.com/news",
-      "adapter": "anthropic",
-      "coverage": ["模型 / 研究", "产品 / 应用", "安全 / 治理"]
+      "url": "https://www.anthropic.com/news"
     },
     {
       "id": "anthropic-engineering",
       "name": "Anthropic Engineering",
       "kind": "html_index",
-      "url": "https://www.anthropic.com/engineering",
-      "adapter": "anthropic",
-      "coverage": ["技术博客 / 工程实践", "Agent / 开发者工具"]
+      "url": "https://www.anthropic.com/engineering"
     },
     {
       "id": "google-ai-blog",
       "name": "Google AI Blog",
       "kind": "rss",
-      "url": "https://blog.google/innovation-and-ai/technology/ai/rss/",
-      "adapter": "rss",
-      "coverage": ["产品 / 应用", "模型 / 研究"]
+      "url": "https://blog.google/innovation-and-ai/technology/ai/rss/"
     },
     {
       "id": "deepmind-blog",
       "name": "Google DeepMind Blog",
       "kind": "rss",
-      "url": "https://deepmind.google/blog/rss.xml",
-      "adapter": "rss",
-      "coverage": ["模型 / 研究", "安全 / 治理"]
+      "url": "https://deepmind.google/blog/rss.xml"
     },
     {
       "id": "interconnects",
       "name": "Interconnects",
       "kind": "rss",
-      "url": "https://www.interconnects.ai/feed",
-      "adapter": "rss",
-      "coverage": ["模型 / 研究", "技术博客 / 工程实践"]
+      "url": "https://www.interconnects.ai/feed"
     }
   ]
 }

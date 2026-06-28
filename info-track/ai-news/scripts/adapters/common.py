@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+import time
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -13,9 +14,20 @@ USER_AGENT = "Mozilla/5.0 ai-news-skill/1.0"
 
 def fetch_text(url: str, timeout: int = 30) -> str:
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=timeout) as response:
-        charset = response.headers.get_content_charset() or "utf-8"
-        return response.read().decode(charset, errors="replace")
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                charset = response.headers.get_content_charset() or "utf-8"
+                return response.read().decode(charset, errors="replace")
+        except Exception as exc:
+            last_error = exc
+            if "HTTP Error 429" in str(exc):
+                break
+            if attempt < 2:
+                time.sleep(1 + attempt)
+    assert last_error is not None
+    raise last_error
 
 
 def strip_html(value: str | None) -> str:
