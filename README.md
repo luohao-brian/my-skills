@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | info-track | `info-track/` | 规则型信息追踪与中文简报 skills |
 | hermes plugins | `hermes-plugins/` | Hermes 插件源码 |
-| openclaw skills | `openclaw-skills/` | Markdown + Python 的 OpenClaw skills |
+| openclaw skills | `openclaw-skills/` | Markdown + references/templates/scripts 的 OpenClaw skills |
 
 ## Skills
 
@@ -35,6 +35,7 @@
 | `image-gen` | `openclaw-skills/image-gen/` | Ark Seedream image generation, `scripts/volc_image_gen.py` |
 | `video-gen` | `openclaw-skills/video-gen/` | Ark Seedance video generation, `scripts/volc_video_gen.py` |
 | `volc-search` | `openclaw-skills/volc-search/` | Volcengine WebSearch, `scripts/web_search.py` |
+| `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 portable HTML/CSS design templates, `templates/*.md` |
 
 ## Design
 
@@ -42,7 +43,8 @@ OpenClaw skills use progressive loading:
 
 1. `SKILL.md` contains trigger metadata, required reads, minimal commands, and the execution contract.
 2. `references/` contains operation-specific details.
-3. `scripts/` contains Python implementations used by the agent.
+3. `templates/` contains reusable output or design templates.
+4. `scripts/` contains deterministic implementations when the skill needs executable helpers.
 
 This mirrors the lightweight-entry pattern used by the bundled PDF/PPT skills: load a short skill first, then open references or scripts only when needed.
 
@@ -57,9 +59,17 @@ info-track/ai-news/SKILL.md
 
 For local development, add this repo or one of the group directories to OpenClaw skill loading config, or copy the desired skill folder into the active workspace `skills/` directory.
 
+For agents that should use `popular-web-designs` without changing their skill registry, point them at the folder directly:
+
+```text
+Use /Users/bytedance/Documents/my-skills/openclaw-skills/popular-web-designs as a file-based design skill.
+Read SKILL.md, references/catalog.md, references/workflow.md, then one selected templates/<site>.md file.
+Apply the template to the current HTML/CSS/frontend target and verify with the available local workflow.
+```
+
 ## Dependencies
 
-Python dependencies are declared in root `pyproject.toml` for local `uv run` usage, and each skill also declares its runtime dependencies in `metadata.openclaw.install`:
+Python dependencies are declared in root `pyproject.toml` for local `uv run` usage, and executable skills also declare runtime dependencies in `metadata.openclaw.install`:
 
 - `requests` for TTS, image generation, and search
 - `websocket-client` for STT

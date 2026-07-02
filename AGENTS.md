@@ -6,7 +6,7 @@
 
 - `info-track/`：信息追踪和简报编排类规则型 skills
 - `hermes-plugins/`：Hermes 插件源码
-- `openclaw-skills/`：OpenClaw skills，采用 Markdown + Python 的渐进式加载实现
+- `openclaw-skills/`：OpenClaw skills，采用 Markdown + references/templates/scripts 的渐进式加载实现
 
 仓库不再维护 Rust workspace、预编译 CLI、tarball bundle 或 `dist/` 产物。
 
@@ -21,6 +21,7 @@
 - `openclaw-skills/image-gen/`：火山 Ark 图像生成
 - `openclaw-skills/video-gen/`：火山 Ark 视频生成
 - `openclaw-skills/volc-search/`：火山引擎 WebSearch
+- `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要
 - `scripts/verify-all.sh`：仓库级静态验证
 
@@ -37,7 +38,7 @@
 
 - `SKILL.md` 只保留触发说明、必读文件、最小命令和执行合同。
 - 细节放在 `references/`，按需加载。
-- 确定性实现放在 `scripts/`，以 Python 脚本为主。
+- 模板资源放在 `templates/`；确定性实现放在 `scripts/`，以 Python 脚本为主。
 - 不要把长 API 文档、迁移过程、历史背景或维护者解释写进 `SKILL.md`。
 - 不要新增 Rust crate、预编译二进制、`cli/`、`dist/` 或 bundle 脚本。
 

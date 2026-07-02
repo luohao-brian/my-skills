@@ -1,6 +1,6 @@
 ---
 name: volc-search
-description: 使用火山引擎融合信息搜索 API 进行联网搜索，只支持 VOLCENGINE_ACCESS_KEY / VOLCENGINE_SECRET_KEY AK/SK 鉴权，返回适合 AI 使用的网页或图片结果。当用户要求联网检索、确认最新信息、搜索新闻、查官网资料、限定站点搜索、获取权威来源，或需要有来源支撑的搜索结果时使用。
+description: 使用火山引擎融合信息搜索 API 检索网页和图片，适合查询最新信息、新闻动态、官网资料、限定站点内容，并整理带来源的搜索结果。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/volc-search
 metadata: {"openclaw":{"skillKey":"volc-search","emoji":"🔍","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/volc-search","requires":{"anyBins":["python3","python"],"env":["VOLCENGINE_ACCESS_KEY","VOLCENGINE_SECRET_KEY"]},"install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ---

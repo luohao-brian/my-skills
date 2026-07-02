@@ -57,6 +57,7 @@ skills=(
   openclaw-skills/image-gen
   openclaw-skills/video-gen
   openclaw-skills/volc-search
+  openclaw-skills/popular-web-designs
 )
 
 for skill in "${skills[@]}"; do
@@ -76,6 +77,8 @@ assert_file pyproject.toml
 assert_file uv.lock
 assert_contains pyproject.toml "requests>=2.32,<3"
 assert_contains uv.lock 'name = "requests"'
+assert_file openclaw-skills/volc-search/requirements.txt
+assert_contains openclaw-skills/volc-search/requirements.txt "requests>=2.32,<3"
 
 assert_contains openclaw-skills/tts/SKILL.md "references/ark-tts.md"
 assert_contains openclaw-skills/stt/SKILL.md "references/ark-stt.md"
@@ -83,6 +86,13 @@ assert_contains openclaw-skills/image-gen/SKILL.md "references/ark-image-gen.md"
 assert_contains openclaw-skills/video-gen/SKILL.md "references/ark-video-gen.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
+assert_contains openclaw-skills/popular-web-designs/SKILL.md "references/catalog.md"
+assert_contains openclaw-skills/popular-web-designs/SKILL.md "templates/<site>.md"
+popular_template_count="$(find openclaw-skills/popular-web-designs/templates -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
+[[ "$popular_template_count" == "54" ]] || fail "popular-web-designs should include 54 templates, found $popular_template_count"
+if rg -n 'Hermes|write_file|generative-widgets|browser_vision|cloudflared|skill_view|claude-design|design-md|DESIGN\.md|metadata\.hermes|triggers:' openclaw-skills/popular-web-designs; then
+  fail "popular-web-designs must stay decoupled from Hermes/runtime-specific skill contracts"
+fi
 
 assert_file info-track/ai-news/references/sources.json
 assert_file info-track/ai-news/references/output-schema.md
