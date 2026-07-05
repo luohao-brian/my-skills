@@ -120,6 +120,25 @@ python cli.py config --voice vivi
 python cli.py config --voice zh_male_m191_uranus_bigtts
 ```
 
+When Ark returns TTS subtitle/timestamp events, `text_to_speech` writes a
+sidecar timeline next to the generated audio. For an output path like
+`/tmp/narration.mp3`, the timeline path is:
+
+```text
+/tmp/narration.transcript.json
+```
+
+The sidecar is a JSON array of segments shaped for caption workflows:
+
+```json
+[
+  {"id": 0, "text": "字幕文本。", "start": 0.135, "end": 1.235}
+]
+```
+
+This file is produced by the same TTS request as the audio. It is not generated
+by a separate STT pass.
+
 The plugin reuses Hermes' existing plugin config namespace:
 
 ```yaml
