@@ -4,12 +4,9 @@
 
 Required:
 
-- `VOLC_AGENT_PLAN_API_KEY`
+- `ARK_AGENT_PLAN_API_KEY`
 
-Accepted compatibility fallbacks:
-
-- `ARK_API_KEY`
-- `OPENAPI_API_KEY`
+The script reads only `ARK_AGENT_PLAN_API_KEY` for authentication.
 
 Optional:
 

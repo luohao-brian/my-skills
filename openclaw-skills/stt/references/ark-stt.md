@@ -4,12 +4,9 @@
 
 Required:
 
-- `VOLC_AGENT_PLAN_API_KEY`
+- `ARK_AGENT_PLAN_API_KEY`
 
-Accepted compatibility fallbacks:
-
-- `ARK_API_KEY`
-- `OPENAPI_API_KEY`
+The script reads only `ARK_AGENT_PLAN_API_KEY` for authentication.
 
 Optional:
 
@@ -35,7 +32,7 @@ python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --seg-duration-ms 200
 
 Report:
 
-- Missing API key.
+- Missing `ARK_AGENT_PLAN_API_KEY`.
 - Empty input file.
 - WebSocket connection errors.
 - Non-zero ASR response codes.

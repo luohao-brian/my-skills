@@ -60,7 +60,7 @@ metadata: {"openclaw":{"emoji":"🔧"}}
 Python 依赖优先使用 `uv` installer：
 
 ```yaml
-metadata: {"openclaw":{"requires":{"anyBins":["python3","python"],"env":["VOLC_AGENT_PLAN_API_KEY"]},"primaryEnv":"VOLC_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
+metadata: {"openclaw":{"requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ```
 
 ## 渐进式加载

@@ -22,12 +22,8 @@ SERIALIZATION_JSON = 0b0001
 COMPRESSION_GZIP = 0b0001
 
 
-def env_first(names: list[str]) -> str:
-    for name in names:
-        value = os.getenv(name, "").strip()
-        if value:
-            return value
-    return ""
+def api_key_value() -> str:
+    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
 
 
 def infer_format(path: Path) -> str:
@@ -125,12 +121,12 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_STT_TIMEOUT", "180")))
     args = parser.parse_args()
 
-    import websocket
-
-    api_key = env_first(["VOLC_AGENT_PLAN_API_KEY", "ARK_API_KEY", "OPENAPI_API_KEY"])
+    api_key = api_key_value()
     if not api_key:
-        print(json.dumps({"success": False, "error": "Missing VOLC_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
         return 2
+
+    import websocket
 
     audio_path = Path(args.audio_path).expanduser()
     data = audio_path.read_bytes()

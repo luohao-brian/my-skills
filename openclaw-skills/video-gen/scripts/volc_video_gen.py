@@ -12,12 +12,8 @@ from pathlib import Path
 from typing import Any
 
 
-def env_first(names: list[str]) -> str:
-    for name in names:
-        value = os.getenv(name, "").strip()
-        if value:
-            return value
-    return ""
+def api_key_value() -> str:
+    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
 
 
 def file_to_data_url(path: str) -> str:
@@ -41,12 +37,12 @@ def main() -> int:
     parser.add_argument("--poll-seconds", type=float, default=float(os.getenv("VOLC_VIDEO_POLL_SECONDS", "5")))
     args = parser.parse_args()
 
-    from volcenginesdkarkruntime import Ark
-
-    api_key = env_first(["VOLC_AGENT_PLAN_API_KEY", "ARK_API_KEY", "OPENAPI_API_KEY"])
+    api_key = api_key_value()
     if not api_key:
-        print(json.dumps({"success": False, "error": "Missing VOLC_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
         return 2
+
+    from volcenginesdkarkruntime import Ark
 
     duration = max(5, min(args.duration, 12))
     full_prompt = " ".join([

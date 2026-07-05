@@ -11,13 +11,28 @@ import sys
 from pathlib import Path
 from typing import Any
 
+SIZE_ALIASES = {
+    "1:1": "2048x2048",
+    "3:4": "1536x2048",
+    "4:3": "2048x1536",
+    "16:9": "2048x1152",
+    "9:16": "1152x2048",
+    "21:9": "2560x1080",
+}
 
-def env_first(names: list[str]) -> str:
-    for name in names:
-        value = os.getenv(name, "").strip()
-        if value:
-            return value
-    return ""
+
+def api_key_value() -> str:
+    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+
+
+def normalize_size(value: str) -> str:
+    size = value.strip()
+    alias = SIZE_ALIASES.get(size)
+    if alias:
+        return alias
+    if size.lower() in {"2k", "3k", "4k"}:
+        return size.lower()
+    return size
 
 
 def endpoint(base_url: str, suffix: str) -> str:
@@ -79,7 +94,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate images with Volcengine Ark")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional local reference image path or data URL")
-    parser.add_argument("--size", default=os.getenv("VOLC_IMAGE_SIZE", "2K"))
+    parser.add_argument("--size", default=os.getenv("VOLC_IMAGE_SIZE", "2k"))
     parser.add_argument("--model", default=os.getenv("VOLC_IMAGE_MODEL_ID", "doubao-seedream-5.0-lite"))
     parser.add_argument("--base-url", default=os.getenv("VOLC_ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3"))
     parser.add_argument("--output-dir", default=os.getenv("VOLC_IMAGE_OUTPUT_DIR", "outputs/images"))
@@ -87,17 +102,17 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_IMAGE_TIMEOUT", "180")))
     args = parser.parse_args()
 
-    import requests
-
-    api_key = env_first(["VOLC_AGENT_PLAN_API_KEY", "ARK_API_KEY", "OPENAPI_API_KEY"])
+    api_key = api_key_value()
     if not api_key:
-        print(json.dumps({"success": False, "error": "Missing VOLC_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
         return 2
+
+    import requests
 
     payload: dict[str, Any] = {
         "model": args.model,
         "prompt": args.prompt,
-        "size": args.size,
+        "size": normalize_size(args.size),
         "response_format": "b64_json",
         "stream": False,
         "watermark": False,
@@ -130,7 +145,7 @@ def main() -> int:
             "remote_url": remote_url,
             "model": args.model,
             "prompt": args.prompt,
-            "size": args.size,
+            "size": normalize_size(args.size),
             "used_reference_image": bool(args.image),
         }, ensure_ascii=False, indent=2))
         return 0
