@@ -4,7 +4,7 @@ description: "Volcengine Ark multimodal backend for Hermes."
 author: local
 kind: standalone
 requires_env:
-  - VOLC_AGENT_PLAN_API_KEY
+  - ARK_AGENT_PLAN_API_KEY
 provides_tools:
   - text_to_speech
   - transcribe_audio
@@ -12,4 +12,3 @@ provides_tools:
   - video_generate
   - vision_analyze
   - video_analyze
-

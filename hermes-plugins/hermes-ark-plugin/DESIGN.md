@@ -192,7 +192,7 @@ python cli.py status
 - Patches raw `config.yaml` instead of saving Hermes' merged defaults, so
   unrelated user config stays untouched.
 - Optionally switches native provider selectors to `ark`.
-- Does not write raw secrets. It writes `${VOLC_AGENT_PLAN_API_KEY}` by default.
+- Does not write raw secrets. It writes `${ARK_AGENT_PLAN_API_KEY}` by default.
 
 Default command:
 

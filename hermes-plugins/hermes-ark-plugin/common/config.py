@@ -64,11 +64,20 @@ def api_key() -> str:
     value = resolve_secret(str(cfg.get("api_key", "")))
     if value:
         return value
-    for name in ("VOLC_AGENT_PLAN_API_KEY", "ARK_API_KEY", "OPENAPI_API_KEY"):
+    for name in ("ARK_AGENT_PLAN_API_KEY",):
         value = env_value(name)
         if value:
             return value
     return ""
+
+
+def section_api_key(name: str) -> str:
+    """Return a section-specific API key, falling back to the plugin key."""
+    cfg = section(name)
+    value = resolve_secret(str(cfg.get("api_key", "")))
+    if value:
+        return value
+    return api_key()
 
 
 def section(name: str) -> dict[str, Any]:
@@ -78,7 +87,8 @@ def section(name: str) -> dict[str, Any]:
 
 
 def ark_base_url() -> str:
-    return str(section("ark").get("base_url") or "https://ark.cn-beijing.volces.com/api/plan/v3")
+    configured = resolve_secret(str(section("ark").get("base_url") or ""))
+    return configured or "https://ark.cn-beijing.volces.com/api/plan/v3"
 
 
 def timeout_seconds(name: str, default: float) -> float:

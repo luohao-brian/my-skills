@@ -149,14 +149,15 @@ class ArkTranscribeAudioProvider(TranscriptionProvider):
         language: Optional[str] = None,
         **extra: Any,
     ) -> dict[str, Any]:
-        from ..common.auth import require_api_key
-        from ..common.config import section, timeout_seconds
+        from ..common.config import section, section_api_key, timeout_seconds
 
         try:
             import websocket
 
             cfg = section("transcribe_audio")
-            api_key = require_api_key()
+            api_key = section_api_key("transcribe_audio")
+            if not api_key:
+                raise RuntimeError("Ark STT API key is not configured")
             audio_path = Path(file_path).expanduser()
             audio_data = audio_path.read_bytes()
             if not audio_data:

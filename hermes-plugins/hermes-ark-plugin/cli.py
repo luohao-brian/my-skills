@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 PLUGIN_ID = "ark"
-DEFAULT_API_KEY_ENV = "VOLC_AGENT_PLAN_API_KEY"
+DEFAULT_API_KEY_ENV = "ARK_AGENT_PLAN_API_KEY"
 DEFAULT_TTS_VOICE = "zh_female_vv_uranus_bigtts"
 
 TTS_VOICES = [

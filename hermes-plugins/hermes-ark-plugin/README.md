@@ -52,7 +52,7 @@ plugins:
 
   entries:
     ark:
-      api_key: ${VOLC_AGENT_PLAN_API_KEY}
+      api_key: ${ARK_AGENT_PLAN_API_KEY}
 
       ark:
         base_url: https://ark.cn-beijing.volces.com/api/plan/v3
@@ -129,7 +129,7 @@ plugins:
 
   entries:
     ark:
-      api_key: ${VOLC_AGENT_PLAN_API_KEY}
+      api_key: ${ARK_AGENT_PLAN_API_KEY}
 
       ark:
         base_url: https://ark.cn-beijing.volces.com/api/plan/v3
@@ -196,7 +196,7 @@ video_gen:
 Store the real secret in `~/.hermes/.env`:
 
 ```bash
-VOLC_AGENT_PLAN_API_KEY=...
+ARK_AGENT_PLAN_API_KEY=...
 ```
 
 ## Uninstall

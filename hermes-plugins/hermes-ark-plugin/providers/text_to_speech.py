@@ -89,12 +89,13 @@ class ArkTextToSpeechProvider(TTSProvider):
     ) -> str:
         from pathlib import Path
 
-        from ..common.auth import require_api_key
         from ..common.client import response_error
-        from ..common.config import section, timeout_seconds
+        from ..common.config import section, section_api_key, timeout_seconds
 
         cfg = section("text_to_speech")
-        api_key = require_api_key()
+        api_key = section_api_key("text_to_speech")
+        if not api_key:
+            raise RuntimeError("Ark TTS API key is not configured")
         url = str(cfg.get("base_url") or "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional")
         resource_id = str(cfg.get("resource_id") or "seed-tts-2.0")
         voice_id = voice or str(cfg.get("voice") or "zh_female_vv_uranus_bigtts")
