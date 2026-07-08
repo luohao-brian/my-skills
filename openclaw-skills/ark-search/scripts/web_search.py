@@ -1,25 +1,18 @@
 #!/usr/bin/env python3
-"""Volcengine WebSearch API client using AK/SK authentication only."""
+"""Ark Agent Plan WebSearch API client using API key authentication only."""
 
 from __future__ import annotations
 
 import argparse
 import datetime
-import hashlib
-import hmac
 import json
 import os
 import re
 import sys
 import textwrap
 from typing import Any
-from urllib.parse import quote
 
-SERVICE = "volc_torchlight_api"
-VERSION = "2025-01-01"
-REGION = "cn-beijing"
-HOST = "mercury.volcengineapi.com"
-ACTION = "WebSearch"
+ENDPOINT = "https://open.feedcoopapi.com/search_api/web_search"
 TIME_RANGE_SHORTCUTS = {"OneDay", "OneWeek", "OneMonth", "OneYear"}
 DATE_RANGE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$")
 
@@ -33,100 +26,11 @@ def _require_requests():
     return requests
 
 
-def _hmac_sha256(key: bytes, content: str) -> bytes:
-    return hmac.new(key, content.encode("utf-8"), hashlib.sha256).digest()
-
-
-def _hash_sha256(content: str) -> str:
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-def _norm_query(params: dict[str, Any]) -> str:
-    query = ""
-    for key in sorted(params.keys()):
-        if isinstance(params[key], list):
-            for value in params[key]:
-                query += quote(key, safe="-_.~") + "=" + quote(value, safe="-_.~") + "&"
-        else:
-            query += quote(key, safe="-_.~") + "=" + quote(str(params[key]), safe="-_.~") + "&"
-    return query[:-1].replace("+", "%20") if query else ""
-
-
-def _utc_now() -> datetime.datetime:
-    try:
-        from datetime import timezone
-
-        return datetime.datetime.now(timezone.utc)
-    except ImportError:
-        return datetime.datetime.utcnow()
-
-
-def _sign_request(method: str, ak: str, sk: str, body: str) -> dict[str, str]:
-    now = _utc_now()
-    x_date = now.strftime("%Y%m%dT%H%M%SZ")
-    short_date = x_date[:8]
-    content_sha256 = _hash_sha256(body)
-    content_type = "application/json"
-    query_params = {"Action": ACTION, "Version": VERSION}
-
-    signed_header_keys = ["content-type", "host", "x-content-sha256", "x-date"]
-    signed_headers_str = ";".join(signed_header_keys)
-    canonical_headers = "\n".join(
-        [
-            f"content-type:{content_type}",
-            f"host:{HOST}",
-            f"x-content-sha256:{content_sha256}",
-            f"x-date:{x_date}",
-        ]
-    )
-    canonical_request = "\n".join(
-        [
-            method.upper(),
-            "/",
-            _norm_query(query_params),
-            canonical_headers,
-            "",
-            signed_headers_str,
-            content_sha256,
-        ]
-    )
-
-    credential_scope = f"{short_date}/{REGION}/{SERVICE}/request"
-    string_to_sign = "\n".join(
-        [
-            "HMAC-SHA256",
-            x_date,
-            credential_scope,
-            _hash_sha256(canonical_request),
-        ]
-    )
-
-    k_date = _hmac_sha256(sk.encode("utf-8"), short_date)
-    k_region = _hmac_sha256(k_date, REGION)
-    k_service = _hmac_sha256(k_region, SERVICE)
-    k_signing = _hmac_sha256(k_service, "request")
-    signature = _hmac_sha256(k_signing, string_to_sign).hex()
-    authorization = (
-        f"HMAC-SHA256 Credential={ak}/{credential_scope}, "
-        f"SignedHeaders={signed_headers_str}, "
-        f"Signature={signature}"
-    )
-
-    return {
-        "Content-Type": content_type,
-        "Host": HOST,
-        "X-Date": x_date,
-        "X-Content-Sha256": content_sha256,
-        "Authorization": authorization,
-    }
-
-
-def _get_credentials() -> tuple[str, str]:
-    ak = os.getenv("VOLCENGINE_ACCESS_KEY", "").strip()
-    sk = os.getenv("VOLCENGINE_SECRET_KEY", "").strip()
-    if not ak or not sk:
-        raise ValueError("missing VOLCENGINE_ACCESS_KEY or VOLCENGINE_SECRET_KEY")
-    return ak, sk
+def _get_api_key() -> str:
+    api_key = os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("missing ARK_AGENT_PLAN_API_KEY")
+    return api_key
 
 
 def _validate_time_range(time_range: str | None) -> str | None:
@@ -193,12 +97,13 @@ def build_body(
     return body
 
 
-def do_search(body: dict[str, Any], ak: str, sk: str, timeout: float) -> dict[str, Any]:
+def do_search(body: dict[str, Any], api_key: str, timeout: float) -> dict[str, Any]:
     requests = _require_requests()
-    body_str = json.dumps(body, ensure_ascii=False)
-    headers = _sign_request("POST", ak, sk, body_str)
-    url = f"https://{HOST}?Action={ACTION}&Version={VERSION}"
-    response = requests.post(url, headers=headers, data=body_str.encode("utf-8"), timeout=timeout)
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    response = requests.post(ENDPOINT, headers=headers, json=body, timeout=timeout)
     response.raise_for_status()
     return response.json()
 
@@ -236,7 +141,7 @@ def format_output(data: dict[str, Any], search_type: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Search with Volcengine WebSearch over AK/SK. Use web for cited text evidence and image only for image results.",
+        description="Search with Ark Agent Plan. Use web for cited text evidence and image only for image results.",
         epilog=textwrap.dedent(
             """\
             Examples:
@@ -284,7 +189,7 @@ def main() -> int:
 
     try:
         time_range = _validate_time_range(args.time_range)
-        ak, sk = _get_credentials()
+        api_key = _get_api_key()
         body = build_body(
             query=args.query,
             search_type=args.type,
@@ -298,7 +203,7 @@ def main() -> int:
             query_rewrite=args.query_rewrite,
             need_summary=not args.no_summary,
         )
-        data = do_search(body, ak=ak, sk=sk, timeout=args.timeout)
+        data = do_search(body, api_key=api_key, timeout=args.timeout)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

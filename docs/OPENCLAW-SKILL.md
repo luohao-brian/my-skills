@@ -16,7 +16,7 @@
 OpenClaw 支持在 skill root 下保留一层分组目录，例如：
 
 ```text
-openclaw-skills/tts/SKILL.md
+openclaw-skills/ark-tts/SKILL.md
 info-track/ai-news/SKILL.md
 ```
 

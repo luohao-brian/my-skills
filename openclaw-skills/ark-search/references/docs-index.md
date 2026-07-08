@@ -1,12 +1,12 @@
-# Volcengine WebSearch Reference
+# Ark Agent Plan Search Reference
 
 Use this reference only when request or response details are needed.
 
 ## Endpoint
 
-- URL: `https://mercury.volcengineapi.com?Action=WebSearch&Version=2025-01-01`
+- URL: `https://open.feedcoopapi.com/search_api/web_search`
 - Method: `POST`
-- Authentication: AK/SK signature with service `volc_torchlight_api` and region `cn-beijing`
+- Authentication: `Authorization: Bearer $ARK_AGENT_PLAN_API_KEY`
 - Content type: `application/json`
 - Official docs: https://www.volcengine.com/docs/87772/2272953?lang=zh
 
@@ -47,11 +47,10 @@ Handle failures with these rules:
 
 - If `ResponseMetadata.Error` is present, stop and report its `Code` and `Message`.
 - For `10400`, fix the request shape before retrying.
-- For `10401`, report that AK/SK authentication failed.
+- For `10401`, report that `ARK_AGENT_PLAN_API_KEY` is invalid or expired.
 - For `10402`, use only supported search types: `web` or `image`.
 - For `10403`, report that the account lacks permission for the requested search product.
 - For `10406`, report quota exhaustion; do not retry immediately.
 - For `10500`, retry once if the task is still useful.
 - For `700429`, back off before retrying; the default account limit is 5 QPS.
-- For `100013`, report that the IAM user is not authorized for the WebSearch action.
 - If HTTP transport fails before a JSON response is returned, report the HTTP or network error without inventing search results.

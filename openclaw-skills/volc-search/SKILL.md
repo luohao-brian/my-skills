@@ -28,17 +28,22 @@ No other credential path is supported by this skill.
 ```bash
 python3 {baseDir}/scripts/web_search.py "搜索词"
 python3 {baseDir}/scripts/web_search.py "OpenAI 最新发布" --time-range OneWeek --count 10
+python3 {baseDir}/scripts/web_search.py "北京旅游攻略" --need-content --need-url
 python3 {baseDir}/scripts/web_search.py "故宫博物院" --type image --count 3
 ```
 
 ## Parameters
 
 - `--type web|image`: defaults to `web`.
-- `--count N`: `web` max is 50; `image` max is 5.
-- `--time-range OneDay|OneWeek|OneMonth|OneYear|YYYY-MM-DD..YYYY-MM-DD`.
+- `--count N`: defaults to `10` for `web` and `5` for `image`; `web` max is 50; `image` max is 5.
+- `--time-range OneDay|OneWeek|OneMonth|OneYear|YYYY-MM-DD..YYYY-MM-DD`: web only.
 - `--sites "a.com|b.com"`: restrict search to sites.
 - `--block-hosts "a.com|b.com"`: exclude sites.
 - `--auth-level 1`: prefer authoritative sources.
+- `--need-content`: only return web results with `Content`.
+- `--need-url`: only return web results with original `Url`.
+- `--query-rewrite`: enable provider query rewrite.
+- `--no-summary`: do not request `Summary` for web results.
 
 ## Answer Rules
 

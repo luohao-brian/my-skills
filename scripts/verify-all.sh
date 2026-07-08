@@ -52,10 +52,13 @@ skills=(
   info-track/ai-news
   info-track/ai-labs-tracker
   info-track/reddit-oss-models
-  openclaw-skills/tts
-  openclaw-skills/stt
-  openclaw-skills/image-gen
-  openclaw-skills/video-gen
+  openclaw-skills/ark-tts
+  openclaw-skills/ark-stt
+  openclaw-skills/ark-image-gen
+  openclaw-skills/ark-video-gen
+  openclaw-skills/ark-vision
+  openclaw-skills/ark-search
+  openclaw-skills/ark-data-pro
   openclaw-skills/volc-search
   openclaw-skills/popular-web-designs
 )
@@ -79,11 +82,25 @@ assert_contains pyproject.toml "requests>=2.32,<3"
 assert_contains uv.lock 'name = "requests"'
 assert_file openclaw-skills/volc-search/requirements.txt
 assert_contains openclaw-skills/volc-search/requirements.txt "requests>=2.32,<3"
+assert_file openclaw-skills/ark-search/requirements.txt
+assert_contains openclaw-skills/ark-search/requirements.txt "requests>=2.32,<3"
+assert_file openclaw-skills/ark-vision/requirements.txt
+assert_contains openclaw-skills/ark-vision/requirements.txt "requests>=2.32,<3"
+assert_file openclaw-skills/ark-data-pro/requirements.txt
+assert_contains openclaw-skills/ark-data-pro/requirements.txt "requests>=2.32,<3"
 
-assert_contains openclaw-skills/tts/SKILL.md "references/ark-tts.md"
-assert_contains openclaw-skills/stt/SKILL.md "references/ark-stt.md"
-assert_contains openclaw-skills/image-gen/SKILL.md "references/ark-image-gen.md"
-assert_contains openclaw-skills/video-gen/SKILL.md "references/ark-video-gen.md"
+assert_contains openclaw-skills/ark-tts/SKILL.md "references/ark-tts.md"
+assert_contains openclaw-skills/ark-stt/SKILL.md "references/ark-stt.md"
+assert_contains openclaw-skills/ark-image-gen/SKILL.md "references/ark-image-gen.md"
+assert_contains openclaw-skills/ark-video-gen/SKILL.md "references/ark-video-gen.md"
+assert_contains openclaw-skills/ark-vision/SKILL.md "references/ark-vision.md"
+assert_contains openclaw-skills/ark-vision/SKILL.md "ARK_AGENT_PLAN_API_KEY"
+assert_contains openclaw-skills/ark-vision/SKILL.md "vision_analyze.py"
+assert_contains openclaw-skills/ark-search/SKILL.md "references/docs-index.md"
+assert_contains openclaw-skills/ark-search/SKILL.md "ARK_AGENT_PLAN_API_KEY"
+assert_contains openclaw-skills/ark-data-pro/SKILL.md "references/docs-index.md"
+assert_contains openclaw-skills/ark-data-pro/SKILL.md "ARK_AGENT_PLAN_API_KEY"
+assert_contains openclaw-skills/ark-data-pro/SKILL.md "data_pro_search.py"
 assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
 assert_contains openclaw-skills/popular-web-designs/SKILL.md "references/catalog.md"
@@ -128,12 +145,17 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   info-track/ai-news/scripts/adapters/rss.py \
   info-track/ai-news/scripts/adapters/json_api.py \
   info-track/ai-news/scripts/adapters/html_index.py \
-  openclaw-skills/tts/scripts/volc_tts.py \
-  openclaw-skills/stt/scripts/volc_stt.py \
-  openclaw-skills/image-gen/scripts/volc_image_gen.py \
-  openclaw-skills/video-gen/scripts/volc_video_gen.py \
+  openclaw-skills/ark-tts/scripts/volc_tts.py \
+  openclaw-skills/ark-stt/scripts/volc_stt.py \
+  openclaw-skills/ark-image-gen/scripts/volc_image_gen.py \
+  openclaw-skills/ark-video-gen/scripts/volc_video_gen.py \
+  openclaw-skills/ark-vision/scripts/vision_analyze.py \
+  openclaw-skills/ark-search/scripts/web_search.py \
+  openclaw-skills/ark-data-pro/scripts/data_pro_search.py \
   openclaw-skills/volc-search/scripts/web_search.py
 
+"$python_bin" openclaw-skills/ark-vision/scripts/vision_analyze.py --help >/dev/null
+"$python_bin" openclaw-skills/ark-data-pro/scripts/data_pro_search.py --help >/dev/null
 "$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
 ai_news_verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-news-verify.XXXXXX")"
 trap 'rm -rf "$ai_news_verify_dir"' EXIT

@@ -30,10 +30,13 @@
 
 | Skill | 路径 | 实现 |
 | --- | --- | --- |
-| `tts` | `openclaw-skills/tts/` | Ark TTS, `scripts/volc_tts.py` |
-| `stt` | `openclaw-skills/stt/` | Ark STT, `scripts/volc_stt.py` |
-| `image-gen` | `openclaw-skills/image-gen/` | Ark Seedream image generation, `scripts/volc_image_gen.py` |
-| `video-gen` | `openclaw-skills/video-gen/` | Ark Seedance video generation, `scripts/volc_video_gen.py` |
+| `ark-tts` | `openclaw-skills/ark-tts/` | Ark TTS, `scripts/volc_tts.py` |
+| `ark-stt` | `openclaw-skills/ark-stt/` | Ark STT, `scripts/volc_stt.py` |
+| `ark-image-gen` | `openclaw-skills/ark-image-gen/` | Ark Seedream image generation, `scripts/volc_image_gen.py` |
+| `ark-video-gen` | `openclaw-skills/ark-video-gen/` | Ark Seedance video generation, `scripts/volc_video_gen.py` |
+| `ark-vision` | `openclaw-skills/ark-vision/` | Ark Agent Plan image understanding, `scripts/vision_analyze.py` |
+| `ark-search` | `openclaw-skills/ark-search/` | Ark Agent Plan search, `scripts/web_search.py` |
+| `ark-data-pro` | `openclaw-skills/ark-data-pro/` | Ark Agent Plan professional datasets, `scripts/data_pro_search.py` |
 | `volc-search` | `openclaw-skills/volc-search/` | Volcengine WebSearch, `scripts/web_search.py` |
 | `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 portable HTML/CSS design templates, `templates/*.md` |
 
@@ -53,7 +56,7 @@ This mirrors the lightweight-entry pattern used by the bundled PDF/PPT skills: l
 OpenClaw supports one grouping level under configured skill roots, so this repository can be used with grouped paths such as:
 
 ```text
-openclaw-skills/tts/SKILL.md
+openclaw-skills/ark-tts/SKILL.md
 info-track/ai-news/SKILL.md
 ```
 
@@ -78,17 +81,10 @@ Python dependencies are declared in root `pyproject.toml` for local `uv run` usa
 Primary Ark credential:
 
 ```bash
-export VOLC_AGENT_PLAN_API_KEY=...
+export ARK_AGENT_PLAN_API_KEY=...
 ```
 
-Compatibility fallbacks supported by the scripts:
-
-```bash
-export ARK_API_KEY=...
-export OPENAPI_API_KEY=...
-```
-
-Search provider credentials:
+Volcengine WebSearch AK/SK credentials:
 
 ```bash
 export VOLCENGINE_ACCESS_KEY=...

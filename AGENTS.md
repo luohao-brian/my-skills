@@ -16,10 +16,13 @@
 - `info-track/ai-labs-tracker/`：OpenAI、Anthropic、Google DeepMind 动态追踪
 - `info-track/reddit-oss-models/`：Reddit 开源模型讨论 weekly
 - `hermes-plugins/hermes-ark-plugin/`：Hermes Ark 多模态插件
-- `openclaw-skills/tts/`：火山 Ark TTS
-- `openclaw-skills/stt/`：火山 Ark STT
-- `openclaw-skills/image-gen/`：火山 Ark 图像生成
-- `openclaw-skills/video-gen/`：火山 Ark 视频生成
+- `openclaw-skills/ark-tts/`：火山 Ark TTS
+- `openclaw-skills/ark-stt/`：火山 Ark STT
+- `openclaw-skills/ark-image-gen/`：火山 Ark 图像生成
+- `openclaw-skills/ark-video-gen/`：火山 Ark 视频生成
+- `openclaw-skills/ark-vision/`：Ark Agent Plan 图片理解
+- `openclaw-skills/ark-search/`：Ark Agent Plan 搜索
+- `openclaw-skills/ark-data-pro/`：Ark Agent Plan 专业数据集
 - `openclaw-skills/volc-search/`：火山引擎 WebSearch
 - `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要

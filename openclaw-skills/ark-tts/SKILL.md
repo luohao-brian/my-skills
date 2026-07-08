@@ -1,8 +1,8 @@
 ---
-name: tts
+name: ark-tts
 description: 使用火山引擎 Ark 语音合成接口把文本生成音频文件。适用于文本转语音、播报、旁白、配音草稿、语音接口验证和需要返回本地音频路径的任务。
-homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/tts
-metadata: {"openclaw":{"skillKey":"tts","emoji":"🔊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/tts","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
+homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-tts
+metadata: {"openclaw":{"skillKey":"ark-tts","emoji":"🔊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-tts","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ---
 
 # Volcengine Ark TTS
@@ -27,8 +27,8 @@ If `python3` is unavailable, use `python`.
 1. Require `ARK_AGENT_PLAN_API_KEY`; the script does not read any other API key variable.
 2. Write the audio file to the requested output path, or to `./outputs/tts/` when no path is supplied.
 3. When Ark returns subtitle/timestamp events, write a sibling `.transcript.json` timeline next to the audio file.
-4. Return JSON containing `success`, `local_path`, `transcript_path`, `transcript_segments`, `format`, `bytes`, `speaker`, and request metadata.
-5. If credentials, resource id, endpoint, or network access fail, report the exact missing variable or API error.
+4. Expect stdout JSON containing `success`, `local_path`, `transcript_path`, `transcript_segments`, `format`, `bytes`, `speaker`, and request metadata.
+5. Treat credential, resource id, endpoint, or network failures as failed skill calls and surface the exact missing variable or API error.
 
 ## Defaults
 
