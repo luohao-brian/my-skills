@@ -162,6 +162,8 @@ def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -
             html = fetch_text(dated_url)
         except Exception:
             continue
+        if "<title>404" in html[:500]:
+            continue
         items = _parse_xiaohu_daily(html, dated_url, date)
         if items:
             all_items.extend(items)
@@ -173,9 +175,26 @@ def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -
             try:
                 all_items.extend(fetch_generic_html(dated, dated_window))
             except Exception:
-                continue
+                pass
     if all_items:
         return all_items
+
+    base_url = str(source["url"])
+    try:
+        html = fetch_text(base_url)
+    except Exception:
+        return []
+    date_link_re = re.compile(r'href="(\d{4}-\d{2}-\d{2}/?)"')
+    found_dates = date_link_re.findall(html)
+    for date in found_dates[:3]:
+        dated_url = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
+        try:
+            daily_html = fetch_text(dated_url)
+        except Exception:
+            continue
+        items = _parse_xiaohu_daily(daily_html, dated_url, date)
+        if items:
+            return items
     return fetch_generic_html(source, window)
 
 
