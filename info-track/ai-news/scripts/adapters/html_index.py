@@ -155,15 +155,27 @@ def fetch_maomu(source: dict[str, Any], window: dict[str, Any] | None = None) ->
 
 def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
     dates = _dates_from_window(window)
+    all_items: list[dict[str, str]] = []
     for date in dates:
-        dated = dict(source)
-        dated["url"] = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
-        dated_window = dict(window or {})
-        dated_window["date"] = date
+        dated_url = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
         try:
-            return fetch_generic_html(dated, dated_window)
+            html = fetch_text(dated_url)
         except Exception:
             continue
+        items = _parse_xiaohu_daily(html, dated_url, date)
+        if items:
+            all_items.extend(items)
+        else:
+            dated = dict(source)
+            dated["url"] = dated_url
+            dated_window = dict(window or {})
+            dated_window["date"] = date
+            try:
+                all_items.extend(fetch_generic_html(dated, dated_window))
+            except Exception:
+                continue
+    if all_items:
+        return all_items
     return fetch_generic_html(source, window)
 
 
@@ -303,6 +315,44 @@ def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[
             {
                 "title": title,
                 "source_url": source_url,
+                "published_at": published_at,
+                "summary_basis": summary,
+            }
+        )
+
+    return items
+
+
+def _parse_xiaohu_daily(html: str, url: str, published_at: str) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    theme_item_re = re.compile(
+        r'<div class="theme-item"><a\s+href="([^"]+)"[^>]*>(.*?)</a>\s*(?:<span class="score-pill[^"]*">(\d+)</span>)?</div>',
+        re.DOTALL,
+    )
+    headline_re = re.compile(r'<div class="headline-title">(.*?)</div>', re.DOTALL)
+    theme_desc_re = re.compile(r'<div class="theme-desc">(.*?)</div>', re.DOTALL)
+    section_re = re.compile(r'<div class="section-title">(.*?)</div>', re.DOTALL)
+
+    theme_descs = [strip_html(m) for m in theme_desc_re.findall(html)]
+    sections = [strip_html(m) for m in section_re.findall(html)]
+    headlines = [strip_html(m) for m in headline_re.findall(html)]
+
+    for index, (href, body, _score) in enumerate(theme_item_re.findall(html)):
+        title = strip_html(body)
+        if len(title) < 8:
+            continue
+        section_idx = min(index // 5, max(len(sections) - 1, 0)) if sections else 0
+        desc_idx = min(index // 10, max(len(theme_descs) - 1, 0)) if theme_descs else 0
+        summary_parts = []
+        if section_idx < len(sections):
+            summary_parts.append(sections[section_idx])
+        if desc_idx < len(theme_descs):
+            summary_parts.append(theme_descs[desc_idx])
+        summary = " | ".join(summary_parts) if summary_parts else title
+        items.append(
+            {
+                "title": title,
+                "source_url": absolutize_url(url, href),
                 "published_at": published_at,
                 "summary_basis": summary,
             }
