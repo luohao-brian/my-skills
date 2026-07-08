@@ -41,8 +41,6 @@ python3 {baseDir}/scripts/ai_news.py render --input candidates/<source_id>.json 
 3. `kind` 只表示来源格式。
 4. 脚本输出的文章候选只保留 `title`、`url`、`summary`。
 5. `render` 只把候选 JSON 渲染成阅读素材，不使用外部模板生成最终简报。
-6. `xiaohu-daily` 是聚合型日报源（非原始新闻），其日期归档页可能不连续发布；当 `collect` 返回 0 条候选时，agent 应从首页 `https://daily.xiaohu.ai/` 用 `web_fetch` 读取最新可用日期链接，再用该日期重新运行 `collect --date <YYYY-MM-DD>`。
-7. `xiaohu-daily` 的候选属于转载聚合，不单独计入原始来源覆盖；agent 在去重时应优先保留原始新闻 URL，`xiaohu-daily` 的条目仅作为补充索引和选题参考。
 
 ## 成稿规则
 
