@@ -50,14 +50,6 @@
       "url": "https://maomu.com/news"
     },
     {
-      "id": "xiaohu-daily",
-      "name": "小互日报",
-      "kind": "html_daily",
-      "url": "https://daily.xiaohu.ai/",
-      "date_url": "https://daily.xiaohu.ai/{YYYY-MM-DD}/",
-      "verify": {"minRaw": 1}
-    },
-    {
       "id": "hex2077",
       "name": "Hex 2077",
       "kind": "html_daily",

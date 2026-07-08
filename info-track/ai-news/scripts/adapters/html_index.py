@@ -184,7 +184,7 @@ def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -
         html = fetch_text(base_url)
     except Exception:
         return []
-    date_link_re = re.compile(r'href="(\d{4}-\d{2}-\d{2}/?)"')
+    date_link_re = re.compile(r'href="(\d{4}-\d{2}-\d{2})/?"')
     found_dates = date_link_re.findall(html)
     for date in found_dates[:3]:
         dated_url = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
