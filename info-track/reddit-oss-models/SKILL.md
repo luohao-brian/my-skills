@@ -9,14 +9,6 @@ metadata: {"openclaw":{"skillKey":"reddit-oss-models","emoji":"🧵","homepage":
 
 监控 Reddit 的 r/LocalLLaMA 和 r/unsloth 的本周热门 RSS，筛选与开源模型直接相关的帖子，生成中文 weekly 简报。
 
-## 浏览要求
-
-**必须优先使用 agent-browser 连接 host browser** 获取页面内容，不要使用普通 headless 浏览器作为主路径。
-
-- 优先复用同一个浏览器 tab，在同一个 tab 中依次访问两个 RSS 链接，不要开多个 tab
-- 如果普通 headless 访问会被 Reddit 拦截，不要停下，继续通过 agent-browser + host browser / CDP 方式获取真实 RSS 内容
-- 优先读取 RSS 内容本身，不要扩展成无关网页漫游
-
 ## 数据源
 
 - https://www.reddit.com/r/LocalLLaMA/top/.rss?t=week
@@ -69,11 +61,7 @@ metadata: {"openclaw":{"skillKey":"reddit-oss-models","emoji":"🧵","homepage":
 
 ## 使用流程
 
-1. 使用 agent-browser 连接 host browser
-2. 访问 r/LocalLLaMA 的 RSS 链接
-3. 解析 RSS 内容，提取热门帖子
-4. 在同一 tab 中访问 r/unsloth 的 RSS 链接
-5. 合并两个 subreddit 的帖子
-6. 按热度排序
-7. 应用筛选规则
-8. 生成中文简报
+1. 读取两个数据源的 RSS 内容，提取热门帖子。
+2. 合并两个 subreddit 的帖子并按热度排序。
+3. 应用筛选和合并规则。
+4. 生成中文简报。

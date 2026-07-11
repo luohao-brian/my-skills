@@ -15,24 +15,23 @@ metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https:
 - [references/output-schema.md](references/output-schema.md)：输出字段
 - [references/brief-format.md](references/brief-format.md)：最终 markdown 格式
 
-采集规划：
+脚本能力：
 
 ```bash
-# 对每个 source_id 单独采集，保留量由目标稿件规模决定
-python3 {baseDir}/scripts/ai_news.py collect --window 72h --source <source_id> --limit-per-source <candidate_budget> --out candidates/<source_id>.json
-
-# 对每个 source 文件分页阅读；offset 按 page_size 递增
-python3 {baseDir}/scripts/ai_news.py render --input candidates/<source_id>.json --limit <page_size> --offset <offset> --show-index
-python3 {baseDir}/scripts/ai_news.py render --input candidates/<source_id>.json --limit <page_size> --offset <offset> --compact --show-index
+python3 {baseDir}/scripts/ai_news.py collect --window 72h --out candidates.json
+python3 {baseDir}/scripts/ai_news.py render --input candidates.json
 ```
+
+- `collect --source <source_id>` 可将采集范围限定为指定来源，参数可重复传入。
+- `collect --limit-per-source <count>` 可设置每个来源保留的候选上限；未传入时不设上限。
+- `render` 默认渲染全部候选。`--limit <count>` 和 `--offset <index>` 可选取指定范围；`--compact` 可切换紧凑视图，`--show-index` 可显示候选索引。
 
 执行：
 
 1. 先读取 `references/sources.json`，列出全部 `source_id`，建立 source 覆盖清单。
-2. 根据目标简报规模给每个 source 分配 `candidate_budget`；高产 source 可提高预算，低产 source 保持完整覆盖。
-3. 按 source 单独运行 `collect`，每个 source 写一个 `candidates/<source_id>.json`。
-4. 对每个 source 文件用 `render --limit/--offset` 分页阅读；保留候选索引，便于回看和去重。
-5. 按本文件的成稿规则和 `references/brief-format.md` 输出最终 markdown。
+2. 使用 `collect` 生成候选 JSON，并根据任务需要决定是否限定来源或候选数量。
+3. 使用 `render` 将候选 JSON 转成阅读素材；是否切分范围、显示索引或使用紧凑视图由当前任务决定。
+4. 按本文件的成稿规则和 `references/brief-format.md` 输出最终 markdown。
 
 ## 来源与候选
 
