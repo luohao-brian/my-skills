@@ -25,6 +25,7 @@
 - `openclaw-skills/ark-data-pro/`：Ark Agent Plan 专业数据集
 - `openclaw-skills/volc-search/`：火山引擎 WebSearch
 - `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
+- `openclaw-skills/ppt-master/`：SVG/PPTX 演示文稿生成、转换与多层视觉校验
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要
 - `scripts/verify-all.sh`：仓库级静态验证
 

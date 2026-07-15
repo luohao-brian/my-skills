@@ -40,6 +40,7 @@
 | `volc-search` | `openclaw-skills/volc-search/` | Volcengine WebSearch, `scripts/web_search.py` |
 | `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 portable HTML/CSS design templates, `templates/*.md` |
 | `guizang-ppt-skill` | `openclaw-skills/guizang-ppt-skill/` | 单文件 HTML PPT，22 个 Swiss 版式契约、golden deck 与静态/视觉校验 |
+| `ppt-master` | `openclaw-skills/ppt-master/` | SVG → 原生 PPTX 工作流，含静态契约、浏览器多视口与导出后几何校验 |
 
 ## Design
 
@@ -106,6 +107,7 @@ The check validates:
 - single-line `metadata` JSON
 - referenced files and scripts
 - Swiss PPT manifest、22 页 golden deck、模板 class/recipe 契约
+- PPT Master 渐进式入口、上游来源、SVG 多视口布局审计与原生 PPTX 几何审计
 - Python syntax compilation
 - absence of removed Rust / CLI / bundle directories
 

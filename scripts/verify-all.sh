@@ -62,6 +62,7 @@ skills=(
   openclaw-skills/volc-search
   openclaw-skills/popular-web-designs
   openclaw-skills/guizang-ppt-skill
+  openclaw-skills/ppt-master
 )
 
 for skill in "${skills[@]}"; do
@@ -122,6 +123,21 @@ assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_END -->"
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_START -->"
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_END -->"
+assert_file openclaw-skills/ppt-master/LICENSE
+assert_file openclaw-skills/ppt-master/references/openclaw-runtime.md
+assert_file openclaw-skills/ppt-master/references/upstream-source.md
+assert_file openclaw-skills/ppt-master/references/upstream-pipeline.md
+assert_file openclaw-skills/ppt-master/scripts/visual_layout_audit.py
+assert_file openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
+assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/visual_layout_audit.py"
+assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/pptx_layout_audit.py"
+assert_contains openclaw-skills/ppt-master/SKILL.md "--dir <absolute-projects-root>"
+if find openclaw-skills/ppt-master -type f -iname 'README.md' -print -quit | rg -q .; then
+  fail "ppt-master must not contain README.md files"
+fi
+if find openclaw-skills/ppt-master -type d -name '__pycache__' -print -quit | rg -q .; then
+  fail "ppt-master must not contain __pycache__ directories"
+fi
 popular_template_count="$(find openclaw-skills/popular-web-designs/templates -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
 [[ "$popular_template_count" == "54" ]] || fail "popular-web-designs should include 54 templates, found $popular_template_count"
 if rg -n 'Hermes|write_file|generative-widgets|browser_vision|cloudflared|skill_view|claude-design|design-md|DESIGN\.md|metadata\.hermes|triggers:' openclaw-skills/popular-web-designs; then
@@ -169,11 +185,15 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   openclaw-skills/ark-vision/scripts/vision_analyze.py \
   openclaw-skills/ark-search/scripts/web_search.py \
   openclaw-skills/ark-data-pro/scripts/data_pro_search.py \
-  openclaw-skills/volc-search/scripts/web_search.py
+  openclaw-skills/volc-search/scripts/web_search.py \
+  openclaw-skills/ppt-master/scripts/visual_layout_audit.py \
+  openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
 
 "$python_bin" openclaw-skills/ark-vision/scripts/vision_analyze.py --help >/dev/null
 "$python_bin" openclaw-skills/ark-data-pro/scripts/data_pro_search.py --help >/dev/null
 "$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
+"$python_bin" openclaw-skills/ppt-master/scripts/visual_layout_audit.py --help >/dev/null
+"$python_bin" openclaw-skills/ppt-master/scripts/pptx_layout_audit.py --help >/dev/null
 ai_news_verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-news-verify.XXXXXX")"
 trap 'rm -rf "$ai_news_verify_dir"' EXIT
 "$python_bin" info-track/ai-news/scripts/ai_news.py verify-sources --window 72h --out "$ai_news_verify_dir/candidates.json"
