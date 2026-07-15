@@ -61,6 +61,7 @@ skills=(
   openclaw-skills/ark-data-pro
   openclaw-skills/volc-search
   openclaw-skills/popular-web-designs
+  openclaw-skills/guizang-ppt-skill
 )
 
 for skill in "${skills[@]}"; do
@@ -105,6 +106,22 @@ assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
 assert_contains openclaw-skills/popular-web-designs/SKILL.md "references/catalog.md"
 assert_contains openclaw-skills/popular-web-designs/SKILL.md "templates/<site>.md"
+assert_file openclaw-skills/guizang-ppt-skill/LICENSE
+assert_file openclaw-skills/guizang-ppt-skill/assets/template.html
+assert_file openclaw-skills/guizang-ppt-skill/assets/template-swiss.html
+assert_file openclaw-skills/guizang-ppt-skill/assets/swiss-golden.html
+assert_file openclaw-skills/guizang-ppt-skill/templates/swiss-golden-slides.html
+assert_file openclaw-skills/guizang-ppt-skill/references/swiss-contract.json
+assert_file openclaw-skills/guizang-ppt-skill/scripts/create-deck.mjs
+assert_file openclaw-skills/guizang-ppt-skill/scripts/validate-swiss-deck.mjs
+assert_file openclaw-skills/guizang-ppt-skill/scripts/verify-swiss-contract.mjs
+assert_file openclaw-skills/guizang-ppt-skill/scripts/visual-check-swiss.mjs
+assert_contains openclaw-skills/guizang-ppt-skill/SKILL.md "references/swiss-contract.json"
+assert_contains openclaw-skills/guizang-ppt-skill/SKILL.md "scripts/validate-swiss-deck.mjs"
+assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_START -->"
+assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_END -->"
+assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_START -->"
+assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_END -->"
 popular_template_count="$(find openclaw-skills/popular-web-designs/templates -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
 [[ "$popular_template_count" == "54" ]] || fail "popular-web-designs should include 54 templates, found $popular_template_count"
 if rg -n 'Hermes|write_file|generative-widgets|browser_vision|cloudflared|skill_view|claude-design|design-md|DESIGN\.md|metadata\.hermes|triggers:' openclaw-skills/popular-web-designs; then
@@ -171,6 +188,15 @@ if command -v uv >/dev/null 2>&1; then
   uv lock --check >/dev/null
 else
   fail "uv is required to verify locked Python dependencies"
+fi
+
+if command -v node >/dev/null 2>&1; then
+  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/build-swiss-golden.mjs" --check
+  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/verify-swiss-contract.mjs"
+  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/validate-swiss-deck.mjs" \
+    "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/assets/swiss-golden.html"
+else
+  fail "node is required to verify guizang-ppt-skill"
 fi
 
 if rg -n 'build-skill-bundle|cli/macos|cli/linux|volc-websearch|volc-gen/|volc-speech/|my-fetch/' README.md AGENTS.md docs/OPENCLAW-SKILL.md openclaw-skills info-track; then

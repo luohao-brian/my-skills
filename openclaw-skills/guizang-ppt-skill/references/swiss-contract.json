@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "upstreamCommit": "82fe5ae129e8c2a12e1155fcabed6703342749d6",
+  "template": "assets/template-swiss.html",
+  "goldenSlides": "templates/swiss-golden-slides.html",
+  "goldenDeck": "assets/swiss-golden.html",
+  "slideRegion": {
+    "start": "<!-- SLIDES_START -->",
+    "end": "<!-- SLIDES_END -->"
+  },
+  "requiredRuntimeMarkers": [
+    "<div id=\"nav\"></div>",
+    "const RECIPES = {",
+    "window.__playSlide = playSlide;",
+    "swiss-low-power-change",
+    "</body>",
+    "</html>"
+  ],
+  "runtimeClasses": ["active", "lucide", "low-power", "motion-ready", "is-win"],
+  "layouts": {
+    "S01": {"name": "Index Cover", "recipes": ["hero"], "requiredClasses": ["canvas-card"]},
+    "S02": {"name": "Vertical Timeline + KPI", "recipes": ["progression"], "requiredClasses": ["timeline-v", "tl-node"]},
+    "S03": {"name": "Split Statement", "recipes": ["statement"], "requiredClasses": ["canvas-card"]},
+    "S04": {"name": "Six Cells", "recipes": ["grid-reveal"], "requiredClasses": ["sub-grid-3-2", "sub-card"]},
+    "S05": {"name": "Three Layers", "recipes": ["stack-build"], "requiredClasses": ["stack-row", "stack-block"]},
+    "S06": {"name": "KPI Tower", "recipes": ["measure-up"], "requiredClasses": ["bar-towers", "bar-tower"]},
+    "S07": {"name": "Horizontal Bar", "recipes": ["bar-grow"], "requiredClasses": ["h-bar-chart", "row-fill"]},
+    "S08": {"name": "Duo Compare", "recipes": ["duo-mirror"], "requiredClasses": ["duo-compare", "vrule"]},
+    "S09": {"name": "Dot Matrix Statement", "recipes": ["statement"], "requiredClasses": ["dot-mat"]},
+    "S10": {"name": "Split Closing", "recipes": ["split-statement"], "requiredClasses": ["split-half", "half"]},
+    "S11": {"name": "Horizontal Timeline", "recipes": ["timeline-walk"], "requiredClasses": ["timeline-h", "tl-row", "th-node"]},
+    "S12": {"name": "Manifesto + Ink Banner", "recipes": ["manifesto"], "requiredClasses": ["manifesto-top", "ink-banner-full"]},
+    "S13": {"name": "Three Forces", "recipes": ["three-forces"], "requiredClasses": ["three-forces", "force-card"]},
+    "S14": {"name": "Loop Form", "recipes": ["loop-form"], "requiredClasses": ["loop-diagram", "loop-steps"]},
+    "S15": {"name": "Matrix + Hero Stat", "recipes": ["matrix-fill"], "requiredClasses": ["matrix-fill", "matrix-cell"]},
+    "S16": {"name": "Multi-card Brief", "recipes": ["field-notes"], "requiredClasses": ["brief-grid", "brief-card"]},
+    "S17": {"name": "System Diagram", "recipes": ["system-diagram"], "requiredClasses": ["system-diagram", "sys-label"]},
+    "S18": {"name": "Why Now", "recipes": ["why-now"], "requiredClasses": ["why-now-grid", "why-col"]},
+    "S19": {"name": "Four Cards", "recipes": ["four-cards"], "requiredClasses": ["four-cards", "fc-col"]},
+    "S20": {"name": "Stacked KPI Ledger", "recipes": ["stacked-ledger"], "requiredClasses": ["stacked-ledger", "ledger-row"]},
+    "S21": {"name": "Tech Spec Sheet", "recipes": ["tech-spec"], "requiredClasses": ["tech-spec", "spec-bars"]},
+    "S22": {"name": "Image Hero", "recipes": ["image-hero"], "requiredClasses": ["image-hero-body", "image-hero-stats"]},
+    "SWISS-COVER-ASCII": {"name": "ASCII Cover", "recipes": ["hero"], "requiredClasses": ["ascii-bg", "canvas-card"]},
+    "SWISS-CLOSING-ASCII": {"name": "ASCII Closing", "recipes": ["split-statement"], "requiredClasses": ["ascii-bg", "split-half"]}
+  },
+  "experimentalLayouts": {
+    "P23": {"name": "Swiss Image Split", "recipes": ["grid-reveal"]},
+    "P24": {"name": "Swiss Evidence Grid", "recipes": ["grid-reveal"]}
+  }
+}

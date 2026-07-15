@@ -39,6 +39,7 @@
 | `ark-data-pro` | `openclaw-skills/ark-data-pro/` | Ark Agent Plan professional datasets, `scripts/data_pro_search.py` |
 | `volc-search` | `openclaw-skills/volc-search/` | Volcengine WebSearch, `scripts/web_search.py` |
 | `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 portable HTML/CSS design templates, `templates/*.md` |
+| `guizang-ppt-skill` | `openclaw-skills/guizang-ppt-skill/` | 单文件 HTML PPT，22 个 Swiss 版式契约、golden deck 与静态/视觉校验 |
 
 ## Design
 
@@ -104,6 +105,7 @@ The check validates:
 - grouped `SKILL.md` discovery
 - single-line `metadata` JSON
 - referenced files and scripts
+- Swiss PPT manifest、22 页 golden deck、模板 class/recipe 契约
 - Python syntax compilation
 - absence of removed Rust / CLI / bundle directories
 
