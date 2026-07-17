@@ -113,7 +113,7 @@ def clean_text(text: str) -> str:
 
 def is_noisy_summary(text: str) -> bool:
     lowered = text.lower()
-    return "article url:" in lowered and ("comments url:" in lowered or "points:" in lowered)
+    return any(marker in lowered for marker in ("article url:", "comments url:", "points:"))
 
 
 def is_noise_entry(item: dict[str, str], source_id: str, window: dict[str, Any]) -> bool:
