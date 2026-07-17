@@ -162,7 +162,14 @@ info-track/ai-news/brief-*.md
 info-track/ai-news/candidates*.json
 
 # Generated local outputs
+output/
 outputs/
+visual-check/
+playwright-report/
+test-results/
+
+# Local agent settings
+.claude/settings.local.json
 
 # Icon must end with two \r
 Icon
