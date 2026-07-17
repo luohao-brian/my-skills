@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Web image search CLI.
 
-Sister tool to ``image_gen.py``: instead of generating an image from a
-prompt, this searches openly-licensed image providers and downloads a
-single best match.
+Search openly-licensed image sources and download a single best match.
 
 Workflow:
     1. Build an :class:`ImageSearchRequest` from CLI args.
@@ -59,7 +57,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from console_encoding import configure_utf8_stdio  # noqa: E402
 from config import load_prefixed_env_file  # noqa: E402
-from image_backends.backend_common import download_image  # noqa: E402
+from image_download import download_image  # noqa: E402
 from image_sources.provider_common import (  # noqa: E402
     AssetCandidate,
     ImageSearchRequest,
@@ -94,7 +92,7 @@ ORIENTATION_CHOICES = ("any", "landscape", "portrait", "square")
 # --- Batch mode (`--batch image_queries.json`) -----------------------------
 # Web providers are politeness-sensitive (Wikimedia/Openverse expect a modest
 # rate), so the default concurrency is deliberately low. Sister-tool
-# `image_gen.py` hits a paid API and defaults higher; here 3 keeps several
+# Three workers keep several searches moving without flooding public sources.
 # rows in flight without hammering any single free provider. Set to 1 to
 # restore strict one-at-a-time pacing.
 DEFAULT_SEARCH_CONCURRENCY = 3
@@ -1048,7 +1046,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Search openly-licensed web images and download a single best match. "
-            "Sister to image_gen.py."
+            "Use this only for web-sourced image rows."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1276,7 +1274,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         except KeyboardInterrupt:
             print("\n\nInterrupted by user. Partial progress preserved in manifest.")
             return 130
-        # Mirror image_gen.py: a non-zero code flags rows that need manual
+        # A non-zero code flags rows that need manual web-source replacement.
         # attention. It is a signal, not a halt — the workflow (image-base.md
         # §6) surfaces Needs-Manual rows and continues regardless.
         return 1 if needs_manual else 0

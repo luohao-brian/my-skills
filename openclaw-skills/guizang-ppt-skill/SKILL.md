@@ -33,9 +33,15 @@ metadata: {"openclaw":{"skillKey":"guizang-ppt-skill","emoji":"📐","homepage":
 
 处理图片或截图时按需读 `references/image-prompts.md` 和 `references/screenshot-framing.md`。交付前读 `references/checklist.md`。
 
+## 缺少输入或工具时
+
+- 用户没选风格时，先问：`选电子杂志风（Style A）还是瑞士国际主义（Style B）？` 风格确定后再读取对应模板。受众、页数、主题色没有写时，从原始材料和用途推断，并把采用的值写进页面规划；不要逐项追问。
+- 需要用户回答时直接提问；不要为不同模型、IDE 或运行产品写不同分支。
+- 需要新配图或重绘截图时，先看本轮工具列表中是否有图像生成或编辑工具。有则按该工具的参数调用；没有则复用用户素材或 skill 资产，并在交付说明中列出仍缺的图片。
+
 ## Workflow
 
-1. 明确风格、受众、时长、原始素材、图片需求、主题色和硬约束。缺少非关键输入时做合理假设；风格未定时必须先确认。
+1. 先确定 Style A/B，再明确受众、时长、原始素材、图片需求、主题色和硬约束。风格未定时使用上面的固定问句；其余未提供项按上面的默认规则处理。
 2. 先列 `页码 → 版式 → 选择原因 → 图片槽位 → data-animate`。Style B 的正文页只能使用 `S01-S22`；实验版式必须得到用户明确许可。
 3. 从对应 layouts 复制骨架。不要混用 Style A/B 类名，不要发明未在模板 CSS 中定义的类。
 4. 先把所有 `<section>` 放入独立的 `slides.html`，再用安全组装脚本生成最终 deck，避免误删模板底部运行时：
@@ -56,11 +62,17 @@ Style A 将 `--style swiss` 改成 `--style magazine`。
 node {baseDir}/scripts/validate-swiss-deck.mjs ./ppt/index.html
 ```
 
-6. 当前环境可用 Playwright 时，运行截图与溢出检查：
+6. 运行四视口视觉审计。检查项：元素重叠、页面/容器越界、底部安全区、内容只挤在局部。CSS class 与 recipe 仍由上一步检查：
 
 ```bash
 node {baseDir}/scripts/visual-check-swiss.mjs ./ppt/index.html --output ./ppt/visual-check
 ```
+
+按退出码处理：
+
+- `0`：通过。
+- `1`：修复页面问题，再运行一次。
+- `2`：缺少 Playwright 或浏览器。原样报告错误；不要安装软件，不要改成单视口检查。
 
 7. 在浏览器逐页检查标题层级、底部导航安全区、深色背景对比度、图片裁切、动画终态和 ESC 索引页。
 

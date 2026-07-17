@@ -85,7 +85,7 @@
 <!-- ... 页面主体 ... -->
 
 <div class="foot">
-  <div class="title">项目名 · CodePilot　|　github.com/codepilot</div>
+  <div class="title">项目名称 · Project Name　|　project.example</div>
   <div>Act I · Dev Numbers</div>
 </div>
 ```
@@ -145,8 +145,8 @@
 
 ```html
 <div class="plat">
-  <div class="sub">Weibo</div>
-  <div class="name">微博</div>
+  <div class="sub">Channel A</div>
+  <div class="name">渠道甲</div>
   <div class="nb">289K</div>
 </div>
 ```
@@ -163,7 +163,7 @@
 <div class="plat" style="border-top-style:dashed;opacity:.72">
   <div class="sub">Also On</div>
   <div class="body-zh" style="font-weight:600;margin-top:.8vh">
-    B 站　·　知乎
+    渠道乙　·　渠道丙
   </div>
 </div>
 ```
@@ -176,7 +176,7 @@
 
 ```html
 <div class="rowline">
-  <div class="k">CLAUDE.md</div>
+  <div class="k">PROJECT_RULES.md</div>
   <div class="v">你该怎么做事 —— 行为规则 + 工作偏好 + 禁止事项</div>
   <div class="m">EMPLOYEE · HANDBOOK</div>
 </div>
@@ -197,7 +197,7 @@
   <div class="pillar">
     <div class="ic">01</div>
     <div class="t">三层<br>文档体系</div>
-    <div class="d">CLAUDE.md<br>+ 项目知识库<br>+ 护栏文件</div>
+    <div class="d">项目规则文件<br>+ 项目知识库<br>+ 质量护栏</div>
   </div>
   <!-- ... 更多 pillar ... -->
 </div>
@@ -247,7 +247,7 @@
     <img src="图片素材/xxx.png" alt="说明">
   </div>
   <figcaption class="frame-cap">
-    <span class="pf">推特 · Twitter</span>
+    <span class="pf">渠道甲 · Channel A</span>
     <span class="nb">137K</span>
   </figcaption>
 </figure>
@@ -277,14 +277,14 @@
 
 5. **信息图 / 截图再设计**：给 `.frame-img` 同时加 `.fit-contain`，避免图内文字和标注被裁切。
 
-6. **用户原始截图比例不合适时**：优先按 `screenshot-framing.md` 做 CleanShot X 式程序化适配;只有截图太长、太窄或需要重构信息时,才重新生成"截图再设计 / UI 情景图"。
+6. **用户原始截图比例不合适时**：优先按 `screenshot-framing.md` 做保真截图适配;只有截图太长、太窄或需要重构信息时,才重新生成"截图再设计 / UI 情景图"。
 
 ### Frame Caption 变体
 
 ```html
 <!-- 标准：左 figure 名，右数字 -->
 <figcaption class="frame-cap">
-  <span class="pf">推特 · Twitter</span>
+  <span class="pf">渠道甲 · Channel A</span>
   <span class="nb">137K</span>
 </figcaption>
 
@@ -302,7 +302,7 @@
 ```html
 <div class="img-slot r-4x3">  <!-- r-4x3 / r-16x9(default) / r-3x2 / r-1x1 -->
   <span class="plus">+</span>
-  <span class="label">GitHub 截图位置</span>
+  <span class="label">产品截图位置</span>
 </div>
 ```
 

@@ -38,7 +38,7 @@ For each row with `Status: Pending`:
 
 | Acquire Via | Load reference | Run | Success status |
 |---|---|---|---|
-| `ai` | [`image-generator.md`](./image-generator.md) | `image_gen.py` | `Generated` |
+| `ai` | [`image-generator.md`](./image-generator.md) | runtime image-generation tool + `image_manifest.py` | `Generated` |
 | `web` | [`image-searcher.md`](./image-searcher.md) | `image_search.py` | `Sourced` |
 | `slice` | [`image-generator.md`](./image-generator.md) §4.3 | `slice_images.py` after parent AI sheet is `Generated` | `Generated` |
 | `user` | — | — | (already `Existing`) |
@@ -63,28 +63,24 @@ Before processing any row:
 
 After all rows reach terminal status:
 
-- Every non-skipped row has a file at `project/images/<filename>`, or is marked `Needs-Manual`
-- Every `slice` row has a generated element file, or is marked `Needs-Manual` because its parent sheet is not available
+- Every `ai` and `slice` row has a file at `project/images/<filename>` and is `Generated`
+- Every failed `web` row is either replaced or marked `Needs-Manual`
 - No `Pending` or `Failed` rows remain
-- `image_prompts.json` exists when ≥1 ai row processed; every entry has `status ∈ {Generated, Needs-Manual}` (no `Pending` or `Failed` remaining)
+- `image_prompts.json` exists when ≥1 ai row processed; every entry has `status: Generated`
 - `image_sources.json` exists when ≥1 web row processed; every entry has `license_tier ∈ {no-attribution, attribution-required, manual}` (`manual` = a user-supplied `--from-url` replacement)
 
-> `Needs-Manual` is a legitimate terminal state for ai rows — Step 7 entry waits for the user to place the file. See [`image-generator.md`](./image-generator.md) §7 Offline Manual Mode.
+> AI image rows never use `Needs-Manual`. They require the runtime's image-generation tool and block Executor until generated.
 
 ---
 
 ## 6. Failure Handling
 
-**Hard rule**: acquisition failures MUST NOT halt the pipeline.
+**Hard rule**: an AI image failure stops AI acquisition before Executor. Web search failures may still use `Needs-Manual`.
 
 1. Try once
 2. On recoverable failure (network, no candidates, license rejection, rate limit), retry once with broadened parameters
-3. On second failure, set `Status: Needs-Manual`, log the reason in conversation, continue
-4. After the phase completes, summarize all `Needs-Manual` rows for the user — list filenames, where prompts live (`images/image_prompts.md` paste-ready blocks for ai rows; refresh via `image_gen.py --render-md` if stale), and where to place generated files (`project/images/<filename>`). For `slice` rows, list the parent sheet filename and target element names; the user places the sheet, then the agent reruns `slice_images.py`.
-
-`Needs-Manual` is also the entry status for **Offline Manual Mode** (no `IMAGE_BACKEND` configured, no host-native image tool in use). Affected ai rows are marked `Needs-Manual` from the start without a failed attempt — see [`image-generator.md`](./image-generator.md) §7 Offline Manual Mode.
-
-Path-specific retry policies (provider chain, backend chain) live in the path's own reference.
+3. For an `ai` row, record `Failed` with `image_manifest.py fail`, report the image-tool error, and stop before Executor.
+4. For a `web` row, follow `image-searcher.md`; after its retry limit it may become `Needs-Manual`.
 
 ---
 
@@ -123,7 +119,7 @@ Executor consumes the resource list plus:
 | Image files | `project/images/*.{jpg,png,webp}` | `<image>` references |
 | Manifest | `project/images/image_sources.json` | `license_tier` per Sourced image |
 
-Executor does NOT invoke `image_gen.py` / `image_search.py` / `slice_images.py`.
+Executor does NOT invoke the image-generation tool, `image_search.py`, or `slice_images.py`.
 
 ---
 
@@ -132,7 +128,7 @@ Executor does NOT invoke `image_gen.py` / `image_search.py` / `slice_images.py`.
 ```markdown
 ## ✅ Image Acquisition Phase Complete
 - [x] {N} rows processed (`ai`: {a} / `web`: {b} / `slice`: {s})
-- [x] {a} `Generated`, {b} `Sourced`, {s} sliced `Generated`, {c} `Needs-Manual`
+- [x] {a} AI `Generated`, {b} web `Sourced`, {s} sliced `Generated`, {c} web `Needs-Manual`
 - [x] image_prompts.json / image_sources.json written
 - [ ] **Next**: Auto-proceed to Executor phase
 ```

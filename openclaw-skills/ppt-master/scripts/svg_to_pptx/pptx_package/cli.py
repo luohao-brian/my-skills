@@ -710,7 +710,7 @@ Recorded narration:
             if unreadable:
                 print(
                     "Error: Recorded narration requires readable audio durations. "
-                    "Install ffprobe/ffmpeg or replace the listed audio files.",
+                    "Provide ffprobe, readable WAV metadata, or afinfo; otherwise replace the listed audio files.",
                     file=sys.stderr,
                 )
                 for item in unreadable[:20]:

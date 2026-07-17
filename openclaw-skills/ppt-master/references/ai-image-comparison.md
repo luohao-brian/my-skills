@@ -16,7 +16,7 @@ This directory uses **controlled-variable comparison** — vary one dimension wh
 Each subdirectory contains:
 
 - `_subject.md` — the controlled variables and the subject used for this set
-- `_manifest.json` — generation manifest (status=Pending), runnable via `image_gen.py --manifest`
+- `_manifest.json` — generation manifest used to reproduce the comparison with the current runtime's image tool
 - `<dimension>.png` — the generated image for each rendering / palette / type
 
 > `page_role: hero_page` images don't pick an `image_type` — they use the four composition primitives in [`image-generator.md`](image-generator.md) §4.1 directly (single-subject / portrait / typographic / atmospheric). The 11 types in `type/` are for local infographic blocks only.
@@ -29,30 +29,20 @@ Each subdirectory contains:
 | palette=`cool-corporate` | Most neutral and most common; simple color behavior (HEX 60-30-10 applied directly) so it doesn't overpower the dimension under comparison |
 | composition=single-subject hero (§4.1 Primitive A) | One dominant subject (60-70% of canvas) — the most visually representative shape, so rendering / palette differences show up most clearly |
 
-## How the images were generated
+## How to regenerate
 
-> Reference images were generated with the **OpenAI gpt-image-2** backend. Other backends (gemini / doubao / qwen / etc.) will produce visually different results — this reflects model-level differences, not differences in PPT Master's dimension system.
-
-To reproduce or regenerate:
+Validate and list each comparison manifest:
 
 ```bash
-python3 {baseDir}/scripts/image_gen.py \
-    --manifest {baseDir}/references/ai-image-comparison/rendering/_manifest.json \
-    -o {baseDir}/references/ai-image-comparison/rendering/ \
-    --backend openai
-
-python3 {baseDir}/scripts/image_gen.py \
-    --manifest {baseDir}/references/ai-image-comparison/palette/_manifest.json \
-    -o {baseDir}/references/ai-image-comparison/palette/ \
-    --backend openai
-
-python3 {baseDir}/scripts/image_gen.py \
-    --manifest {baseDir}/references/ai-image-comparison/type/_manifest.json \
-    -o {baseDir}/references/ai-image-comparison/type/ \
-    --backend openai
+python3 {baseDir}/scripts/image_manifest.py pending \
+  {baseDir}/references/ai-image-comparison/rendering/_manifest.json
+python3 {baseDir}/scripts/image_manifest.py pending \
+  {baseDir}/references/ai-image-comparison/palette/_manifest.json
+python3 {baseDir}/scripts/image_manifest.py pending \
+  {baseDir}/references/ai-image-comparison/type/_manifest.json
 ```
 
-Generated images land in the corresponding subdirectory. Each item's `status` in the manifest is updated in place to `Generated` / `Failed` / `Needs-Manual`. Re-running only retries `Pending` and `Failed` items — `Generated` items are skipped.
+Call the current runtime's image-generation tool for each task and record each returned file with `image_manifest.py record`. Do not select a provider or model in this skill.
 
 ## How to use
 

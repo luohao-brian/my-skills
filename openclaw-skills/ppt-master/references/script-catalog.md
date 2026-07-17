@@ -7,8 +7,8 @@ This directory contains user-facing scripts for conversion, project setup, direc
 - Top-level `scripts/`: runnable entry scripts
 - `scripts/source_to_md.py`: unified source-document → Markdown dispatcher
 - `scripts/source_to_md/`: source-document → Markdown routing/batch helpers and backend converters (`_dispatcher.py`, `_batch.py`, `pdf_to_md.py`, `doc_to_md.py`, `excel_to_md.py`, `ppt_to_md.py`, `web_to_md.py`)
-- `scripts/image_backends/`: internal provider implementations used by `image_gen.py`
-- `scripts/tts_backends/`: internal TTS provider implementations used by `notes_to_audio.py`
+- `scripts/image_manifest.py`: provider-neutral image task validation and result recording
+- `scripts/audio_manifest.py`: provider-neutral narration task preparation and result validation
 - `scripts/template_import/`: internal PPTX reference-preparation helpers used by `pptx_template_import.py`
 - `scripts/svg_finalize/`: internal post-processing helpers used by `finalize_svg.py`
 - `scripts/docs/`: topic-focused script documentation
@@ -39,11 +39,11 @@ python3 {baseDir}/scripts/svg_to_pptx.py <project_path>
 |------|-----------------|---------------|
 | Conversion | `source_to_md.py`, `source_to_md/pdf_to_md.py`, `source_to_md/doc_to_md.py`, `source_to_md/excel_to_md.py`, `source_to_md/ppt_to_md.py`, `source_to_md/web_to_md.py`, `pptx_intake.py`, `pptx_to_svg.py` | [docs/conversion.md](../scripts/docs/conversion.md) |
 | Project management | `project_manager.py`, `batch_validate.py`, `error_helper.py`, `pptx_template_import.py`, `template_fill_pptx.py`, `native_enhance_pptx.py` | [docs/project.md](../scripts/docs/project.md) |
-| SVG pipeline | `preset_shape_svg.py`, `svg_authoring_view.py`, `finalize_svg.py`, `svg_to_pptx.py`, `template_preview_pptx.py`, `total_md_split.py`, `svg_quality_checker.py`, `extract_svg_assets.py`, `extract_svg_pictures.py`, `animation_config.py`, `notes_to_audio.py` | [docs/svg-pipeline.md](../scripts/docs/svg-pipeline.md); [native preset authoring](native-shape-authoring.md) |
+| SVG pipeline | `preset_shape_svg.py`, `svg_authoring_view.py`, `finalize_svg.py`, `svg_to_pptx.py`, `template_preview_pptx.py`, `total_md_split.py`, `audio_manifest.py`, `svg_quality_checker.py`, `extract_svg_assets.py`, `extract_svg_pictures.py`, `animation_config.py` | [docs/svg-pipeline.md](../scripts/docs/svg-pipeline.md); [native preset authoring](native-shape-authoring.md) |
 | PPTX transitions | `pptx_transitions.py` | [docs/pptx-transitions.md](../scripts/docs/pptx-transitions.md) |
 | PPTX animations | `pptx_animations.py`, `animation_config.py` | [docs/pptx-animations.md](../scripts/docs/pptx-animations.md) |
 | Spec maintenance | `update_spec.py` | [docs/update_spec.md](../scripts/docs/update_spec.md) |
-| Image tools | `image_gen.py`, `latex_render.py`, `analyze_images.py`, `gemini_watermark_remover.py` | [docs/image.md](../scripts/docs/image.md) |
+| Image tools | `image_manifest.py`, `latex_render.py`, `analyze_images.py` | [docs/image.md](../scripts/docs/image.md) |
 | Troubleshooting | validation, preview, export, dependency issues | [docs/troubleshooting.md](../scripts/docs/troubleshooting.md) |
 
 ## High-Frequency Commands
@@ -187,16 +187,16 @@ Image generation:
 ```bash
 python3 {baseDir}/scripts/latex_render.py <project_path>
 python3 {baseDir}/scripts/latex_render.py <project_path> --providers codecogs,quicklatex,mathpad,wikimedia
-python3 {baseDir}/scripts/image_gen.py "A modern futuristic workspace"
-python3 {baseDir}/scripts/image_gen.py --list-backends
+python3 {baseDir}/scripts/image_manifest.py check <project_path>/images/image_prompts.json
+python3 {baseDir}/scripts/image_manifest.py verify <project_path>/images/image_prompts.json
 python3 {baseDir}/scripts/analyze_images.py <project_path>/images
 ```
 
 ## Recommendations
 
 - Keep one user-facing entry point per workflow at the top level of `scripts/`
-- Move provider-specific or helper internals into subdirectories
-- Prefer the unified entry points `project_manager.py`, `finalize_svg.py`, and `image_gen.py`
+- Keep provider selection outside this skill; image and narration generation use runtime tools
+- Prefer the deterministic entry points `project_manager.py`, `finalize_svg.py`, `image_manifest.py`, and `audio_manifest.py`
 - Use `svg_output/` for the only supported native PPTX export and `svg_final/` for self-contained SVG visual preview / picture insertion
 
 ## Related Docs

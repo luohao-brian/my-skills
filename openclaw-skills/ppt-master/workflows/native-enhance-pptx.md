@@ -193,61 +193,36 @@ python3 {baseDir}/scripts/native_enhance_pptx.py validate "<project>"
 
 ---
 
-## 7. Audio Voice Confirmation
+## 7. Prepare Narration Tasks
 
 🚧 **GATE**: Step 6 complete; `audio.enabled` is true.
 
-Follow the same one-shot interaction standard as [`generate-audio`](./generate-audio.md):
-
-1. Determine the notes' primary language.
-2. List available voices for the selected backend.
-3. Recommend backend, voice, rate/settings, and whether to embed audio back into the PPTX.
-4. Ask the user to accept all recommendations or override any field.
-
-For edge voices:
+Narration requires a TTS tool in the current runtime. Do not choose a provider, model, voice, rate, endpoint, or API key. If the TTS tool is absent, stop and report the missing capability.
 
 ```bash
-python3 {baseDir}/scripts/notes_to_audio.py --list-voices --locale <locale>
-```
-
-**⛔ BLOCKING**: Stop here and wait for explicit user confirmation of audio backend, voice, rate/settings, and embedding. Do not run `notes_to_audio.py` before this confirmation.
-
-Record the confirmed audio config into `project.json`:
-
-```json
-{
-  "audio": {
-    "provider": "edge",
-    "voice": "zh-CN-YunjianNeural",
-    "rate": "+0%"
-  }
-}
+python3 {baseDir}/scripts/audio_manifest.py prepare "<project>"
+python3 {baseDir}/scripts/audio_manifest.py pending "<project>/audio/audio_tasks.json"
 ```
 
 ---
 
-## 8. Generate Audio
+## 8. Generate and Verify Audio
 
-🚧 **GATE**: Step 7 confirmed; notes files exist under `<project>/notes/`.
-
-Run with the confirmed values:
+For every task printed by `pending`, call the current runtime's TTS tool with the task's `text` and absolute `output_path`. Record the returned file:
 
 ```bash
-python3 {baseDir}/scripts/notes_to_audio.py "<project>" \
-  --voice <chosen-ShortName> --rate <chosen-rate>
+python3 {baseDir}/scripts/audio_manifest.py record \
+  "<project>/audio/audio_tasks.json" <slide> --source <returned-local-file>
 ```
 
-**Default — edge (may override)**: Use `edge` unless the user requests a cloud provider or supplies a cloned voice ID.
-
-**Naming contract**: Audio stems match note stems: `001.md` → `001.mp3`.
-
-Validate:
+Then verify the complete set:
 
 ```bash
+python3 {baseDir}/scripts/audio_manifest.py verify "<project>/audio/audio_tasks.json"
 python3 {baseDir}/scripts/native_enhance_pptx.py validate "<project>"
 ```
 
----
+Audio stems match note stems: `001.md` → `001.mp3`. Any Pending or Failed narration task blocks package patching.
 
 ## 9. Apply V1 Enhancements
 

@@ -468,45 +468,6 @@
       "label_ja": "画像なし"
     }
   ],
-  "image_ai_path": [
-    {
-      "id": "auto",
-      "label": "Automatic Path A → Path B → Offline Manual",
-      "label_zh": "自动选择",
-      "label_en": "Automatic Path A → Path B → Offline Manual",
-      "label_ja": "自動選択（Path A → Path B → オフライン手動）"
-    },
-    {
-      "id": "api",
-      "label": "Path A",
-      "label_zh": "接口后端",
-      "label_en": "Path A",
-      "label_ja": "Path A",
-      "desc_zh": "强制走接口后端，第 5 步运行 image_gen.py（需已配置 IMAGE_BACKEND）。",
-      "desc_en": "Force the API backend — image_gen.py runs in Step 5 (requires IMAGE_BACKEND).",
-      "desc_ja": "APIバックエンドを強制使用。ステップ5でimage_gen.pyを実行（IMAGE_BACKENDの設定が必要）。"
-    },
-    {
-      "id": "host-native",
-      "label": "Path B",
-      "label_zh": "宿主原生工具",
-      "label_en": "Path B",
-      "label_ja": "Path B",
-      "desc_zh": "强制使用当前环境的原生图像工具生成（即使配置了 IMAGE_BACKEND 也跳过接口）；需宿主提供原生图像工具（Codex / Claude Code 等）。",
-      "desc_en": "Force the host's native image tool (skips the API even if IMAGE_BACKEND is set); requires a host with a native image tool (Codex / Claude Code / similar).",
-      "desc_ja": "現在の環境のネイティブ画像ツールを強制使用（IMAGE_BACKENDが設定されていてもAPIをスキップ）。ネイティブ画像ツールを持つホスト（Codex／Claude Codeなど）が必要。"
-    },
-    {
-      "id": "manual",
-      "label": "Offline Manual",
-      "label_zh": "离线手动",
-      "label_en": "Offline Manual",
-      "label_ja": "オフライン手動",
-      "desc_zh": "机制：写入图片提示词文件；用户在外部生成后放入项目图片目录。",
-      "desc_en": "Prompts written to images/image_prompts.json; user generates externally and places files in project/images/.",
-      "desc_ja": "images/image_prompts.jsonにプロンプトを書き出し、ユーザーが外部で生成した画像をproject/images/に配置する方式。"
-    }
-  ],
   "formula_policy": [
     {
       "id": "mixed",

@@ -37,15 +37,9 @@ This workflow is **independent**: it owns the source-acquisition step when no fi
 
 ## Step 2: Gather via web search
 
-**Tools** — use the web search and web fetch tools the current IDE provides:
+**Tools** — use the web search and page-fetch capabilities exposed in the current runtime's tool list. Do not infer tool names from the model, host, or IDE. Search finds candidate sources; page fetch retrieves the selected source content.
 
-| IDE | Web search | Web fetch |
-|---|---|---|
-| Claude Code | `WebSearch` | `WebFetch` |
-| Cursor / Codebuddy / VS Code + Copilot | provider-equivalent built-in | provider-equivalent built-in |
-| None available | — | fallback below |
-
-**Fallback when no IDE web tools** — pause, ask the user for 2–4 authoritative URLs (Wikipedia / official site / institutional release), then fetch each:
+**Fallback when those capabilities are unavailable** — pause, ask the user for 2–4 authoritative URLs (Wikipedia / official site / institutional release), then fetch each with the bundled converter:
 
 ```bash
 python3 {baseDir}/scripts/source_to_md/web_to_md.py <URL>
@@ -74,14 +68,14 @@ python3 {baseDir}/scripts/source_to_md/web_to_md.py <URL>
 
 ## Step 3: Save materials
 
-Two artifacts under `projects/`:
+Resolve an absolute research root outside source repositories, following `references/openclaw-runtime.md`. Write two artifacts there:
 
 | Artifact | Path |
 |---|---|
-| Research document | `projects/<topic_slug>.md` |
-| Image folder | `projects/<topic_slug>/` |
+| Research document | `<external-research-root>/<topic_slug>.md` |
+| Image folder | `<external-research-root>/<topic_slug>/` |
 
-**Hard rule — naming**: filename (without `.md`) and folder name MUST match. **Hard rule — location**: under `projects/`, never the repository root.
+**Hard rule — naming**: filename (without `.md`) and folder name MUST match. **Hard rule — location**: the research root must be an absolute external directory, never `{baseDir}`, the current source repository, or a relative `projects/` path.
 
 **Document structure** — section layout follows the topic: person → biography / works / impact; technology → background / mechanism / applications / outlook; company → overview / products / market / culture. The file MUST end with a `## Sources` section listing the URLs used.
 
@@ -97,8 +91,8 @@ Two artifacts under `projects/`:
 | Filename | descriptive English snake_case (`joe_hisaishi_concert.jpg`, not `image1.jpg`) |
 
 ```bash
-mkdir -p "projects/<topic_slug>"
-curl -L -o "projects/<topic_slug>/<descriptive_name>.<ext>" "<image_url>"
+mkdir -p "<external-research-root>/<topic_slug>"
+curl -L -o "<external-research-root>/<topic_slug>/<descriptive_name>.<ext>" "<image_url>"
 ```
 
 ---
@@ -109,11 +103,11 @@ Output a checkpoint, then continue with the main pipeline. The artifacts feed di
 
 ```markdown
 ## ✅ Topic Research Complete
-- [x] Document: `projects/<topic_slug>.md` (N sections)
-- [x] Images: `projects/<topic_slug>/` (N files)
+- [x] Document: `<external-research-root>/<topic_slug>.md` (N sections)
+- [x] Images: `<external-research-root>/<topic_slug>/` (N files)
 - [ ] **Next**: SKILL.md Step 2 →
   `project_manager.py init <project_name> --format <format>`
-  `project_manager.py import-sources projects/<project_name> projects/<topic_slug>.md projects/<topic_slug>/*.* --move`
+  `project_manager.py import-sources <absolute-project-path> <external-research-root>/<topic_slug>.md <external-research-root>/<topic_slug>/*.* --move`
 ```
 
-`<project_name>` is the user's chosen project identifier (typically `<format>_<topic_slug>`, e.g. `ppt169_joe_hisaishi`); `--move` removes the research artifacts from `projects/<topic_slug>` after they are imported.
+`<project_name>` is the user's chosen project identifier (typically `<format>_<topic_slug>`, e.g. `ppt169_joe_hisaishi`); `--move` removes the external research artifacts after they are imported into the project.

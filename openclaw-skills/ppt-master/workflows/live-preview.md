@@ -101,7 +101,7 @@ python3 {baseDir}/scripts/svg_editor/server.py <project_path> --daemon --no-brow
 python3 {baseDir}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
 ```
 
-- **VS Code / Cursor Remote-SSH**: open the **PORTS** panel (`Ctrl+Shift+P` → `Ports: Focus on Ports View`), click **Forward a Port**, enter `5050`. The workspace remembers it.
+- **Remote workspace**: use the current host's port-forwarding capability to expose port `5050`, then open the forwarded URL. Follow the host's published port-forwarding contract rather than assuming a specific IDE command.
 - **Termius**: open the **Port Forwarding** module from the left sidebar (top-level, not nested). Add a rule with **Type = Local**, Host = your remote, Binding `127.0.0.1:5050`, Destination `127.0.0.1:5050`. Save, then start the rule (▶ button).
 - **Plain SSH**: `ssh -L 5050:127.0.0.1:5050 <user>@<host>` (or add `LocalForward 5050 127.0.0.1:5050` to `~/.ssh/config`).
 

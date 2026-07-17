@@ -41,7 +41,7 @@ Defined in the Design Specification & Content Outline; each image carries an `Ac
 ```
 1. Strategist defines image needs → Add image resource list with Acquire Via + Status per row
 2. Image Acquisition (Step 5):
-   - Pending + ai  → Image_Generator runs image_gen.py     → Generated
+   - Pending + ai  → Image_Generator calls the image tool  → Generated
    - Pending + web → Image_Searcher runs image_search.py   → Sourced
    - Pending + slice → after parent AI sheet is Generated, slice_images.py cuts element files → Generated
    - formula / user / placeholder rows are skipped

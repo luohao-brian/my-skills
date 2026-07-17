@@ -1,6 +1,6 @@
 # Image Generation Prompts
 
-> Auto-generated from `image_prompts.json` by `image_gen.py --render-md`.
+> Generated from the image task manifest; use `image_manifest.py` to validate and record regenerated images.
 > Do not hand-edit — re-run the command to refresh.
 
 > Project: {baseDir}/references/ai-image-comparison/type

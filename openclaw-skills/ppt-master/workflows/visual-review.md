@@ -1,10 +1,10 @@
 ---
-description: Per-page rubric-based visual self-review via parallel subagents. Run after Executor, before post-processing.
+description: Batched per-page visual self-review using the current runtime's available execution capabilities. Run after Executor, before post-processing.
 ---
 
 # Visual Review Workflow
 
-> Standalone post-generation step. Goal: reduce human iteration by letting AI subagents visually self-check each rendered slide against a fixed rubric and apply atomic position/spacing fixes.
+> Standalone post-generation step. Goal: reduce human iteration by reviewing each rendered slide against a fixed rubric and applying atomic position/spacing fixes.
 >
 > Reads `<project>/svg_output/<page>.svg` and a pre-rendered PNG of each slide, then either applies a fix or flags `needs_human`. **Never touches** brand decisions, layout structure, or other files.
 >
@@ -14,7 +14,7 @@ description: Per-page rubric-based visual self-review via parallel subagents. Ru
 
 This is an **optional auxiliary loop**, opt-in only. The main pipeline (SKILL.md Step 1–7) does not invoke it; trigger only when the user explicitly asks for a visual re-pass on the generated SVGs before export.
 
-**Token cost**: each batch subagent re-reads the rubric + `design_spec.md` + `spec_lock.md` and processes K SVG+PNG pairs. For a 20-page deck with K=5, expect on the order of 100–150K additional input tokens on top of the main generation run.
+**Token cost**: each independent review batch re-reads the rubric + `design_spec.md` + `spec_lock.md` and processes K SVG+PNG pairs. For a 20-page deck with K=5, expect on the order of 100–150K additional input tokens on top of the main generation run.
 
 ## When to Run
 
@@ -71,37 +71,30 @@ If any page comes back with `"all_background": true` in the JSON summary, that p
 
 ---
 
-## Step 2 — Spawn the review team
+## Step 2 — Execute review batches
 
-Create a team and dispatch one orchestrator agent. The orchestrator partitions the N pages into batches of ≤ K pages (default **K = 5**) and spawns one subagent per batch **in parallel** (single message, `ceil(N/K)` parallel `Agent` calls). Each batch subagent reads the fixed inputs (rubric + `design_spec.md` + `spec_lock.md`) **once**, then iterates over its assigned pages sequentially.
+Partition the N pages into batches of ≤ K pages (default **K = 5**). Select the execution mode from the current runtime's tool list:
 
-```text
-TeamCreate(team_name="visual-review-<project>", agent_type="orchestrator")
-Agent(
-  team_name="visual-review-<project>",
-  subagent_type="general-purpose",
-  name="orchestrator",
-  prompt=<orchestrator-prompt>,
-)
-```
+- If the runtime exposes task delegation and result aggregation, dispatch independent batches in parallel through those published capabilities.
+- Otherwise, the current main executor processes the batches sequentially.
 
-The orchestrator prompt must be self-contained and is the **single** place where dispatch shape, batch size, and forbid lists are stated — the rubric (`references/visual-review.md`) defines the contract those prompts must satisfy. Required fields (all absolute paths):
+Do not infer delegation tool names from the model, host, or IDE, and do not call capabilities absent from the current tool list. In either mode, each batch reads the fixed inputs (rubric + `design_spec.md` + `spec_lock.md`) **once**, then processes its assigned pages sequentially.
+
+Each batch instruction must be self-contained and is the **single** place where batch size and forbid lists are stated — the rubric (`references/visual-review.md`) defines the contract. Required fields (all absolute paths):
 
 - `<project_path>` — project root
 - Full page list with `page_role` per page (parse `<project>/design_spec.md` §IX outline; if §IX is absent, default every page to `content` and flag this in the final report)
 - Batch size `K` (default 5; raise to 10 for token-sensitive runs on large decks, lower to 3 for high-fidelity short decks — see rubric §6.1)
 - Iteration budget per page (default 1; 2 only for high-stakes / final-cut runs — see [Appendix: Iteration loop](#appendix-iteration-loop-opt-in))
 - Path to the rubric: `{baseDir}/references/visual-review.md`
-- Dispatch contract reference: rubric [§6](../references/visual-review.md#6-dispatch--messaging-contract) (batched parallel spawn, self-contained prompts, mandatory `SendMessage` on idle, anonymous-name tolerance)
-- Subagent forbid list: do not edit any other page, `design_spec.md`, `spec_lock.md`, `animations.json`, `image_prompts.json`, or `images/`
-
-**Host compatibility**: `TeamCreate` and `SendMessage` are Claude-Code-specific multi-agent primitives. On hosts without those primitives (Cursor, VS Code + Copilot, Codebuddy, etc.) the main agent processes batches sequentially — same partitioning, same per-batch prompts, no parallel dispatch. Token savings from shared fixed inputs still apply; wall-clock time grows roughly N/K-fold.
+- Dispatch contract reference: rubric [§6](../references/visual-review.md#6-dispatch--result-contract)
+- Worker forbid list: do not edit any other page, `design_spec.md`, `spec_lock.md`, `animations.json`, `image_prompts.json`, or `images/`
 
 ---
 
 ## Step 3 — Aggregate findings
 
-The orchestrator emits the aggregate Markdown table back to you (the main agent):
+The review coordinator, or the main executor in sequential mode, produces the aggregate Markdown table:
 
 ```
 | page | role | status | hard_hits | soft_hits | fixes_applied | needs_human_reason |
@@ -144,17 +137,17 @@ python3 {baseDir}/scripts/svg_to_pptx.py <project_path>
 ## Notes & invariants
 
 - **Single source of truth for rules**: [`references/visual-review.md`](../references/visual-review.md). This workflow file is just the orchestration — never restate or paraphrase rules here.
-- **Concurrency**: `visual_review.py` serializes renders via `<project>/.preview/.render.lock`. Subagents must never call the renderer directly without the lock.
+- **Concurrency**: `visual_review.py` serializes renders via `<project>/.preview/.render.lock`. Review workers must never call the renderer directly without the lock.
 - **Iteration budget**: default 1 iteration. Bumping to 2 doubles render cost and roughly triples token cost. Only worth it for high-stakes / final-cut decks.
-- **Don't-touch (rubric §3)** is hard-enforced by subagents. If you want the subagent to e.g. change a brand color, that is **out of scope** — make the change manually first, then re-render & re-review.
+- **Don't-touch (rubric §3)** is hard-enforced by every review worker. Changing a brand color is **out of scope** — make the change at the deck level first, then re-render and re-review.
 - **Backups**: every modified SVG has a `.review/backup/<page>.iter<N>.svg` rollback anchor. Restore by `cp`.
 - **The rubric is not the designer**: it catches collisions, drift, and rhythm errors — it does not improve a fundamentally weak layout. If 80%+ of pages come back `needs_human`, the design spec or the executor's choice of layout patterns is the root cause, not this workflow.
-- **Playwright output discipline**: when an agent uses the playwright MCP tool `browser_take_screenshot` directly (outside the `visual_review.py` script), the `filename` parameter is resolved against the CWD (typically the repo root) — passing a bare relative path will create stray directories inside the repository. Always pass an absolute path:
+- **Direct screenshot output discipline**: when using a browser screenshot capability directly outside `visual_review.py`, provide an absolute output path whenever that capability accepts one; relative output paths may resolve against the current source repository.
   - One-off probe / ad-hoc inspection → `/tmp/probe-<topic>-<n>.png`
   - Project artifact (replaces what the script would have produced) → `<project_path>/.preview/<page>.png` (absolute)
   - Never write to `<repo>/<anything>.png` or `<repo>/<some_dir>/...` — those are caught by `.gitignore` patterns but the cleanup burden is real
 
-  The `visual_review.py` script handles output paths correctly on its own; this rule only applies to direct playwright MCP usage during interactive exploration or recovery.
+  The `visual_review.py` script handles output paths correctly on its own; this rule only applies to direct browser screenshot capabilities used during interactive exploration or recovery.
 
 ---
 
@@ -167,4 +160,4 @@ Default behavior is single-iteration review: one scan, fix in place, write the r
 3. Iteration 2: re-verify changed elements + scan for new Hard hits
 4. Rollback on any new Hard hit introduced by a fix
 
-To enable, set iteration budget = 2 in the orchestrator prompt (this is a prompt-level instruction to subagents; neither `visual_review.py` nor the harness enforces it). Each added iteration roughly doubles render cost and triples token cost on the affected pages — reserve for final-cut runs only.
+To enable, set iteration budget = 2 in the batch instruction (neither `visual_review.py` nor the execution runtime enforces it). Each added iteration roughly doubles render cost and triples token cost on the affected pages — reserve for final-cut runs only.

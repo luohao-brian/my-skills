@@ -92,7 +92,7 @@ description: >
 | `{baseDir}/scripts/icon_sync.py` | Copy chosen library icons into `<project>/icons/` at selection time; missing names reported + non-zero (re-pick gate) |
 | `{baseDir}/scripts/analyze_images.py` | Image analysis |
 | `{baseDir}/scripts/latex_render.py` | LaTeX formula rendering (manifest-driven PNG assets) |
-| `{baseDir}/scripts/image_gen.py` | AI image generation (multi-provider) |
+| `{baseDir}/scripts/image_manifest.py` | AI image task validation and result recording; generation itself uses the runtime image tool |
 | `{baseDir}/scripts/slice_images.py` | Slice one AI illustration sheet into individual spot-illustration elements |
 | `{baseDir}/scripts/svg_authoring_view.py` | Create a lightweight non-destructive inspection projection of PPTX-imported SVGs; never a release source |
 | `{baseDir}/scripts/svg_quality_checker.py` | SVG quality check |
@@ -429,7 +429,7 @@ Steps:
    python3 {baseDir}/scripts/confirm_ui/server.py <project_path> --wait-only --wait-stage stage2
    ```
    This returns when the page writes the stage-2 `result.json` (`status: stage2-confirmed`). On a non-zero exit, re-check `result.json` once before falling back to chat — except a `stage skip detected` error, which is not a page failure: you wrote a stage out of order; rewrite `recommendations.json` with the stage the error names and re-attach.
-4. **Re-derive Stage 3 from the confirmed anchors + design system, then wait for the final confirmation.** Read the stage-2 `result.json`. Author the image and execution recommendations and **overwrite** `recommendations.json` with `"stage": "stage3"`: `image_usage` as one or more source ids (`["ai"]`, `["ai","provided"]`, `["web","placeholder"]`, or `["none"]`; `none` is exclusive); `image_strategy.candidates` as **exactly three non-custom** rendering × palette recommendations from h.5 when `image_usage` includes `ai` (the page adds the fourth Custom card itself); enumerable `image_ai_path` / `generation_mode` and `refine_spec` (recommended `id` / boolean). If the recommendation involves several image sources, keep the source list structured in `recommend.image_usage` and write the usage rationale / page-role guidance into `image_notes` (for example, "封面和章节页用 AI 主视觉，产品页优先用户素材，行业背景页可用网络参考"). Write `image_ai_path` only when `image_usage` includes `ai`. Spot-illustration lean is **not** a candidate field here: it derives from the locked `visual_style`'s illustration propensity and is expressed only in the recommendation rationale / `image_notes`, never as a new confirmation field. Generated-image style palettes are **color behavior only**; final image colors follow the confirmed Stage-2 `color`. Custom image-strategy dimensions are handled by the built-in Custom card, are prose-only, and should not promise a gallery reference image. Then attach to the already-running page; `--wait-only` auto-recovers a dead server as above (same 600000 ms budget):
+4. **Re-derive Stage 3 from the confirmed anchors + design system, then wait for the final confirmation.** Read the stage-2 `result.json`. Author the image and execution recommendations and **overwrite** `recommendations.json` with `"stage": "stage3"`: `image_usage` as one or more source ids (`["ai"]`, `["ai","provided"]`, `["web","placeholder"]`, or `["none"]`; `none` is exclusive); `image_strategy.candidates` as **exactly three non-custom** rendering × palette recommendations from h.5 when `image_usage` includes `ai` (the page adds the fourth Custom card itself); enumerable `generation_mode` and `refine_spec` (recommended `id` / boolean). If the recommendation involves several image sources, keep the source list structured in `recommend.image_usage` and write the usage rationale / page-role guidance into `image_notes` (for example, "封面和章节页用 AI 主视觉，产品页优先用户素材，行业背景页可用网络参考"). Spot-illustration lean is **not** a candidate field here: it derives from the locked `visual_style`'s illustration propensity and is expressed only in the recommendation rationale / `image_notes`, never as a new confirmation field. Generated-image style palettes are **color behavior only**; final image colors follow the confirmed Stage-2 `color`. Custom image-strategy dimensions are handled by the built-in Custom card, are prose-only, and should not promise a gallery reference image. Then attach to the already-running page; `--wait-only` auto-recovers a dead server as above (same 600000 ms budget):
    ```bash
    python3 {baseDir}/scripts/confirm_ui/server.py <project_path> --wait-only
    ```
@@ -549,37 +549,36 @@ Then **lazy-load the path-specific reference** for each row that actually needs 
 
 | Acquire Via | Load reference (only if any such row exists) | Run |
 |---|---|---|
-| `ai` | `references/image-generator.md` | write `<project_path>/images/image_prompts.json`, then follow `image-generator.md §7 Path Selection` (`image_gen.py --manifest` is **Path A only**) |
+| `ai` | `references/image-generator.md` | write `<project_path>/images/image_prompts.json`, call the current runtime's image-generation tool, then record and verify results with `image_manifest.py` |
 | `web` | `references/image-searcher.md` | `python3 {baseDir}/scripts/image_search.py ...` (≥2 web rows → `--batch images/image_queries.json`) |
 | `slice` | `references/image-generator.md` §4.3 | derived — **after** the parent `ai` sheet row is `Generated`, run `python3 {baseDir}/scripts/slice_images.py <project_path>/images/<sheet>.png --grid RxC --names ... --trim --alpha` (see workflow step 2.5) |
 | `user` / `formula` / `placeholder` | (skip) | (skip) |
 
 A deck with only `ai` rows never loads `image-searcher.md`; a deck with only `web` rows never loads `image-generator.md`. A mixed deck loads both, processes each row through its own path, and writes both `image_prompts.json` and `image_sources.json`.
 
-> ⚠️ **In-pipeline ai rows MUST use the manifest contract** — even when only 1 ai row exists. Always write `images/image_prompts.json` first and render `image_prompts.md` with `image_gen.py --render-md`. Then execute the confirmed path from `image-generator.md §7`: `image_gen.py --manifest` is **Path A only**; `host-native` is **Path B** and MUST skip `--manifest`; `manual` writes the prompts and stops for external generation. The positional form (`image_gen.py "prompt" ...`) is reserved for **out-of-pipeline one-off testing / single-image fixups** — it skips manifest + sidecar, leaving no audit trail.
+> ⚠️ **In-pipeline ai rows MUST use the manifest contract** — even when only 1 ai row exists. Always write `images/image_prompts.json`, validate it with `image_manifest.py check`, call the current runtime's image-generation tool for each task, and record every result with `image_manifest.py record`. There is no alternate provider or manual path.
 
 > ⚠️ **web path — batch multiple rows**: when ≥2 rows are `Acquire Via: web`, write all queries into `images/image_queries.json` and run `image_search.py --batch` once (concurrent acquisition, status written back), instead of one CLI call per row. A single web row may use the positional single-query form. See [image-searcher.md](../references/image-searcher.md) §5.
 
 > 💡 **ai path — spot illustrations as one sheet**: when the §VIII image resource plan needs ≥3 same-family spot illustrations as decorative accessories, generate **one grid sheet** (a single `ai` sheet row) instead of one row per element, then slice it (workflow step 2.5 below). Choose sheet geometry from intended placement: `1xN` / `Nx1` are useful for extreme portrait / landscape cells, and a designed `MxN` grid is valid when its cell ratio fits the planned elements. The sheet row is generated but not placed; each cut **element row** (`Acquire Via: slice`) is placed and must appear in `spec_lock.md images`. One generation = one coherent style across all pieces. Resource contract + the geometry rules: [image-generator.md](../references/image-generator.md) §4.3.
 
-> ⚠️ **Honor the confirmed image source before running any generation command**: the `ai` generation path (Path A = `image_gen.py` API / Path B = host-native tool / Offline Manual) is **not** auto-only — a confirmed choice other than `auto` wins, whether it came from chat (canonical) or, when the page was used, `result.json.image_ai_path`. `host-native` forces Path B even when `IMAGE_BACKEND` is configured; `api` forces Path A; `manual` forces offline. Never run `image_gen.py --manifest` when the confirmed value is `host-native` or `manual`. Full selection rule: [image-generator.md](../references/image-generator.md) §7 Path Selection.
+> ⚠️ **AI generation has one execution path**: call the current runtime's image-generation tool. Never select a provider, model, endpoint, API key, or external/manual generator. Full contract: [image-generator.md](../references/image-generator.md) §7.
 
 Workflow:
 
 1. Extract all resource rows from the design spec and group them by `Acquire Via`; rows with `Status: Pending` or `Status: Failed` and `Acquire Via ∈ {ai, web, slice}` must all reach a terminal state before Executor starts
 2. Generate prompts (ai rows) and/or run search (web rows) per [image-base.md](../references/image-base.md) §3 dispatch table
-2.5. **Slice any spot-illustration sheets (only if `slice` rows exist).** For each generated `ai` **sheet** row, run `slice_images.py` (grid + the element `--names` matching the `slice` rows, `--trim --alpha`) so every element file lands in `images/`; mark each `slice` row `Generated`. A sheet still in `Needs-Manual` cannot be sliced — leave its `slice` rows `Needs-Manual` and surface them at the Step 7 readiness gate. Contract: [image-generator.md](../references/image-generator.md) §4.3.
-3. Verify every row reaches a terminal status: `Generated` (ai success / sliced element), `Sourced` (web success), or `Needs-Manual`. `Failed` is not a terminal status: it means the current run did not generate that item, but the item remains retryable. The agent must resolve every residual `Failed` item by rerunning the confirmed path or marking it `Needs-Manual` before Executor starts
+2.5. **Slice any spot-illustration sheets (only if `slice` rows exist).** For each generated `ai` **sheet** row, run `slice_images.py` (grid + the element `--names` matching the `slice` rows, `--trim --alpha`) so every element file lands in `images/`; mark each `slice` row `Generated`. A failed sheet blocks its slice rows and Executor. Contract: [image-generator.md](../references/image-generator.md) §4.3.
+3. Verify every AI and slice row is `Generated`. Web rows may be `Sourced` or `Needs-Manual`. Any AI `Pending` or `Failed` row blocks Executor and must be regenerated with the image tool.
 4. Re-derive image facts now that web / AI / sliced files are in the folder — `python3 {baseDir}/scripts/analyze_images.py <project_path>/images` — so `analysis/image_analysis.csv` reflects every acquired image **including the sliced elements** (real measured sizes) before the Executor lays them out. Image facts are regenerated on use, never a stale store (see Step 4's image-facts note).
 
 **✅ Checkpoint — Confirm acquisition attempted for every row**:
 ```markdown
 ## ✅ Image Acquisition Phase Complete
 - [x] image_prompts.json created (when any ai rows processed)
-- [x] image_prompts.md sidecar rendered (when any ai rows processed)
 - [x] image_sources.json created (when any web rows processed)
 - [x] Spot-illustration sheets sliced (when any `slice` rows exist); every element file present in `images/` and listed in `spec_lock.md images`
-- [x] Each row: status is `Generated` / `Sourced` / `Needs-Manual` (no `Pending` or `Failed` remaining)
+- [x] Every AI / slice row is `Generated`; every web row is `Sourced` or `Needs-Manual`
 - [x] analyze_images.py re-run so image_analysis.csv covers the acquired web / AI / sliced images
 ```
 
@@ -592,7 +591,7 @@ Workflow:
   - [ ] **Next**: open a fresh chat window and input `继续生成 projects/<project_name>` to enter the execution session via the [`resume-execute`](../workflows/resume-execute.md) workflow.
   ```
 
-> On acquisition failure, do NOT halt — follow the Failure Handling rule in [image-base.md](../references/image-base.md) §5: retry once, then mark the row `Needs-Manual`, report to user, and continue to the checkpoint above.
+> On AI generation failure, record `Failed`, report the image-tool error, and stop before Executor. Web acquisition follows its own retry and `Needs-Manual` rules in [image-base.md](../references/image-base.md) §6.
 
 ---
 
@@ -685,13 +684,13 @@ python3 {baseDir}/scripts/visual_layout_audit.py <project_path>
 
 🚧 **GATE**: Step 6 complete; all SVGs generated to `svg_output/`; speaker notes `notes/total.md` generated.
 
-🚧 **Image readiness GATE** (when Step 5 left ai rows in `Needs-Manual`): every expected file must exist at `project/images/<filename>` before running 7.1.
+🚧 **Image readiness GATE**: every AI / slice row must be `Generated`, and every expected file must exist at `project/images/<filename>` before running 7.1.
 
 **Failure recovery**: if a Step 7 command fails, fix the owning source artifact and resume from the failed sub-step per [`workflows/failure-recovery.md`](../workflows/failure-recovery.md). Do not restart the planning session unless the owning source changed.
 
-> If files are missing: PAUSE, list the missing filenames, point the user to `images/image_prompts.md` (each `### Image N:` block is paste-ready for ChatGPT / Gemini / Midjourney; auto-generated from `image_prompts.json`) and the required placement `project/images/<filename>`. Resume Step 7.1 only after all expected files are in place. `finalize_svg.py` and `svg_to_pptx.py` do not detect missing files at this layer — proceeding with gaps produces a deck with broken image references.
+> If an AI file is missing: PAUSE, list the filename and rerun its image-tool task from `images/image_prompts.json`. Record the returned file with `image_manifest.py record`, then verify the whole manifest. `finalize_svg.py` and `svg_to_pptx.py` do not detect missing files at this layer.
 
-> **Spot-illustration sheets at this gate**: `slice` element files are **derived**, not placed by the user. If a sheet was `Needs-Manual` (offline), the element files do not exist yet — list the **sheet** filename (`images/<sheet>.png`) plus its element target names, and instruct: place the sheet, then run the Step 5 `slice_images.py` command for it, then re-run `analyze_images.py`, before resuming 7.1. Never tell the user to hand-place the individual element files — they only come from slicing the sheet.
+> **Spot-illustration sheets at this gate**: `slice` element files are **derived**. A missing or failed parent sheet blocks its slice rows; regenerate the sheet with the image tool, record it, run `slice_images.py`, then rerun `analyze_images.py`.
 
 > ⚠️ Run the three sub-steps **one at a time** — each must complete successfully before the next.
 > ❌ **NEVER** combine them into a single code block or shell invocation.
@@ -908,9 +907,9 @@ Run the standalone [`customize-animations`](../workflows/customize-animations.md
 
 **Optional recorded narration** (only when the user asks for narrated/video export):
 
-Run the standalone [`generate-audio`](../workflows/generate-audio.md) workflow. The AI picks a narration backend (`edge` by default, or a configured cloud provider such as ElevenLabs / MiniMax / Qwen / CosyVoice for high-quality or cloned voices), asks the user once (backend + voice + rate/settings + embed-or-not, all with recommended values), then executes `notes_to_audio.py` and (if chosen) re-exports the PPTX with `--recorded-narration audio`.
+Run the standalone [`generate-audio`](../workflows/generate-audio.md) workflow. It prepares one task per page, calls the current runtime's TTS tool, verifies every audio file and duration, then optionally re-exports the PPTX with `--recorded-narration audio`.
 
-Do NOT call `notes_to_audio.py` directly without going through the workflow — `--voice` / `--voice-id` is required and the workflow produces the locale/provider-aware recommendation that makes the choice meaningful.
+Do not call a TTS provider API or install a TTS backend from this skill.
 
 Full effect list, anchor logic, and limits: [`references/animations.md`](../references/animations.md).
 The compatibility contract covers PowerPoint OOXML; do not promise identical

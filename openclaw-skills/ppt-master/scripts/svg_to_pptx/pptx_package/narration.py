@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import base64
-import json
 import re
-import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -21,6 +19,7 @@ from pptx_transitions import (
     read_slide_transition_xml,
     serialize_source_xml,
 )
+from audio_duration import probe_audio_duration
 
 
 DRAWINGML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -111,28 +110,6 @@ def find_narration_files(audio_dir: Path, svg_files: list[Path]) -> dict[str, Pa
         if index in numbered:
             matched[stem] = numbered[index]
     return matched
-
-
-def probe_audio_duration(audio_path: Path) -> float | None:
-    """Return duration in seconds using ffprobe when available."""
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "json",
-                str(audio_path),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        data = json.loads(result.stdout or "{}")
-        duration = float(data.get("format", {}).get("duration", 0))
-        return duration if duration > 0 else None
-    except Exception:
-        return None
 
 
 def next_shape_id(slide_xml: str) -> int:

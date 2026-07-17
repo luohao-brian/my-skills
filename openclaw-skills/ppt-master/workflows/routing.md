@@ -6,7 +6,7 @@ description: Deterministic route selection rules for PPT Master requests
 
 Route selection authority for PPT Master. Use this file before entering the main pipeline or any standalone workflow.
 
-**Hard rule**: If this file conflicts with a route summary in `SKILL.md`, `AGENTS.md`, or a user-facing doc, this file wins for route selection. After a route is selected, the target workflow file or `SKILL.md` owns execution details.
+**Hard rule**: If this file conflicts with a route summary in `SKILL.md`, host-level instructions, or a user-facing doc, follow higher-priority host instructions first; otherwise this file wins for route selection. After a route is selected, the target workflow file or `SKILL.md` owns execution details.
 
 ---
 

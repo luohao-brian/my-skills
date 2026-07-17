@@ -5,7 +5,7 @@ PPT Master - Illustration Sheet Slicer
 Slice one AI-generated "illustration sheet" (a single image whose prompt laid
 out several illustration elements in a grid) into N individual element files in
 the project's `images/` folder. This is the cheap-and-consistent path for spot
-illustrations: generate one multi-element sheet with `image_gen.py` (one call,
+illustrations: generate one multi-element sheet with the runtime image tool (one call,
 one coherent style/palette), then cut the cells out here so each element is a
 normal image the Executor places like any other.
 

@@ -59,13 +59,15 @@ PowerPoint's manual Convert-to-Shape behavior is unsupported. `svg_final/` is su
 2. Export with the project-relative audio directory:
 
 ```bash
-python3 {baseDir}/scripts/notes_to_audio.py <project_path> --voice zh-CN-XiaoxiaoNeural
+python3 {baseDir}/scripts/audio_manifest.py prepare <project_path>
+# Call the runtime TTS tool for every Pending task, then:
+python3 {baseDir}/scripts/audio_manifest.py verify <project_path>/audio/audio_tasks.json
 python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio
 ```
 
 `--recorded-narration` prepares PowerPoint recorded timings and narrations. If it fails, check:
 - every slide has a matching `m4a`, `mp3`, or `wav` file in `audio/`
-- `ffprobe` is installed and can read each audio duration
+- each audio duration is readable by `ffprobe`, WAV metadata, or `afinfo`
 - the deck is not using `--animation-trigger on-click`
 
 Use `--narration-audio-dir audio` only when you intentionally want lower-level, partial audio embedding instead of PowerPoint recorded timings.
@@ -80,8 +82,6 @@ pip install -r requirements.txt
 
 Important optional packages:
 - `python-pptx` for PPTX export
-- `edge-tts` for `notes_to_audio.py` recorded narration audio
 - `Pillow` for image utilities
 - `numpy` for watermark removal
 - `PyMuPDF` for PDF conversion
-- `google-genai` for Gemini image generation

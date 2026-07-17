@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+export PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -123,20 +124,39 @@ assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_END -->"
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_START -->"
 assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_END -->"
+if rg -n --glob '*.md' 'GPT-M 2\.0|CleanShot X|Claude Code|Codex|Ask Question|ask_question|CLAUDE\.md|CodePilot|Fujifilm|Leica|Runtime Capability Contract|结构化用户询问|显著改变结果' openclaw-skills/guizang-ppt-skill; then
+  fail "guizang-ppt-skill instructions must stay concrete and product-neutral"
+fi
 assert_file openclaw-skills/ppt-master/LICENSE
 assert_file openclaw-skills/ppt-master/references/openclaw-runtime.md
 assert_file openclaw-skills/ppt-master/references/upstream-source.md
 assert_file openclaw-skills/ppt-master/references/upstream-pipeline.md
 assert_file openclaw-skills/ppt-master/scripts/visual_layout_audit.py
 assert_file openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
+assert_file openclaw-skills/ppt-master/scripts/image_manifest.py
+assert_file openclaw-skills/ppt-master/scripts/audio_manifest.py
+assert_no_path openclaw-skills/ppt-master/scripts/image_gen.py
+assert_no_path openclaw-skills/ppt-master/scripts/notes_to_audio.py
+assert_no_path openclaw-skills/ppt-master/scripts/image_backends
+assert_no_path openclaw-skills/ppt-master/scripts/tts_backends
 assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/visual_layout_audit.py"
 assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/pptx_layout_audit.py"
 assert_contains openclaw-skills/ppt-master/SKILL.md "--dir <absolute-projects-root>"
+if rg -n --glob '*.md' --glob '*.py' --glob '*.json' --glob '!templates/**' \
+  'Claude Code|Codex|Antigravity|Hermes|My Cowork|ask_question|TeamCreate|SendMessage|~/.agents|CLAUDE\.md|Cursor|Codebuddy|VS Code \+ Copilot|playwright MCP|Runtime Capability Contract|结构化用户询问|显著改变结果' \
+  openclaw-skills/ppt-master; then
+  fail "ppt-master instructions must stay concrete and product-neutral"
+fi
 if find openclaw-skills/ppt-master -type f -iname 'README.md' -print -quit | rg -q .; then
   fail "ppt-master must not contain README.md files"
 fi
 if find openclaw-skills/ppt-master -type d -name '__pycache__' -print -quit | rg -q .; then
   fail "ppt-master must not contain __pycache__ directories"
+fi
+if rg -n --glob '!**/templates/**' --glob '!references/upstream-source.md' \
+  'IMAGE_BACKEND|image_gen\.py|notes_to_audio\.py|scripts/(image|tts)_backends|edge-tts|ElevenLabs|CosyVoice' \
+  openclaw-skills/ppt-master; then
+  fail "ppt-master image and narration generation must use runtime tools only"
 fi
 popular_template_count="$(find openclaw-skills/popular-web-designs/templates -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
 [[ "$popular_template_count" == "54" ]] || fail "popular-web-designs should include 54 templates, found $popular_template_count"
@@ -186,6 +206,10 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   openclaw-skills/ark-search/scripts/web_search.py \
   openclaw-skills/ark-data-pro/scripts/data_pro_search.py \
   openclaw-skills/volc-search/scripts/web_search.py \
+  openclaw-skills/ppt-master/scripts/image_manifest.py \
+  openclaw-skills/ppt-master/scripts/audio_manifest.py \
+  openclaw-skills/ppt-master/scripts/audio_duration.py \
+  openclaw-skills/ppt-master/scripts/image_download.py \
   openclaw-skills/ppt-master/scripts/visual_layout_audit.py \
   openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
 
@@ -194,6 +218,8 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
 "$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
 "$python_bin" openclaw-skills/ppt-master/scripts/visual_layout_audit.py --help >/dev/null
 "$python_bin" openclaw-skills/ppt-master/scripts/pptx_layout_audit.py --help >/dev/null
+"$python_bin" openclaw-skills/ppt-master/scripts/image_manifest.py --help >/dev/null
+"$python_bin" openclaw-skills/ppt-master/scripts/audio_manifest.py --help >/dev/null
 ai_news_verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-news-verify.XXXXXX")"
 trap 'rm -rf "$ai_news_verify_dir"' EXIT
 "$python_bin" info-track/ai-news/scripts/ai_news.py verify-sources --window 72h --out "$ai_news_verify_dir/candidates.json"
@@ -211,6 +237,7 @@ else
 fi
 
 if command -v node >/dev/null 2>&1; then
+  node --check "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/visual-check-swiss.mjs"
   node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/build-swiss-golden.mjs" --check
   node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/verify-swiss-contract.mjs"
   node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/validate-swiss-deck.mjs" \

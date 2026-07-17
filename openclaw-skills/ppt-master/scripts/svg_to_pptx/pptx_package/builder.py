@@ -5183,7 +5183,7 @@ def create_pptx_with_native_svg(
                         duration = probe_audio_duration(audio_path)
                         if duration is None:
                             raise RuntimeError(
-                                f"Unable to read narration duration with ffprobe: {audio_path}"
+                                f"Unable to read narration duration: {audio_path}"
                             )
                         slide_xml = apply_recorded_timing(
                             slide_xml,

@@ -108,7 +108,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
 
 | 位置 | 角色 | 内容性质 | 例子 |
 |------|------|---------|------|
-| `.chrome` 左上 | **杂志页眉 / 导航元数据** | 稳定的"栏目名"或"章节分类"，跨多页可以相同 | "Act II · Workflow" / "Data · Result" / "lukew.com · 2026.04" |
+| `.chrome` 左上 | **杂志页眉 / 导航元数据** | 稳定的"栏目名"或"章节分类"，跨多页可以相同 | "Act II · Workflow" / "Data · Result" / "publication.example · 2026.04" |
 | `.chrome` 右上 | **页号 + 幕号** | 固定格式 | "Act II · 15 / 25" |
 | `.kicker` | **这一页独一份的引导句** | 是大标题的"小前缀"，像杂志大标题上方的一行话，每页都应不同 | "BUT" / "一个人,做了什么。" / "Phase 01 · 设计阶段" |
 
@@ -168,18 +168,18 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
     <div>Vol.01</div>
   </div>
   <div class="frame" style="display:grid; gap:4vh; align-content:center; min-height:80vh">
-    <div class="kicker" data-anim>私享会 · 李继刚</div>
-    <h1 class="h-hero" data-anim>一人公司</h1>
-    <h2 class="h-sub" data-anim>被 AI 折叠的组织</h2>
+    <div class="kicker" data-anim>行业分享 · 讲者姓名</div>
+    <h1 class="h-hero" data-anim>从想法到产品</h1>
+    <h2 class="h-sub" data-anim>一支小团队的增长路径</h2>
     <p class="lead" style="max-width:60vw" data-anim>
-      一个 AI 创作者 —— 在 64 天里做了 11 万行代码、在 9 个平台上持续输出，生活节奏几乎没有被改变。
+      一个小团队在一个季度内完成产品验证、首轮发布和多渠道增长，同时保持稳定的交付节奏。
     </p>
     <div class="meta-row" data-anim>
-      <span>歸藏 Guizang</span><span>·</span><span>独立创作者 / CodePilot 作者</span>
+      <span>讲者姓名</span><span>·</span><span>产品负责人</span>
     </div>
   </div>
   <div class="foot">
-    <div>一场关于 AI · 组织 · 个体的分享</div>
+    <div>一场关于产品 · 团队 · 增长的分享</div>
     <div>— 2026 —</div>
   </div>
 </section>
@@ -233,7 +233,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
   <div class="frame" style="padding-top:6vh">
     <div class="kicker" data-anim>一个人，做了什么。</div>
     <h2 class="h-xl" data-anim>过去 64 天</h2>
-    <p class="lead" style="margin-bottom:5vh" data-anim>从 0 到开源 CodePilot。</p>
+    <p class="lead" style="margin-bottom:5vh" data-anim>从 0 到产品发布。</p>
 
     <div class="grid-6" style="margin-top:6vh">
       <div class="stat-card" data-anim>
@@ -269,7 +269,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
     </div>
   </div>
   <div class="foot">
-    <div>项目 · CodePilot　|　github.com/codepilot</div>
+    <div>项目名称 · Project Name　|　project.example</div>
     <div>Act I · Dev Numbers</div>
   </div>
 </section>
@@ -297,10 +297,10 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
       <div>
         <div class="kicker" data-anim>BUT</div>
         <h2 class="h-xl" style="white-space:nowrap; font-size:7.2vw" data-anim>
-          我不是程序员。
+          我们重新设计了流程。
         </h2>
         <p class="lead" style="margin-top:3vh" data-anim>
-          大学毕业之后再也没写过一行代码。过去十年做的是 UI 设计和 AI 特效。
+          原有流程依赖多次串行交接。新的工作方式让关键角色共享上下文并同步推进。
         </p>
       </div>
       <div class="callout" data-anim>
@@ -311,12 +311,12 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
     </div>
     <!-- 右列：图片用标准 16/10 比例 + max-height，不要 align-self:end -->
     <figure class="frame-img r-16x10" data-anim>
-      <img src="images/codepilot.png" alt="CodePilot 产品截图">
-      <figcaption class="img-cap">CodePilot · 产品截图</figcaption>
+      <img src="images/product.png" alt="项目产品截图">
+      <figcaption class="img-cap">项目名称 · 产品截图</figcaption>
     </figure>
   </div>
   <div class="foot">
-    <div>Page 03 · 我不是程序员</div>
+    <div>Page 03 · 流程重构</div>
     <div>— · —</div>
   </div>
 </section>
@@ -344,28 +344,28 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
 
     <div class="grid-3-3" style="margin-top:4vh">
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/weibo.png" alt="微博 289K">
-        <figcaption class="img-cap">微博 · 289K</figcaption>
+        <img src="images/channel-a.png" alt="渠道甲 289K">
+        <figcaption class="img-cap">渠道甲 · 289K</figcaption>
       </figure>
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/twitter.png" alt="推特 137K">
-        <figcaption class="img-cap">推特 · 137K</figcaption>
+        <img src="images/channel-b.png" alt="渠道乙 137K">
+        <figcaption class="img-cap">渠道乙 · 137K</figcaption>
       </figure>
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/wechat.png" alt="公众号 96K">
-        <figcaption class="img-cap">公众号 · 96K</figcaption>
+        <img src="images/channel-c.png" alt="渠道丙 96K">
+        <figcaption class="img-cap">渠道丙 · 96K</figcaption>
       </figure>
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/jike.png" alt="即刻 26K">
-        <figcaption class="img-cap">即刻 · 26K</figcaption>
+        <img src="images/channel-d.png" alt="渠道丁 26K">
+        <figcaption class="img-cap">渠道丁 · 26K</figcaption>
       </figure>
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/xhs.png" alt="小红书 19K">
-        <figcaption class="img-cap">小红书 · 19K</figcaption>
+        <img src="images/channel-e.png" alt="渠道戊 19K">
+        <figcaption class="img-cap">渠道戊 · 19K</figcaption>
       </figure>
       <figure class="frame-img" style="height:26vh" data-anim>
-        <img src="images/douyin.png" alt="抖音 10K">
-        <figcaption class="img-cap">抖音 · 10K</figcaption>
+        <img src="images/channel-f.png" alt="渠道己 10K">
+        <figcaption class="img-cap">渠道己 · 10K</figcaption>
       </figure>
     </div>
   </div>
@@ -412,7 +412,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
         <div class="step" data-anim="step">
           <div class="step-nb">03</div>
           <div class="step-title">Morph</div>
-          <div class="step-desc">AI 变形成推特 / 小红书</div>
+          <div class="step-desc">适配多个内容渠道</div>
         </div>
         <div class="step" data-anim="step">
           <div class="step-nb">04</div>
@@ -518,7 +518,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
       And that makes all the difference.
     </p>
     <div class="meta-row" data-anim>
-      <span>— Luke Wroblewski</span><span>·</span><span>2026.04.16</span>
+      <span>— 行业观察</span><span>·</span><span>2026.04.16</span>
     </div>
   </div>
   <div class="foot">
@@ -554,9 +554,9 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
         <div class="kicker" style="opacity:.9">Before · 旧模式</div>
         <h3 class="h-md" style="margin-top:2vh">设计 → 开发 → 交接</h3>
         <ul style="margin-top:3vh; padding-left:1.2em; display:flex; flex-direction:column; gap:1.4vh; font-family:var(--sans-zh); font-size:max(14px,1.1vw); line-height:1.55">
-          <li>设计师在 Figma 做稿</li>
+          <li>设计师在设计工具中完成方案</li>
           <li>开发者盯着文件翻译像素</li>
-          <li>反复 PR 沟通对齐</li>
+          <li>反复评审和沟通对齐</li>
           <li>非技术人员无法触碰代码</li>
         </ul>
       </div>
@@ -565,8 +565,8 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
         <div class="kicker" style="opacity:.9">After · 新模式</div>
         <h3 class="h-md" style="margin-top:2vh">同工具 · 并行 · 共建</h3>
         <ul style="margin-top:3vh; padding-left:1.2em; display:flex; flex-direction:column; gap:1.4vh; font-family:var(--sans-zh); font-size:max(14px,1.1vw); line-height:1.55">
-          <li>三个角色同时在 Intent 工作</li>
-          <li>agents.md 作为共享上下文</li>
+          <li>三个角色同时在共享工作区协作</li>
+          <li>项目规则和知识库作为共享上下文</li>
           <li>代理处理对齐 / 冲突 / 动画</li>
           <li>任何人都能安全贡献代码</li>
         </ul>
@@ -603,7 +603,7 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
       <h2 class="h-xl" style="margin-top:1vh; margin-bottom:3vh" data-anim>设计先行 · 2 周</h2>
 
       <p class="lead" style="margin-bottom:3vh" data-anim>
-        在 Figma 中完成视觉探索与设计系统,网格 / 排版 / 颜色变量 / 可复用组件,桌面和移动端稿件几轮反馈迭代。
+        在设计工具中完成视觉探索与设计系统,网格 / 排版 / 颜色变量 / 可复用组件,桌面和移动端稿件经过几轮反馈迭代。
       </p>
 
       <p data-anim style="font-family:var(--sans-zh); font-size:max(14px,1.15vw); line-height:1.75; opacity:.78; margin-bottom:2.4vh">
@@ -612,13 +612,13 @@ layouts.md 使用的所有类（`h-hero` / `h-xl` / `h-sub` / `h-md` / `lead` / 
 
       <div class="callout" style="margin-top:3vh" data-anim>
         "This phase was pretty standard.<br>Just a solid Web design process."
-        <div class="callout-src">— Luke Wroblewski</div>
+        <div class="callout-src">— 项目复盘</div>
       </div>
     </div>
     <!-- 右列:辅助图 · 竖版或方形 -->
     <figure class="frame-img r-3x4" data-anim>
-      <img src="images/figma.png" alt="Figma design system">
-      <figcaption class="img-cap">Figma · Design System</figcaption>
+      <img src="images/design-system.png" alt="项目设计系统">
+      <figcaption class="img-cap">项目名称 · Design System</figcaption>
     </figure>
   </div>
   <div class="foot">

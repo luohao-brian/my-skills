@@ -131,7 +131,7 @@ python3 {baseDir}/scripts/image_search.py "<query>" \
 
 ### Batch mode (≥ 2 web rows) — preferred
 
-When more than one row is `Acquire Via: web`, do **not** call the CLI once per row. Write all rows into one `image_queries.json` and run a single concurrent batch — the web sister of `image_gen.py --manifest`:
+When more than one row is `Acquire Via: web`, do **not** call the CLI once per row. Write all rows into one `image_queries.json` and run a single concurrent batch:
 
 ```bash
 python3 {baseDir}/scripts/image_search.py --batch <project_path>/images/image_queries.json \

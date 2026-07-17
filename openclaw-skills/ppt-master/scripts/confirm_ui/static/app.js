@@ -48,7 +48,6 @@
             placeholder_pages: "e.g. 12-15",
             hex_override: "Custom HEX override:",
             formula_policy: "Formula rendering policy",
-            image_ai_path: "AI image source",
             image_strategy: "Generated image style",
             image_strategy_empty: "No generated-image style candidates were provided.",
             image_strategy_rendering: "Rendering",
@@ -160,7 +159,6 @@
             placeholder_pages: "例：12-15",
             hex_override: "カスタムHEXで上書き：",
             formula_policy: "数式レンダリング方針",
-            image_ai_path: "AI画像の生成元",
             image_strategy: "生成画像のスタイル",
             image_strategy_empty: "生成画像スタイルの候補がまだありません。",
             image_strategy_rendering: "レンダリング",
@@ -272,7 +270,6 @@
             placeholder_pages: "如：12-15",
             hex_override: "自定义色值覆盖：",
             formula_policy: "公式渲染策略",
-            image_ai_path: "生成配图来源",
             image_strategy: "生成图风格",
             image_strategy_empty: "还没有提供生成图风格候选。",
             image_strategy_rendering: "渲染风格",
@@ -498,10 +495,6 @@
         },
         image_usage: {
             search: "web"
-        },
-        image_ai_path: {
-            default: "auto",
-            builtin: "host-native"
         }
     };
 
@@ -708,7 +701,6 @@
         if (field === "visual_style") return REC.visual_style || (REC.style && REC.style.value);
         if (field === "icons") return REC.icons && REC.icons.value;
         if (field === "image_usage") return REC.images && REC.images.value;
-        if (field === "image_ai_path") return REC.image_ai_path || (REC.images && REC.images.ai_path);
         if (field === "formula_policy") return REC.typography && REC.typography.formula_policy && REC.typography.formula_policy.value;
         if (field === "generation_mode") return REC.generation_mode && REC.generation_mode.value;
         return REC[field] && REC[field].value;
@@ -965,7 +957,7 @@
     }
 
     function customImagePlanHasAiSignal() {
-        return imageStrategyRecommendationCandidates().length > 0 || !!recId("image_ai_path");
+        return imageStrategyRecommendationCandidates().length > 0;
     }
 
     function needsGeneratedImagesForUsage(value) {
@@ -1783,8 +1775,6 @@
         usageNoteInput.value = STATE.image_notes || "";
         usageNoteInput.addEventListener("input", function () { STATE.image_notes = usageNoteInput.value; });
         usageNote.appendChild(usageNoteInput);
-        var sub = el("div", "subfield");
-        sub.appendChild(el("div", "subfield-label", t("image_ai_path")));
         var strategySub = el("div", "subfield image-strategy-subfield");
         strategySub.appendChild(el("div", "subfield-label", t("image_strategy")));
         strategySub.appendChild(el("div", "toggle-desc", t("image_strategy_reference_hint")));
@@ -1794,9 +1784,7 @@
             return needsGeneratedImagesForUsage(STATE.image_usage);
         }
         function refreshAiControls() {
-            var needsAiPath = needsGeneratedImages();
-            sub.style.display = needsAiPath ? "block" : "none";
-            strategySub.style.display = needsAiPath ? "block" : "none";
+            strategySub.style.display = needsGeneratedImages() ? "block" : "none";
             refreshImageStrategyPreview();
         }
         function markStrategyCard(selectedCard) {
@@ -1949,9 +1937,6 @@
         });
         sec.appendChild(usageChips);
         sec.appendChild(usageNote);
-        enumField(sub, CAT.image_ai_path, recOrFirst("image_ai_path", CAT.image_ai_path),
-            function () { return STATE.image_ai_path; }, function (v) { STATE.image_ai_path = v; });
-        sec.appendChild(sub);
         sec.appendChild(strategySub);
         if (isManualImageStrategy(STATE.image_strategy)) {
             renderingSelect.value = firstComparisonId("rendering", STATE.image_strategy.rendering || renderingSelect.value);
@@ -2146,7 +2131,6 @@
             STATE.image_usage = [defaultImageUsageId()];
         }
         STATE.image_notes = imageUsageNotesRecommendation(rawImageUsage);
-        STATE.image_ai_path = pick("image_ai_path", CAT.image_ai_path);
 
         STATE.generation_mode = pick("generation_mode", CAT.generation_mode);
         STATE.refine_spec = !!((REC.refine_spec && REC.refine_spec.value) || (REC.recommend && REC.recommend.refine_spec));
@@ -2285,7 +2269,6 @@
         }
         if (!String(payload.image_notes || "").trim()) delete payload.image_notes;
         if (!needsGeneratedImagesForUsage(payload.image_usage)) {
-            delete payload.image_ai_path;
             delete payload.image_strategy;
         }
         btn.disabled = true;

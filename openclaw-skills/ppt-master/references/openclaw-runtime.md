@@ -5,7 +5,7 @@
 - Repository: `https://github.com/hugohe3/ppt-master`
 - Imported commit: `85cf22eaf4a74a511c4bff9b33a15fc0f7b33e87`
 - Imported at: `2026-07-15`
-- Hermes comparison: the Hermes-installed `SKILL.md` was older than this baseline; the OpenClaw copy starts from the GitHub baseline and adds the release checks below.
+- This copy starts from the recorded GitHub baseline and adds the runtime and release checks below.
 
 ## Install dependencies
 
@@ -21,7 +21,7 @@ The layout audit also tries an installed Google Chrome channel when Playwright's
 
 ## Keep projects outside source repositories
 
-Resolve an absolute project root before initialization. Use the user's requested output directory; otherwise use a workspace such as `~/hermes-workspace` or an OS temporary directory. Never use `{baseDir}/projects`, the current source repository, or a relative `projects/` path.
+Resolve an absolute project root before initialization. Use the user's requested output directory; otherwise use an external workspace or an OS temporary directory. Never use `{baseDir}/projects`, the current source repository, or a relative `projects/` path.
 
 ```bash
 PROJECTS_ROOT="<absolute external directory>"

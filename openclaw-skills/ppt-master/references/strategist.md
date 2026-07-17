@@ -396,15 +396,7 @@ The script renders PNGs into `images/`, trying `codecogs`, `quicklatex`, `mathpa
 
 **Plan illustration shape from placement, not from a square default.** Before writing the sheet row, group the planned spot illustrations by intended placement shape: compact object, tall side accent, wide banner/vignette, or another explicit shape family. Do not ask for generic "small illustrations" with no shape intent. If one deck needs incompatible shapes, write separate sheet intents instead of forcing every element into one implied square set; Image_Generator owns the exact sheet ratio and grid.
 
-**When recommending C** — surface its three implementation modes so the user knows "no API key" is a supported state:
-
-| Mode | Trigger | Mechanism |
-|---|---|---|
-| **Path A** | `IMAGE_BACKEND` configured (default) | `image_gen.py` runs in Step 5 |
-| **Path B** | `IMAGE_BACKEND` not configured AND host has a native image tool (Codex / Antigravity / Claude Code / similar) — auto-selected, no user prompting needed | Host-native generation |
-| **Offline Manual** | `IMAGE_BACKEND` not configured AND host has no native image tool | Prompts written to `images/image_prompts.json`; user generates externally and places files in `project/images/` |
-
-Selection is automatic in Step 5 (A → B → Manual). Detailed contract: [`image-generator.md`](./image-generator.md) §7 Path Selection (Deterministic).
+**When recommending C** — generated images always use the current runtime's image-generation tool. Do not ask the user to choose an API, backend, provider, or manual generation path. Detailed contract: [`image-generator.md`](./image-generator.md) §7.
 
 Selections may be mixed at the row level — e.g. a deck can use C for hero illustrations while sourcing D for supporting team photos.
 

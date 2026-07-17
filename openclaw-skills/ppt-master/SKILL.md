@@ -15,11 +15,19 @@ metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https:
 3. 新建 SVG/PPTX 演示时读取 `references/upstream-pipeline.md`；只读取其中当前阶段直接引用的详细 reference。
 4. 处理现有 PPTX、模板、动画或旁白时，只读取 routing 指定的 workflow 及其直接引用，不要预加载完整主流程。
 
+## 缺少输入或工具时
+
+- 用户只说“做一份 PPT”时，默认使用 16:9 画布并交付可编辑 PPTX；页数、受众和视觉方向从原始材料与用途推断，写入 `design_spec.md` 后继续。只有源文件打不开、用户点名的模板或品牌素材未提供、要求互相冲突，或下一步会移动/覆盖用户原件时，才暂停并询问。
+- 需要用户回答时直接提问；不要为不同模型、IDE 或运行产品写不同分支。
+- 需要搜索、读取网页、生成图片、检查浏览器页面或委派任务时，只调用本轮工具列表里真实存在的工具名。没有对应工具就执行相关 workflow 写明的替代步骤；没有替代步骤则报告哪一步未完成。
+- AI 配图必须调用本轮可用的通用图片生成工具。不要选择图片 provider、模型、API 或密钥；没有图片生成工具时停止 AI 配图步骤并报告缺少该能力。
+- 旁白必须调用本轮可用的通用 TTS 工具。不要选择 TTS provider、模型、音色或密钥；没有 TTS 工具时停止旁白步骤并报告缺少该能力。
+
 ## 不可破坏的边界
 
 - 使用 `{baseDir}` 解析 skill 内脚本、模板和 references；不要假设 cwd 中存在 `skills/ppt-master`。
 - 项目、截图、预览、备份和导出必须写入用户指定的绝对路径；未指定时写入仓库外的 workspace 或系统临时目录。禁止在 `{baseDir}` 或当前源码仓库创建 `projects/`、`outputs/`、`.preview/` 或导出文件。
-- SVG 生成保持主 Agent、逐页、顺序执行；每页写入前重新读取项目 `spec_lock.md`。
+- SVG 生成保持当前主执行者、逐页、顺序执行；每页写入前重新读取项目 `spec_lock.md`。
 - `svg_output/` 是生成式路径的页面设计真相来源。模板和设计说明只能约束页面，不能补上 SVG 中缺失的可见内容。
 - SVG 使用内联属性。禁止 `<style>`、`class`、外部 stylesheet 和未被转换器支持的 CSS/视觉属性。
 - 用户确认过的画布、页数、受众、风格、配色、图标、字体和图片策略必须写入 `design_spec.md` 与 `spec_lock.md`；两者冲突时以 `spec_lock.md` 为准。
