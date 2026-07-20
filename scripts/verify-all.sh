@@ -24,6 +24,12 @@ assert_file() {
   [[ -f "$path" ]] || fail "$path missing"
 }
 
+assert_tracked_file() {
+  local path="$1"
+  assert_file "$path"
+  git ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || fail "$path is not tracked by Git"
+}
+
 assert_contains() {
   local path="$1"
   local text="$2"
@@ -135,6 +141,10 @@ assert_file openclaw-skills/ppt-master/scripts/visual_layout_audit.py
 assert_file openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
 assert_file openclaw-skills/ppt-master/scripts/image_manifest.py
 assert_file openclaw-skills/ppt-master/scripts/audio_manifest.py
+assert_tracked_file openclaw-skills/ppt-master/requirements.txt
+assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-APACHE-2.0.txt
+assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-OPEN-XML-SDK-MIT.txt
+assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/shape_type_values.txt
 assert_no_path openclaw-skills/ppt-master/scripts/image_gen.py
 assert_no_path openclaw-skills/ppt-master/scripts/notes_to_audio.py
 assert_no_path openclaw-skills/ppt-master/scripts/image_backends
