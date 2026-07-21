@@ -141,7 +141,7 @@ def enrich_rspress_metadata(value: Any, public_base_url: str) -> Any:
     return value
 
 
-def title_from_text(text: str) -> str | None:
+def section_title_from_text(text: str) -> str | None:
     body = text
     if body.startswith("---\n"):
         frontmatter_end = body.find("\n---\n", 4)
@@ -151,64 +151,164 @@ def title_from_text(text: str) -> str | None:
             if title_match:
                 return title_match.group(1).strip()
             body = body[frontmatter_end + 5:]
-    heading = re.search(r"^#{1,2}\s+(.+?)\s*$", body, re.MULTILINE)
+    heading = re.search(r"^#{1,6}\s+(.+?)\s*$", body, re.MULTILINE)
     if heading:
         return heading.group(1).strip()
     return None
 
 
-def fallback_title(source_path: str | None) -> str | None:
+def fallback_article_title(source_path: str | None) -> str | None:
     if source_path:
         stem = re.sub(r"\.(?:md|mdx)$", "", source_path.rsplit("/", 1)[-1], flags=re.IGNORECASE)
         return re.sub(r"[-_]+", " ", stem).strip() or None
     return None
 
 
-def directory_entry_order(item: dict[str, Any]) -> tuple[int, str]:
-    uri = str(item.get("uri", ""))
-    name = unquote(uri.rsplit("/", 1)[-1])
-    overview_section = 0 if re.match(r"^\d+\._", name) else 1
-    return overview_section, uri
+def display_name_from_uri(uri: str) -> str | None:
+    name = unquote(uri.rstrip("/").rsplit("/", 1)[-1])
+    name = re.sub(r"\.(?:md|mdx)$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"_+", " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name or None
 
 
-def context_title(client: Client, uri: str, text: str, source_path: str | None) -> str | None:
-    direct_title = title_from_text(text)
-    if direct_title:
-        return direct_title
-    root_uri = source_resource_uri(uri)
-    if not root_uri:
-        return fallback_title(source_path)
-
-    pending = [root_uri]
-    visited: set[str] = set()
-    while pending and len(visited) < 12:
-        directory_uri = pending.pop(0)
-        if directory_uri in visited:
+def article_title(client: Client, root_uri: str, source_path: str | None) -> str | None:
+    root = root_uri.rstrip("/")
+    try:
+        entries = list(iter_hits(client.ls(root + "/")))
+    except RuntimeError:
+        entries = []
+    for entry in entries:
+        entry_uri = entry.get("uri")
+        if not entry.get("isDir") or not isinstance(entry_uri, str):
             continue
-        visited.add(directory_uri)
+        if entry_uri.rstrip("/").rsplit("/", 1)[0] != root:
+            continue
+        title = display_name_from_uri(entry_uri)
+        if title:
+            return title
+    return fallback_article_title(source_path)
+
+
+def is_generated_summary_uri(uri: str) -> bool:
+    return uri.rstrip("/").rsplit("/", 1)[-1].lower() in {".abstract.md", ".overview.md"}
+
+
+def is_section_uri(uri: str) -> bool:
+    if is_generated_summary_uri(uri):
+        return False
+    root_uri = source_resource_uri(uri)
+    if not root_uri or uri.rstrip("/") == root_uri.rstrip("/"):
+        return False
+    name = unquote(uri.rstrip("/").rsplit("/", 1)[-1]).lower()
+    return name.endswith((".md", ".mdx"))
+
+
+def relevance_value(hit: dict[str, Any]) -> float:
+    score = hit.get("score")
+    return float(score) if isinstance(score, (int, float)) else float("-inf")
+
+
+def collect_article_candidates(found: Any, public_base_url: str) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for hit in iter_hits(found):
+        uri = hit.get("uri")
+        if not isinstance(uri, str):
+            continue
+        source = rspress_metadata(uri, public_base_url)
+        source_path = source["source_path"]
+        root_uri = source_resource_uri(uri)
+        if not source_path or not source["public_url"] or not root_uri:
+            continue
+        candidate = grouped.setdefault(source_path, {
+            "source_path": source_path,
+            "root_uri": root_uri,
+            "article_url": source["public_url"],
+            "relevance": hit.get("score"),
+            "hits": [],
+        })
+        candidate["hits"].append(hit)
+        if relevance_value(hit) > relevance_value({"score": candidate["relevance"]}):
+            candidate["relevance"] = hit.get("score")
+    return sorted(grouped.values(), key=lambda item: relevance_value({"score": item["relevance"]}), reverse=True)
+
+
+def relevant_sections(
+    client: Client,
+    query: str,
+    candidate: dict[str, Any],
+    sections_per_article: int,
+    max_chars: int,
+) -> list[dict[str, Any]]:
+    search_limit = max(sections_per_article * 4, 8)
+    hits = list(candidate["hits"])
+    try:
+        scoped = client.find(query, candidate["root_uri"].rstrip("/") + "/", search_limit)
+        hits.extend(iter_hits(scoped))
+    except RuntimeError:
+        pass
+
+    unique_hits: dict[str, dict[str, Any]] = {}
+    for hit in hits:
+        uri = hit.get("uri")
+        if not isinstance(uri, str) or not is_section_uri(uri):
+            continue
+        if rspress_metadata(uri, "")["source_path"] != candidate["source_path"]:
+            continue
+        previous = unique_hits.get(uri)
+        if previous is None or relevance_value(hit) > relevance_value(previous):
+            unique_hits[uri] = hit
+
+    sections: list[dict[str, Any]] = []
+    ordered_hits = sorted(unique_hits.values(), key=relevance_value, reverse=True)
+    for hit in ordered_hits:
+        if len(sections) >= sections_per_article:
+            break
+        uri = hit["uri"]
         try:
-            entries = sorted(
-                iter_hits(client.ls(directory_uri.rstrip("/") + "/")),
-                key=directory_entry_order,
-            )
+            text = content_text(client.read(uri)).strip()
         except RuntimeError:
             continue
-        for entry in entries:
-            entry_uri = entry.get("uri")
-            if not isinstance(entry_uri, str) or entry_uri == directory_uri:
-                continue
-            if entry.get("isDir"):
-                pending.append(entry_uri)
-                continue
-            if entry_uri.rsplit("/", 1)[-1] in {".abstract.md", ".overview.md"}:
-                continue
-            try:
-                candidate_title = title_from_text(content_text(client.read(entry_uri)))
-            except RuntimeError:
-                continue
-            if candidate_title:
-                return candidate_title
-    return fallback_title(source_path)
+        if not text:
+            continue
+        sections.append({
+            "relevance": hit.get("score"),
+            "section_title": section_title_from_text(text) or display_name_from_uri(uri),
+            "content": text[:max_chars],
+        })
+    return sections
+
+
+def retrieve_articles(
+    client: Client,
+    query: str,
+    target_uri: str,
+    article_limit: int,
+    sections_per_article: int,
+    max_chars: int,
+    public_base_url: str,
+) -> dict[str, Any]:
+    candidate_limit = max(article_limit * 8, 20)
+    found = client.find(query, target_uri, candidate_limit)
+    candidates = collect_article_candidates(found, public_base_url)
+    articles = []
+    for candidate in candidates:
+        if len(articles) >= article_limit:
+            break
+        sections = relevant_sections(client, query, candidate, sections_per_article, max_chars)
+        if not sections:
+            continue
+        articles.append({
+            "relevance": candidate["relevance"],
+            "article_title": article_title(client, candidate["root_uri"], candidate["source_path"]),
+            "article_url": candidate["article_url"],
+            "sections": sections,
+        })
+    return {
+        "schema": "openviking.article-retrieval/v1",
+        "query": query,
+        "articles": articles,
+    }
 
 
 def parser() -> argparse.ArgumentParser:
@@ -223,13 +323,16 @@ def parser() -> argparse.ArgumentParser:
     for name in ("ls", "stat", "read"):
         command = commands.add_parser(name)
         command.add_argument("uri")
-    for name in ("find", "retrieve"):
-        command = commands.add_parser(name)
-        command.add_argument("query")
-        command.add_argument("--target-uri", default=DEFAULT_TARGET)
-        command.add_argument("--limit", type=int, default=5)
-        if name == "retrieve":
-            command.add_argument("--max-chars", type=int, default=12000)
+    find_command = commands.add_parser("find")
+    find_command.add_argument("query")
+    find_command.add_argument("--target-uri", default=DEFAULT_TARGET)
+    find_command.add_argument("--limit", type=int, default=5, help="maximum raw search hits")
+    retrieve_command = commands.add_parser("retrieve")
+    retrieve_command.add_argument("query")
+    retrieve_command.add_argument("--target-uri", default=DEFAULT_TARGET)
+    retrieve_command.add_argument("--limit", type=int, default=5, help="maximum distinct articles")
+    retrieve_command.add_argument("--sections-per-article", type=int, default=3)
+    retrieve_command.add_argument("--max-chars", type=int, default=6000, help="maximum characters per section")
     return root
 
 
@@ -247,35 +350,17 @@ def main() -> int:
     elif args.command == "find":
         output = enrich_rspress_metadata(client.find(args.query, args.target_uri, args.limit), args.public_base_url)
     else:
-        found = client.find(args.query, args.target_uri, args.limit)
-        contexts = []
-        seen: set[str] = set()
-        for hit in iter_hits(found):
-            uri = hit["uri"]
-            if uri in seen or len(contexts) >= args.limit:
-                continue
-            seen.add(uri)
-            try:
-                text = content_text(client.read(uri))[: args.max_chars]
-            except RuntimeError as exc:
-                text = ""
-                hit = {**hit, "read_error": str(exc)}
-            source = rspress_metadata(uri, args.public_base_url)
-            contexts.append({
-                "uri": uri,
-                **source,
-                "title": context_title(client, uri, text, source["source_path"]),
-                "score": hit.get("score"),
-                "abstract": hit.get("abstract") or hit.get("summary"),
-                "content": text,
-                **({"read_error": hit["read_error"]} if "read_error" in hit else {}),
-            })
-        output = {
-            "schema": "openviking.rag-context/v1",
-            "query": args.query,
-            "target_uri": args.target_uri,
-            "contexts": contexts,
-        }
+        if args.limit < 1 or args.sections_per_article < 1 or args.max_chars < 1:
+            raise RuntimeError("retrieve limits must be positive integers")
+        output = retrieve_articles(
+            client,
+            args.query,
+            args.target_uri,
+            args.limit,
+            args.sections_per_article,
+            args.max_chars,
+            args.public_base_url,
+        )
     print(json.dumps(output, ensure_ascii=False, indent=2))
     return 0
 
