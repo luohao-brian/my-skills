@@ -17,8 +17,9 @@
 | Skill | 路径 | 说明 |
 | --- | --- | --- |
 | `ai-news` | `info-track/ai-news/` | 中文 AI 新闻日报 |
-| `ai-labs-tracker` | `info-track/ai-labs-tracker/` | OpenAI、Anthropic、Google DeepMind 动态追踪 |
-| `reddit-oss-models` | `info-track/reddit-oss-models/` | Reddit 开源模型热门讨论 weekly |
+| `ai-labs-tracker` | `info-track/ai-labs-tracker/` | AI 厂商产品、工程与研究动态追踪 |
+| `ai-tech-blogs` | `info-track/ai-tech-blogs/` | Hubwiz、QingkeAI 技术博客聚合 |
+| `reddit-oss-models` | `info-track/reddit-oss-models/` | Reddit、GitHub、Hugging Face AI 开源更新 |
 
 ### hermes plugins
 
@@ -37,6 +38,7 @@
 | `ark-vision` | `openclaw-skills/ark-vision/` | Ark Agent Plan image understanding, `scripts/vision_analyze.py` |
 | `ark-search` | `openclaw-skills/ark-search/` | Ark Agent Plan search, `scripts/web_search.py` |
 | `ark-data-pro` | `openclaw-skills/ark-data-pro/` | Ark Agent Plan professional datasets, `scripts/data_pro_search.py` |
+| `ark-viking` | `openclaw-skills/ark-viking/` | OpenViking knowledge browse, semantic retrieval, and RAG context assembly, `scripts/openviking.py` |
 | `volc-search` | `openclaw-skills/volc-search/` | Volcengine WebSearch, `scripts/web_search.py` |
 | `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 portable HTML/CSS design templates, `templates/*.md` |
 | `guizang-ppt-skill` | `openclaw-skills/guizang-ppt-skill/` | 单文件 HTML PPT，22 个 Swiss 版式契约、golden deck 与静态/视觉校验 |
@@ -84,6 +86,12 @@ Primary Ark credential:
 
 ```bash
 export ARK_AGENT_PLAN_API_KEY=...
+```
+
+Independent OpenViking credential:
+
+```bash
+export ARK_AGENT_PLAN_OPENVIKING_API_KEY=...
 ```
 
 Volcengine WebSearch AK/SK credentials:

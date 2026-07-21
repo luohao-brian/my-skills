@@ -13,8 +13,9 @@
 ## 当前目录结构
 
 - `info-track/ai-news/`：中文版 AI 新闻简报
-- `info-track/ai-labs-tracker/`：OpenAI、Anthropic、Google DeepMind 动态追踪
-- `info-track/reddit-oss-models/`：Reddit 开源模型讨论 weekly
+- `info-track/ai-labs-tracker/`：AI 厂商产品、工程与研究动态追踪
+- `info-track/ai-tech-blogs/`：Hubwiz、QingkeAI 技术博客聚合
+- `info-track/reddit-oss-models/`：Reddit、GitHub、Hugging Face AI 开源更新
 - `hermes-plugins/hermes-ark-plugin/`：Hermes Ark 多模态插件
 - `openclaw-skills/ark-tts/`：火山 Ark TTS
 - `openclaw-skills/ark-stt/`：火山 Ark STT
@@ -23,6 +24,7 @@
 - `openclaw-skills/ark-vision/`：Ark Agent Plan 图片理解
 - `openclaw-skills/ark-search/`：Ark Agent Plan 搜索
 - `openclaw-skills/ark-data-pro/`：Ark Agent Plan 专业数据集
+- `openclaw-skills/ark-viking/`：OpenViking 知识浏览、语义召回与 RAG 上下文组装
 - `openclaw-skills/volc-search/`：火山引擎 WebSearch
 - `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
 - `openclaw-skills/ppt-master/`：SVG/PPTX 演示文稿生成、转换与多层视觉校验

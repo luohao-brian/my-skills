@@ -1,69 +1,29 @@
 ---
 name: ai-labs-tracker
-description: 追踪 OpenAI、Anthropic 和 Google DeepMind 三家 AI 实验室的最新动态。当用户需要获取 OpenAI、Anthropic、Google Gemini 三家公司最新动态、AI 行业月报、技术更新汇总时使用此技能。
-homepage: https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-labs-tracker
-metadata: {"openclaw":{"skillKey":"ai-labs-tracker","emoji":"🧪","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-labs-tracker"}}
+description: 采集并整理 AI 厂商的产品发布、功能更新、API/工程动态、技术博客和研究进展。适用于生成 AI 厂商周报/月报，或追踪 OpenAI、Anthropic/Claude、Google/DeepMind、Cursor 等官方更新。
+metadata: {"openclaw":{"skillKey":"ai-labs-tracker","emoji":"🧪","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-labs-tracker","requires":{"anyBins":["python3","python"]}}}
 ---
 
-# AI Labs Tracker
+# AI 厂商动态追踪
 
-追踪 OpenAI、Anthropic 和 Google DeepMind 三家公司过去一个月内的最新动态，生成结构化的追踪报告。
+运行确定性采集器获取候选；由 agent 完成核验、去重和最终中文报告。
 
-## 追踪周期
+执行前按需读取：
 
-- 默认追踪周期：**过去 30 天**
-- 可调整范围：7 天 / 30 天 / 90 天
+- [references/sources.md](references/sources.md)：来源范围与采集边界。
+- [references/output-schema.md](references/output-schema.md)：候选字段和失败语义。
+- [references/template.md](references/template.md)：需要完整周报或月报时的成稿格式。
 
-## 目标公司
-
-1. **OpenAI** - GPT 系列模型、ChatGPT、API 平台
-2. **Anthropic** - Claude 系列模型、Anthropic API
-3. **Google DeepMind** - Gemini 系列模型、Google AI 服务
-
-## 信息源
-
-三家公司的官方信息源列表详见 [references/sources.md](references/sources.md)
-
-## 内容分类标准
-
-每条动态按以下三类之一进行分类：
-
-### 1. 产品发布 (Product Release)
-- 新产品/功能的正式发布
-- 重大版本更新（如 GPT-4、Claude 3、Gemini 2.0）
-- 面向消费者的应用上线
-
-### 2. 技术与工程 (Technology & Engineering)
-- API 更新与变更日志
-- 性能优化与基础设施改进
-- 开发者工具与 SDK 更新
-- 定价策略调整
-
-### 3. 前沿研究 (Frontier Research)
-- 学术论文发布
-- 模型能力突破（推理、多模态、长上下文等）
-- 安全研究与对齐技术
-- 开源代码/数据集发布
-
-## 输出格式
-
-每条记录按以下格式输出：
-
-```
-### [分类] Title
-- **Link**: URL
-- **Date**: YYYY-MM-DD
-- **Summary**: 2-3 句话概括核心内容
+```bash
+python3 {baseDir}/scripts/vendor_updates.py --days 7 --output vendor-candidates.json --stats
 ```
 
-## 报告模板
+执行合同：
 
-完整报告结构参考 [references/template.md](references/template.md)
+1. 默认采集截至今天的最近 7 天；用户明确指定日期或周期时再传 `--date`、`--days`。
+2. 保持官方来源集合稳定，不因某个来源暂时失败而扩展到媒体或聚合站。
+3. 读取候选 JSON，按 URL 和同一事件去重；剔除 `-misc`、无有效标题或无可访问链接的条目。
+4. 最终只分为“AI 厂商产品更新”和“AI 厂商博客更新”，并统一使用模板中的列表格式。
+5. 标题和摘要可改写为中文，但不得增加候选字段与原文无法支持的事实。
 
-## 工作流程
-
-1. 确定追踪周期（默认过去 30 天）
-2. 依次访问三家公司的官方信息源
-3. 筛选目标时间范围内的动态
-4. 按分类标准整理内容
-5. 按模板格式生成报告
+`LLM_API_KEY` 可选。存在时采集器会调用 OpenAI-compatible provider 辅助中文改写和分类；缺失时使用原始文本与规则分类，采集仍可运行。

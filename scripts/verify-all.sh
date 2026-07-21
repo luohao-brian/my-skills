@@ -58,6 +58,7 @@ assert_no_path volc-websearch
 skills=(
   info-track/ai-news
   info-track/ai-labs-tracker
+  info-track/ai-tech-blogs
   info-track/reddit-oss-models
   openclaw-skills/ark-tts
   openclaw-skills/ark-stt
@@ -66,6 +67,7 @@ skills=(
   openclaw-skills/ark-vision
   openclaw-skills/ark-search
   openclaw-skills/ark-data-pro
+  openclaw-skills/ark-viking
   openclaw-skills/volc-search
   openclaw-skills/popular-web-designs
   openclaw-skills/guizang-ppt-skill
@@ -110,6 +112,10 @@ assert_contains openclaw-skills/ark-search/SKILL.md "ARK_AGENT_PLAN_API_KEY"
 assert_contains openclaw-skills/ark-data-pro/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/ark-data-pro/SKILL.md "ARK_AGENT_PLAN_API_KEY"
 assert_contains openclaw-skills/ark-data-pro/SKILL.md "data_pro_search.py"
+assert_contains openclaw-skills/ark-viking/SKILL.md "ARK_AGENT_PLAN_OPENVIKING_API_KEY"
+assert_contains openclaw-skills/ark-viking/SKILL.md "scripts/openviking.py"
+assert_file openclaw-skills/ark-viking/requirements.txt
+assert_contains openclaw-skills/ark-viking/requirements.txt "requests>=2.32,<3"
 assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
 assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
 assert_contains openclaw-skills/popular-web-designs/SKILL.md "references/catalog.md"
@@ -192,6 +198,25 @@ assert_contains info-track/ai-news/SKILL.md '`title`、`url`、`summary`'
 assert_contains info-track/ai-news/SKILL.md "## 来源与候选"
 assert_contains info-track/ai-news/SKILL.md "## 成稿规则"
 
+assert_file info-track/ai-labs-tracker/scripts/vendor_updates.py
+assert_file info-track/ai-labs-tracker/references/sources.md
+assert_file info-track/ai-labs-tracker/references/output-schema.md
+assert_contains info-track/ai-labs-tracker/SKILL.md "scripts/vendor_updates.py"
+assert_contains info-track/ai-labs-tracker/SKILL.md "references/sources.md"
+
+assert_file info-track/ai-tech-blogs/scripts/tech_blogs.py
+assert_file info-track/ai-tech-blogs/references/sources.md
+assert_file info-track/ai-tech-blogs/references/output-schema.md
+assert_contains info-track/ai-tech-blogs/SKILL.md "scripts/tech_blogs.py"
+assert_contains info-track/ai-tech-blogs/SKILL.md "Hubwiz=0.75,QingkeAI=0.25"
+
+assert_file info-track/reddit-oss-models/scripts/open_source_updates.py
+assert_file info-track/reddit-oss-models/scripts/parse_rss.py
+assert_file info-track/reddit-oss-models/references/sources.md
+assert_file info-track/reddit-oss-models/references/output-schema.md
+assert_contains info-track/reddit-oss-models/SKILL.md "scripts/open_source_updates.py"
+assert_contains info-track/reddit-oss-models/SKILL.md "GitHub Weekly"
+
 python_bin=""
 if command -v python3 >/dev/null 2>&1; then
   python_bin=python3
@@ -208,6 +233,10 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   info-track/ai-news/scripts/adapters/rss.py \
   info-track/ai-news/scripts/adapters/json_api.py \
   info-track/ai-news/scripts/adapters/html_index.py \
+  info-track/ai-labs-tracker/scripts/vendor_updates.py \
+  info-track/ai-tech-blogs/scripts/tech_blogs.py \
+  info-track/reddit-oss-models/scripts/open_source_updates.py \
+  info-track/reddit-oss-models/scripts/parse_rss.py \
   openclaw-skills/ark-tts/scripts/volc_tts.py \
   openclaw-skills/ark-stt/scripts/volc_stt.py \
   openclaw-skills/ark-image-gen/scripts/volc_image_gen.py \
@@ -215,6 +244,7 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
   openclaw-skills/ark-vision/scripts/vision_analyze.py \
   openclaw-skills/ark-search/scripts/web_search.py \
   openclaw-skills/ark-data-pro/scripts/data_pro_search.py \
+  openclaw-skills/ark-viking/scripts/openviking.py \
   openclaw-skills/volc-search/scripts/web_search.py \
   openclaw-skills/ppt-master/scripts/image_manifest.py \
   openclaw-skills/ppt-master/scripts/audio_manifest.py \
@@ -225,7 +255,12 @@ PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_comp
 
 "$python_bin" openclaw-skills/ark-vision/scripts/vision_analyze.py --help >/dev/null
 "$python_bin" openclaw-skills/ark-data-pro/scripts/data_pro_search.py --help >/dev/null
+"$python_bin" openclaw-skills/ark-viking/scripts/openviking.py --help >/dev/null
 "$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
+"$python_bin" info-track/ai-labs-tracker/scripts/vendor_updates.py --help >/dev/null
+"$python_bin" info-track/ai-tech-blogs/scripts/tech_blogs.py --help >/dev/null
+"$python_bin" info-track/reddit-oss-models/scripts/open_source_updates.py --help >/dev/null
+"$python_bin" info-track/reddit-oss-models/scripts/parse_rss.py --help >/dev/null
 "$python_bin" openclaw-skills/ppt-master/scripts/visual_layout_audit.py --help >/dev/null
 "$python_bin" openclaw-skills/ppt-master/scripts/pptx_layout_audit.py --help >/dev/null
 "$python_bin" openclaw-skills/ppt-master/scripts/image_manifest.py --help >/dev/null

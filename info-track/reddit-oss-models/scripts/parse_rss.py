@@ -11,10 +11,11 @@ from __future__ import annotations
 import argparse
 import html
 import re
+import sys
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
 
@@ -168,7 +169,11 @@ def text_of(node: ET.Element | None, path: str) -> str:
 def load_xml(source: str) -> ET.Element:
     parsed = urlparse(source)
     if parsed.scheme in ("http", "https"):
-        with urlopen(source, timeout=30) as response:
+        request = Request(
+            source,
+            headers={"User-Agent": "my-skills-info-track/1.0 (https://github.com/luohao-brian/my-skills)"},
+        )
+        with urlopen(request, timeout=30) as response:
             payload = response.read()
         return ET.fromstring(payload)
     return ET.parse(source).getroot()
@@ -181,8 +186,50 @@ def first_nonempty(*values: str) -> str:
     return ""
 
 
+def local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def atom_text(node: ET.Element, name: str) -> str:
+    for child in list(node):
+        if local_name(child.tag) == name:
+            return (child.text or "").strip()
+    return ""
+
+
+def atom_link(node: ET.Element) -> str:
+    for child in list(node):
+        if local_name(child.tag) != "link":
+            continue
+        if child.attrib.get("rel", "alternate") == "alternate" and child.attrib.get("href"):
+            return child.attrib["href"]
+    return ""
+
+
 def parse_rss(source: str) -> List[Dict[str, object]]:
     root = load_xml(source)
+    if local_name(root.tag) == "feed":
+        subreddit = detect_subreddit(atom_text(root, "title"), source)
+        posts: List[Dict[str, object]] = []
+        for entry in (node for node in list(root) if local_name(node.tag) == "entry"):
+            title = atom_text(entry, "title")
+            content = strip_html(first_nonempty(atom_text(entry, "content"), atom_text(entry, "summary")))
+            if not is_model_related(title, content):
+                continue
+            posts.append(
+                {
+                    "title": title,
+                    "subreddit": subreddit,
+                    "link": atom_link(entry),
+                    "content": content,
+                    "score": 0,
+                    "comments": 0,
+                    "published": first_nonempty(atom_text(entry, "published"), atom_text(entry, "updated")),
+                    "model_info": extract_model_info(content),
+                    "stage": classify_stage(f"{title} {content}"),
+                }
+            )
+        return posts
     channel = root.find("./channel")
     subreddit = detect_subreddit(text_of(channel, "title"), source)
     posts: List[Dict[str, object]] = []
@@ -298,7 +345,12 @@ def main() -> int:
     parser.add_argument("--summary", action="store_true", help="Print markdown summary instead of a short parse preview")
     args = parser.parse_args()
 
-    groups = [parse_rss(source) for source in args.sources]
+    groups = []
+    for source in args.sources:
+        try:
+            groups.append(parse_rss(source))
+        except Exception as exc:
+            print(f"REDDIT_RSS_SKIPPED source={source} reason={type(exc).__name__}", file=sys.stderr)
     posts = merge_posts(*groups)
 
     if args.summary:

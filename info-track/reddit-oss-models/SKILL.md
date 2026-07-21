@@ -1,67 +1,34 @@
 ---
 name: reddit-oss-models
-description: 监控 Reddit 的 r/LocalLLaMA 和 r/unsloth 的本周热门 RSS，筛选与开源模型直接相关的帖子，生成中文 weekly 简报。当用户需要获取开源模型最新动态、热门模型讨论、或 Reddit 社区热帖时使用此技能。
-homepage: https://github.com/luohao-brian/my-skills/tree/main/info-track/reddit-oss-models
-metadata: {"openclaw":{"skillKey":"reddit-oss-models","emoji":"🧵","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/reddit-oss-models"}}
+description: 采集 Reddit 开源模型热帖、GitHub Weekly AI/Agent/LLM Trending，以及 Hugging Face 热门开源模型和数据集，生成 AI 开源周报。适用于追踪开源模型、Agent 项目、本地推理、量化、训练生态与数据集更新。
+metadata: {"openclaw":{"skillKey":"reddit-oss-models","emoji":"🧵","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/reddit-oss-models","requires":{"anyBins":["python3","python"]}}}
 ---
 
-# Reddit 开源模型监控
+# AI 开源更新
 
-监控 Reddit 的 r/LocalLLaMA 和 r/unsloth 的本周热门 RSS，筛选与开源模型直接相关的帖子，生成中文 weekly 简报。
+运行综合采集器获取四组候选；由 agent 负责核验、主题合并和最终中文周报。
 
-## 数据源
+执行前按需读取：
 
-- https://www.reddit.com/r/LocalLLaMA/top/.rss?t=week
-- https://www.reddit.com/r/unsloth/top/.rss?t=week
+- [references/sources.md](references/sources.md)：来源边界与模型分类规则。
+- [references/output-schema.md](references/output-schema.md)：分组字段与成稿格式。
 
-## 筛选规则
+```bash
+python3 {baseDir}/scripts/open_source_updates.py --reddit-limit 10 --github-limit 10 --model-max 10 --dataset-limit 20 --output oss-candidates.json --stats
+```
 
-只保留与开源模型直接相关的热门帖子。
+仅需 Reddit RSS 时使用：
 
-**排除内容：**
-- 纯吐槽帖
-- 纯工具报错帖
-- 纯情绪帖
-- 与开源模型无直接关系的帖子
+```bash
+python3 {baseDir}/scripts/parse_rss.py 'https://www.reddit.com/r/LocalLLaMA/top/.rss?t=week' 'https://www.reddit.com/r/unsloth/top/.rss?t=week' --summary
+```
 
-**合并规则：**
-- 如果同一模型一周内有多条相关热帖，允许保留，但总结时要合并主题，避免重复表述
+执行合同：
 
-## 输出要求
+1. 保持 Reddit、GitHub Weekly Trending、Hugging Face Models、Hugging Face Datasets 四组边界，不把不同热度口径混成统一排名。
+2. Reddit 与 GitHub 默认各保留最多 10 条；数据集最多 20 条；模型每类最多 10 条。
+3. 合并同一仓库、模型、数据集或同一发布事件的重复讨论；保留能体现不同流程阶段的独立帖子。
+4. 剔除纯吐槽、纯求助、工具报错、无开源 AI 关系和无法确认入口的噪音。
+5. 入口或事实无法确认时写“未确认”，不得猜测。
 
-生成 weekly 开源模型热帖 Top 10。
-
-**每条热帖包含：**
-1. 帖子标题
-2. subreddit（r/LocalLLaMA 或 r/unsloth）
-3. 帖子链接
-4. 核心内容摘要
-5. 流程摘要 - 说明这条帖子反映了模型从发布、适配、量化、训练到本地可用的哪一步
-
-**最后追加两部分：**
-
-### 1. 本周讨论主题总结
-
-总结这周最热的开源模型、大家主要在讨论什么、这些讨论反映出什么趋势。
-
-### 2. 可用入口整理
-
-按模型汇总可用入口，优先给出：
-- LM Studio 入口
-- Unsloth 入口
-- 官网 / 官方模型页入口
-
-## 写作要求
-
-- 输出中文，结构清晰，可直接转发
-- 不要只写一句话摘要，要写出核心内容和流程摘要
-- 链接尽量直接给到帖子原链接、模型页或文档页
-- 如果某个入口没有确认到，明确写"未确认"，不要猜测或编造
-- 如果本周高质量帖子不足 10 条，就输出实际能确认的数量，并说明原因，不要凑数
-
-## 使用流程
-
-1. 读取两个数据源的 RSS 内容，提取热门帖子。
-2. 合并两个 subreddit 的帖子并按热度排序。
-3. 应用筛选和合并规则。
-4. 生成中文简报。
+`LLM_API_KEY` 可选。存在时采集器会辅助生成中文简介和模型分类；缺失时使用来源 metadata 与确定性规则。
