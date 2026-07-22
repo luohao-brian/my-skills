@@ -161,6 +161,10 @@ yarn-error.log*
 info-track/ai-news/brief-*.md
 info-track/ai-news/candidates*.json
 
+# Generated ai-community-pulse outputs
+/ai-community-pulse-*.md
+/ai-community-pulse-*.json
+
 # Generated local outputs
 output/
 outputs/

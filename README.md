@@ -17,9 +17,10 @@
 | Skill | 路径 | 说明 |
 | --- | --- | --- |
 | `ai-news` | `info-track/ai-news/` | 中文 AI 新闻日报 |
+| `ai-community-pulse` | `info-track/ai-community-pulse/` | AI 社区与生态热点日报 |
 | `ai-labs-tracker` | `info-track/ai-labs-tracker/` | AI 厂商产品、工程与研究动态追踪 |
 | `ai-tech-blogs` | `info-track/ai-tech-blogs/` | Hubwiz、QingkeAI 技术博客聚合 |
-| `reddit-oss-models` | `info-track/reddit-oss-models/` | Reddit、GitHub、Hugging Face AI 开源更新 |
+| `ai-oss-models` | `info-track/ai-oss-models/` | Hugging Face AI 开源模型与数据集更新 |
 
 ### hermes plugins
 
