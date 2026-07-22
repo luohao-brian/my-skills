@@ -5,14 +5,18 @@
 ```json
 {
   "kind": "ai-tech-blogs",
-  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
-  "weights": {"Hubwiz": 0.75, "QingkeAI": 0.25},
-  "limit": 50,
+  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "period": "1w"},
+  "sources": {
+    "Hubwiz": {"ok": true, "count": 12, "selected": 12, "error": null},
+    "QingkeAI": {"ok": false, "count": 0, "selected": 0, "error": "TimeoutError"}
+  },
   "items": []
 }
 ```
 
 每个 `items[]` 包含 `title`、`url`、`summary`、`date`、`source`、`category`、`score`、`metadata`。
+
+`sources.<source>.ok` 区分采集成功与失败；`count` 是来源在窗口内返回的候选数；`selected` 是按精确 URL 去重后的输出数；`error` 只在失败时记录异常类型。
 
 最终列表固定为：
 
@@ -24,5 +28,3 @@
 - 时间：YYYY-MM-DD
 - 链接：[原文](https://example.com)
 ```
-
-单个来源失败时保留另一来源的有效结果，并明确说明实际来源数量；两者都为空时不扩窗、不补写。

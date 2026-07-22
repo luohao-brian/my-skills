@@ -42,11 +42,6 @@ from zoneinfo import ZoneInfo
 
 USER_AGENT = "my-skills-info-track/1.0"
 
-TECH_BLOG_SOURCE_WEIGHTS = {
-    "Hubwiz": 0.75,
-    "QingkeAI": 0.25,
-}
-
 @dataclass
 class Item:
     title: str
@@ -144,18 +139,17 @@ def extract_first(pattern: str, text: str) -> str:
     match = re.search(pattern, text, re.S | re.I)
     return clean_text(match.group(1)) if match else ""
 
-def parse_hubwiz_week(start: dt.date, end: dt.date, limit: int = 50) -> list[Item]:
+def parse_hubwiz_week(start: dt.date, end: dt.date) -> list[Item]:
     items: list[Item] = []
     seen: set[str] = set()
     page_num = 1
-    while len(items) < limit:
+    while True:
         url = "https://www.hubwiz.com/blog/" if page_num == 1 else f"https://www.hubwiz.com/blog/page/{page_num}/"
-        try:
-            page = fetch_text(url, timeout=45)
-        except Exception:
-            break
+        page = fetch_text(url, timeout=45)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*post-card[^"\']*["\'][^>]*>(.*?)</article>', page, re.S | re.I)
         if not cards:
+            if page_num == 1:
+                raise ValueError("Hubwiz response contains no post cards")
             break
         stop = False
         for card in cards:
@@ -183,21 +177,19 @@ def parse_hubwiz_week(start: dt.date, end: dt.date, limit: int = 50) -> list[Ite
                     category=extract_first(r'<div\b[^>]*class=["\'][^"\']*post-card-primary-tag[^"\']*["\'][^>]*>(.*?)</div>', card),
                 )
             )
-            if len(items) >= limit:
-                break
-        if stop or len(items) >= limit or 'rel="next"' not in page:
+        if stop or 'rel="next"' not in page:
             break
         page_num += 1
-    return items[:limit]
+    return items
 
-def parse_qingke_week(start: dt.date, end: dt.date, limit: int = 50) -> list[Item]:
+def parse_qingke_week(start: dt.date, end: dt.date) -> list[Item]:
     url = "https://qingkeai.online/apis/api.content.halo.run/v1alpha1/posts?page=1&size=1000&sort=spec.publishTime,desc"
-    try:
-        data = json.loads(fetch_text(url, timeout=45))
-    except Exception:
-        return []
+    data = json.loads(fetch_text(url, timeout=45))
+    rows = data.get("items")
+    if not isinstance(rows, list):
+        raise ValueError("QingkeAI response contains no items list")
     items: list[Item] = []
-    for row in data.get("items", []):
+    for row in rows:
         spec = row.get("spec") or {}
         status = row.get("status") or {}
         published = parse_halo_datetime(spec.get("publishTime", ""))
@@ -234,88 +226,54 @@ def parse_qingke_week(start: dt.date, end: dt.date, limit: int = 50) -> list[Ite
                 },
             )
         )
-        if len(items) >= limit:
-            break
     return items
 
-def parse_source_weights(value: str) -> dict[str, float]:
-    if not value:
-        return dict(TECH_BLOG_SOURCE_WEIGHTS)
-    weights: dict[str, float] = {}
-    for part in value.split(","):
-        if "=" not in part:
+def resolve_week_window(anchor: dt.date, *, date_is_start: bool) -> tuple[dt.date, dt.date]:
+    if date_is_start:
+        return anchor, anchor + dt.timedelta(days=6)
+    return anchor - dt.timedelta(days=6), anchor
+
+
+def dedupe_items(items: list[Item]) -> list[Item]:
+    selected: list[Item] = []
+    seen_urls: set[str] = set()
+    for item in items:
+        key = item.url.strip()
+        if key and key in seen_urls:
             continue
-        name, raw_weight = part.split("=", 1)
-        try:
-            weight = float(raw_weight)
-        except ValueError:
-            continue
-        if name.strip() and weight > 0:
-            weights[name.strip()] = weight
-    return weights or dict(TECH_BLOG_SOURCE_WEIGHTS)
+        if key:
+            seen_urls.add(key)
+        selected.append(item)
+    selected.sort(key=lambda item: (item.date, item.source, item.title), reverse=True)
+    return selected
 
-def select_weighted_blog_items(
-    source_items: dict[str, list[Item]],
-    weights: dict[str, float],
-    limit: int = 50,
-) -> list[Item]:
-    candidates = {
-        source: sorted(items, key=lambda item: (item.date, item.score), reverse=True)
-        for source, items in source_items.items()
-        if items
-    }
-    if not candidates or limit <= 0:
-        return []
-    active_weights = {source: max(weights.get(source, 0.0), 0.0) for source in candidates}
-    if not any(active_weights.values()):
-        active_weights = {source: 1.0 for source in candidates}
-
-    selected: dict[str, list[Item]] = {source: [] for source in candidates}
-    remaining = limit
-    while remaining > 0:
-        available = [source for source, items in candidates.items() if len(selected[source]) < len(items)]
-        if not available:
-            break
-        total_weight = sum(active_weights.get(source, 0.0) for source in available) or len(available)
-        quotas: dict[str, int] = {}
-        remainders: list[tuple[float, str]] = []
-        for source in available:
-            exact = remaining * ((active_weights.get(source, 0.0) or 1.0) / total_weight)
-            take = min(int(exact), len(candidates[source]) - len(selected[source]))
-            quotas[source] = take
-            remainders.append((exact - int(exact), source))
-        assigned = sum(quotas.values())
-        for _, source in sorted(remainders, reverse=True):
-            if assigned >= remaining:
-                break
-            if len(selected[source]) + quotas[source] < len(candidates[source]):
-                quotas[source] += 1
-                assigned += 1
-        if assigned == 0:
-            break
-        for source, take in quotas.items():
-            if take <= 0:
-                continue
-            start = len(selected[source])
-            selected[source].extend(candidates[source][start : start + take])
-        remaining = limit - sum(len(items) for items in selected.values())
-
-    merged = [item for rows in selected.values() for item in rows]
-    merged.sort(key=lambda item: (item.date, item.source, item.title), reverse=True)
-    return merged[:limit]
-
-def fetch_tech_blog_items(start: dt.date, end: dt.date, limit: int = 50, weights: dict[str, float] | None = None) -> list[Item]:
-    weights = weights or dict(TECH_BLOG_SOURCE_WEIGHTS)
+def fetch_tech_blog_items(
+    start: dt.date,
+    end: dt.date,
+) -> tuple[list[Item], dict[str, dict[str, Any]]]:
     source_items: dict[str, list[Item]] = {}
+    source_status: dict[str, dict[str, Any]] = {}
     for source, fetcher in {
-        "Hubwiz": lambda: parse_hubwiz_week(start, end, limit=limit),
-        "QingkeAI": lambda: parse_qingke_week(start, end, limit=limit),
+        "Hubwiz": lambda: parse_hubwiz_week(start, end),
+        "QingkeAI": lambda: parse_qingke_week(start, end),
     }.items():
         try:
             source_items[source] = fetcher()
         except Exception as exc:
+            source_items[source] = []
+            source_status[source] = {"ok": False, "count": 0, "selected": 0, "error": type(exc).__name__}
             print(f"TECH_BLOG_FETCH_SKIPPED source={source} reason={type(exc).__name__}", file=sys.stderr)
-    return select_weighted_blog_items(source_items, weights, limit=limit)
+        else:
+            source_status[source] = {
+                "ok": True,
+                "count": len(source_items[source]),
+                "selected": 0,
+                "error": None,
+            }
+    selected = dedupe_items([item for rows in source_items.values() for item in rows])
+    for item in selected:
+        source_status[item.source]["selected"] += 1
+    return selected, source_status
 
 def item_to_dict(item: Item) -> dict[str, Any]:
     return {
@@ -343,31 +301,29 @@ def emit_payload(payload: dict[str, Any], output: str | None) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect Hubwiz and QingkeAI technical blog posts.")
-    parser.add_argument("--date", default=dt.date.today().isoformat(), help="Window end date, YYYY-MM-DD")
-    parser.add_argument("--days", type=int, default=7, help="Inclusive window length")
-    parser.add_argument("--limit", type=int, default=50, help="Maximum combined candidates")
-    parser.add_argument("--weights", default="Hubwiz=0.75,QingkeAI=0.25", help="Source weights")
+    parser.add_argument("--date", help="Window start date, YYYY-MM-DD; omit for the recent period ending today")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
-    parser.add_argument("--stats", action="store_true", help="Print source counts to stderr")
+    parser.add_argument("--stats", action="store_true", help="Print source statuses to stderr")
     args = parser.parse_args()
-    if args.days < 1 or args.limit < 0:
-        parser.error("--days must be at least 1 and --limit must be non-negative")
-    end = dt.date.fromisoformat(args.date)
-    start = end - dt.timedelta(days=args.days - 1)
-    items = fetch_tech_blog_items(start, end, args.limit, parse_source_weights(args.weights))
+    try:
+        if args.date:
+            anchor = dt.date.fromisoformat(args.date)
+            start, end = resolve_week_window(anchor, date_is_start=True)
+        else:
+            anchor = dt.date.today()
+            start, end = resolve_week_window(anchor, date_is_start=False)
+    except ValueError as exc:
+        parser.error(str(exc))
+    items, source_status = fetch_tech_blog_items(start, end)
     payload = {
         "kind": "ai-tech-blogs",
-        "window": {"start": start.isoformat(), "end": end.isoformat()},
-        "weights": parse_source_weights(args.weights),
-        "limit": args.limit,
+        "window": {"start": start.isoformat(), "end": end.isoformat(), "period": "1w"},
+        "sources": source_status,
         "items": [item_to_dict(item) for item in items],
     }
     emit_payload(payload, args.output)
     if args.stats:
-        counts: dict[str, int] = {}
-        for item in items:
-            counts[item.source] = counts.get(item.source, 0) + 1
-        print(json.dumps(counts, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+        print(json.dumps(source_status, ensure_ascii=False, sort_keys=True), file=sys.stderr)
     return 0
 
 
