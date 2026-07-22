@@ -20,7 +20,7 @@ from adapters import ADAPTERS as FETCHERS  # noqa: E402
 
 
 TZ = timezone(timedelta(hours=8))
-REQUIRED_TOP_LEVEL = ["window", "candidates"]
+REQUIRED_TOP_LEVEL = ["window", "sources", "candidates"]
 REQUIRED_CANDIDATE_FIELDS = [
     "title",
     "url",
@@ -55,14 +55,9 @@ def build_window(args: argparse.Namespace) -> dict[str, Any]:
         end = start + timedelta(days=1) - timedelta(seconds=1)
         return {"start": start, "end": end, "label": args.date, "date": args.date}
 
-    window = getattr(args, "window", None) or "72h"
-    match = re.fullmatch(r"(\d+)h", window)
-    if not match:
-        raise ValueError("--window must use Nh format, for example 72h")
-    hours = int(match.group(1))
     end = datetime.now(TZ)
-    start = end - timedelta(hours=hours)
-    return {"start": start, "end": end, "label": f"最近{hours}小时"}
+    start = end - timedelta(hours=72)
+    return {"start": start, "end": end, "label": "最近72小时"}
 
 
 def serialize_window(window: dict[str, Any]) -> dict[str, str]:
@@ -155,7 +150,7 @@ def resolve_fetcher(source: dict[str, Any]):
         return FETCHERS["rss"]
     if kind == "json":
         return FETCHERS["tensorfeed_json"]
-    if source_id in {"anthropic-news", "anthropic-engineering"}:
+    if source_id == "anthropic-news":
         return FETCHERS["anthropic"]
     if source_id == "tmtpost-edge-ai-daily":
         return FETCHERS["tmtpost"]
@@ -173,18 +168,7 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
     sources = registry.get("sources", [])
     if not isinstance(sources, list):
         raise ValueError("references/sources.json must contain sources[]")
-    source_filter = set(getattr(args, "source", None) or [])
-    if source_filter:
-        known = {str(source.get("id", "")) for source in sources if isinstance(source, dict)}
-        unknown = sorted(source_filter - known)
-        if unknown:
-            raise ValueError("unknown source id: " + ", ".join(unknown))
-        sources = [source for source in sources if str(source.get("id", "")) in source_filter]
     window = build_window(args)
-    limit_per_source = getattr(args, "limit_per_source", None)
-    limit_per_source = int(limit_per_source) if limit_per_source is not None else None
-    if limit_per_source is not None and limit_per_source < 1:
-        raise ValueError("--limit-per-source must be >= 1")
 
     candidates: list[dict[str, Any]] = []
     source_rows: list[dict[str, Any]] = []
@@ -234,8 +218,6 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                 }
             )
             source_candidate_count += 1
-            if limit_per_source is not None and source_candidate_count >= limit_per_source:
-                break
 
         source_rows.append(
             {
@@ -255,12 +237,23 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def collect_document(args: argparse.Namespace) -> dict[str, Any]:
-    data = collect_data(args)
+def public_document(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "window": data["window"],
+        "sources": {
+            row["source_id"]: {
+                "ok": row["ok"],
+                "count": row["candidates"],
+                "error": row["error"],
+            }
+            for row in data["_sources"]
+        },
         "candidates": data["candidates"],
     }
+
+
+def collect_document(args: argparse.Namespace) -> dict[str, Any]:
+    return public_document(collect_data(args))
 
 
 def validate_document(data: dict[str, Any]) -> list[str]:
@@ -273,6 +266,8 @@ def validate_document(data: dict[str, Any]) -> list[str]:
 
     if not isinstance(data["candidates"], list):
         errors.append("candidates must be a list")
+    if not isinstance(data["sources"], dict):
+        errors.append("sources must be an object")
 
     for index, candidate in enumerate(data.get("candidates", [])):
         for field in REQUIRED_CANDIDATE_FIELDS:
@@ -307,47 +302,21 @@ def validate_sources() -> list[str]:
     return errors
 
 
-def clamp_render_window(total: int, offset: int, limit: int | None) -> tuple[int, int]:
-    start = max(0, offset)
-    if start > total:
-        start = total
-    if limit is None:
-        end = total
-    else:
-        end = min(total, start + max(0, limit))
-    return start, end
-
-
-def format_candidate(item: dict[str, Any], index: int, show_index: bool, compact: bool) -> str:
+def format_candidate(item: dict[str, Any]) -> str:
     title = str(item.get("title", ""))
     summary = str(item.get("summary", ""))
     url = str(item.get("url", ""))
-    prefix = f"[{index}] " if show_index else ""
-    if compact:
-        return f"- {prefix}{title}\n  摘要：{summary}\n  来源链接：{url}"
-    return f"### {prefix}{title}\n摘要：{summary}\n来源链接：{url}"
+    return f"### {title}\n摘要：{summary}\n来源链接：{url}"
 
 
-def render_markdown(data: dict[str, Any], args: argparse.Namespace | None = None) -> str:
+def render_markdown(data: dict[str, Any]) -> str:
     errors = validate_document(data)
     if errors:
         raise ValueError("invalid ai-news document:\n" + "\n".join(errors))
 
     candidates = data["candidates"]
-    offset = int(getattr(args, "offset", 0) or 0)
-    limit = getattr(args, "limit", None)
-    limit = int(limit) if limit is not None else None
-    start, end = clamp_render_window(len(candidates), offset, limit)
-    show_index = bool(getattr(args, "show_index", False))
-    compact = bool(getattr(args, "compact", False))
-    rendered_items = [
-        format_candidate(item, index, show_index, compact)
-        for index, item in enumerate(candidates[start:end], start=start)
-    ]
-    if len(candidates) and (start != 0 or end != len(candidates)):
-        range_note = f"候选范围：{start + 1}-{end} / {len(candidates)}"
-    else:
-        range_note = f"候选数量：{len(candidates)}"
+    rendered_items = [format_candidate(item) for item in candidates]
+    range_note = f"候选数量：{len(candidates)}"
     sections = [range_note, *rendered_items]
 
     body = "\n\n".join(sections).strip()
@@ -374,7 +343,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_render(args: argparse.Namespace) -> int:
-    print(render_markdown(load_json(args.input), args), end="")
+    print(render_markdown(load_json(args.input)), end="")
     return 0
 
 
@@ -399,8 +368,8 @@ def cmd_verify_sources(args: argparse.Namespace) -> int:
             if isinstance(verify, dict) and "minRaw" in verify:
                 source_min_raw[str(source.get("id"))] = int(verify["minRaw"])
     if args.out:
-        dump_json({"window": document["window"], "candidates": document["candidates"]}, args.out)
-    errors = validate_document({"window": document["window"], "candidates": document["candidates"]})
+        dump_json(public_document(document), args.out)
+    errors = validate_document(public_document(document))
     for row in document["_sources"]:
         raw_count = int(row.get("raw", 0))
         if row.get("ok") is not True:
@@ -441,9 +410,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     collect = subparsers.add_parser("collect", help="Collect candidate news into JSON.")
     collect.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
-    collect.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
-    collect.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
-    collect.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
     collect.add_argument("--out", type=Path, help="Write JSON to this path instead of stdout.")
     collect.set_defaults(func=cmd_collect)
 
@@ -453,24 +419,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     render = subparsers.add_parser("render", help="Render a candidate JSON file to readable markdown.")
     render.add_argument("--input", type=Path, required=True, help="Candidate JSON to render.")
-    render.add_argument("--limit", type=int, help="Maximum number of candidates to render.")
-    render.add_argument("--offset", type=int, default=0, help="Zero-based candidate offset.")
-    render.add_argument("--show-index", action="store_true", help="Show candidate indexes in rendered items.")
-    render.add_argument("--compact", action="store_true", help="Use a compact list view.")
     render.set_defaults(func=cmd_render)
 
     run = add_hidden_subparser(subparsers, "run")
     run.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
-    run.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
-    run.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
-    run.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
     run.set_defaults(func=cmd_run)
 
     verify_sources = add_hidden_subparser(subparsers, "verify-sources")
     verify_sources.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
-    verify_sources.add_argument("--window", default="72h", help="Rolling time window, for example 72h.")
-    verify_sources.add_argument("--source", action="append", help="Collect only this source id. Repeat to collect multiple sources.")
-    verify_sources.add_argument("--limit-per-source", type=int, help="Maximum accepted candidates to keep from each source.")
     verify_sources.add_argument("--min-raw", type=int, default=0, help="Default minimum raw items required per source.")
     verify_sources.add_argument("--out", type=Path, help="Write collected JSON to this path.")
     verify_sources.set_defaults(func=cmd_verify_sources)

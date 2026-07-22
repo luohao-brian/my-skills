@@ -32,12 +32,6 @@
       "url": "https://tensorfeed.ai/api/news"
     },
     {
-      "id": "planet-ai",
-      "name": "Planet AI",
-      "kind": "rss",
-      "url": "https://planet-ai.net/rss.xml"
-    },
-    {
       "id": "tmtpost-edge-ai-daily",
       "name": "TMTPost Edge AI Daily",
       "kind": "html_index",
@@ -70,12 +64,6 @@
       "url": "https://www.anthropic.com/news"
     },
     {
-      "id": "anthropic-engineering",
-      "name": "Anthropic Engineering",
-      "kind": "html_index",
-      "url": "https://www.anthropic.com/engineering"
-    },
-    {
       "id": "google-ai-blog",
       "name": "Google AI Blog",
       "kind": "rss",
@@ -86,12 +74,6 @@
       "name": "Google DeepMind Blog",
       "kind": "rss",
       "url": "https://deepmind.google/blog/rss.xml"
-    },
-    {
-      "id": "interconnects",
-      "name": "Interconnects",
-      "kind": "rss",
-      "url": "https://www.interconnects.ai/feed"
     }
   ]
 }
