@@ -146,6 +146,11 @@ def in_window(value: str, start: dt.date, end: dt.date) -> bool:
     parsed = parse_date(value, fallback_year=end.year)
     return bool(parsed and start <= parsed <= end)
 
+def resolve_week_window(anchor: dt.date, *, date_is_start: bool) -> tuple[dt.date, dt.date]:
+    if date_is_start:
+        return anchor, anchor + dt.timedelta(days=6)
+    return anchor - dt.timedelta(days=6), anchor
+
 def parse_rss(label: str, url: str) -> list[Item]:
     root = ET.fromstring(fetch_text(url, timeout=45).encode("utf-8"))
     items: list[Item] = []
@@ -479,39 +484,51 @@ def dedupe_items(items: list[Item]) -> list[Item]:
         out.append(item)
     return out
 
-def fetch_vendor_items(start: dt.date, end: dt.date) -> list[Item]:
-    items: list[Item] = []
-    for label, url in [
-        ("OpenAI News", "https://openai.com/news/rss.xml"),
-        ("Google AI Blog", "https://blog.google/innovation-and-ai/technology/ai/rss/"),
-        ("Google DeepMind", "https://deepmind.google/blog/rss.xml"),
-        ("Interconnects AI", "https://www.interconnects.ai/feed"),
-    ]:
+def fetch_vendor_items(
+    start: dt.date,
+    end: dt.date,
+) -> tuple[list[Item], dict[str, dict[str, Any]]]:
+    fetchers: list[tuple[str, Callable[[], list[Item]]]] = [
+        ("OpenAI News", lambda: parse_rss("OpenAI News", "https://openai.com/news/rss.xml")),
+        ("Google AI Blog", lambda: parse_rss("Google AI Blog", "https://blog.google/innovation-and-ai/technology/ai/rss/")),
+        ("Google DeepMind", lambda: parse_rss("Google DeepMind", "https://deepmind.google/blog/rss.xml")),
+        ("Interconnects AI", lambda: parse_rss("Interconnects AI", "https://www.interconnects.ai/feed")),
+        ("Anthropic News", lambda: parse_anthropic_list("Anthropic News", "https://www.anthropic.com/news", "/news/", end)),
+        (
+            "Anthropic Engineering",
+            lambda: parse_anthropic_list(
+                "Anthropic Engineering",
+                "https://www.anthropic.com/engineering",
+                "/engineering/",
+                end,
+            ),
+        ),
+        ("Cursor Blog", lambda: parse_cursor_blog(end)),
+        ("Claude Blog", lambda: parse_claude_blog(start, end)),
+    ]
+    candidates: list[Item] = []
+    source_status: dict[str, dict[str, Any]] = {}
+    for source, fetcher in fetchers:
         try:
-            items.extend(parse_rss(label, url))
+            source_items = [item for item in fetcher() if in_window(item.date, start, end)]
         except Exception as exc:
-            print(f"FETCH_VENDOR_SKIPPED source={label} reason={type(exc).__name__}", file=sys.stderr)
-    for label, url, prefix in [
-        ("Anthropic News", "https://www.anthropic.com/news", "/news/"),
-        ("Anthropic Engineering", "https://www.anthropic.com/engineering", "/engineering/"),
-    ]:
-        try:
-            items.extend(parse_anthropic_list(label, url, prefix, end))
-        except Exception as exc:
-            print(f"FETCH_VENDOR_SKIPPED source={label} reason={type(exc).__name__}", file=sys.stderr)
-    try:
-        items.extend(parse_cursor_blog(end))
-    except Exception as exc:
-        print(f"FETCH_VENDOR_SKIPPED source=Cursor reason={type(exc).__name__}", file=sys.stderr)
-    try:
-        items.extend(parse_claude_blog(start, end))
-    except Exception as exc:
-        print(f"FETCH_VENDOR_SKIPPED source=ClaudeBlog reason={type(exc).__name__}", file=sys.stderr)
-    week = [item for item in dedupe_items(items) if in_window(item.date, start, end)]
-    classify_vendor_items(week)
-    rewrite_vendor_items(week)
-    week.sort(key=lambda item: (item.date, item.source, item.title), reverse=True)
-    return week
+            source_status[source] = {"ok": False, "count": 0, "selected": 0, "error": type(exc).__name__}
+            print(f"FETCH_VENDOR_SKIPPED source={source} reason={type(exc).__name__}", file=sys.stderr)
+            continue
+        candidates.extend(source_items)
+        source_status[source] = {
+            "ok": True,
+            "count": len(source_items),
+            "selected": 0,
+            "error": None,
+        }
+    selected = dedupe_items(candidates)
+    classify_vendor_items(selected)
+    rewrite_vendor_items(selected)
+    selected.sort(key=lambda item: (item.date, item.source, item.title), reverse=True)
+    for item in selected:
+        source_status[item.source]["selected"] += 1
+    return selected, source_status
 
 def item_to_dict(item: Item) -> dict[str, Any]:
     return {
@@ -539,28 +556,33 @@ def emit_payload(payload: dict[str, Any], output: str | None) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect weekly AI vendor product and technology updates.")
-    parser.add_argument("--date", default=dt.date.today().isoformat(), help="Window end date, YYYY-MM-DD")
-    parser.add_argument("--days", type=int, default=7, help="Inclusive window length")
+    parser.add_argument("--date", help="Window start date, YYYY-MM-DD; omit for the recent period ending today")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
-    parser.add_argument("--stats", action="store_true", help="Print source/category counts to stderr")
+    parser.add_argument("--stats", action="store_true", help="Print source statuses and category counts to stderr")
     args = parser.parse_args()
-    if args.days < 1:
-        parser.error("--days must be at least 1")
-    end = dt.date.fromisoformat(args.date)
-    start = end - dt.timedelta(days=args.days - 1)
-    items = fetch_vendor_items(start, end)
+    try:
+        if args.date:
+            anchor = dt.date.fromisoformat(args.date)
+            start, end = resolve_week_window(anchor, date_is_start=True)
+        else:
+            anchor = dt.date.today()
+            start, end = resolve_week_window(anchor, date_is_start=False)
+    except ValueError as exc:
+        parser.error(str(exc))
+    items, source_status = fetch_vendor_items(start, end)
     payload = {
         "kind": "ai-vendor-updates",
-        "window": {"start": start.isoformat(), "end": end.isoformat()},
+        "window": {"start": start.isoformat(), "end": end.isoformat(), "period": "1w"},
+        "sources": source_status,
         "items": [item_to_dict(item) for item in items],
     }
     emit_payload(payload, args.output)
     if args.stats:
-        counts: dict[str, int] = {}
+        category_counts: dict[str, int] = {}
         for item in items:
-            key = f"{item.source} / {item.category}"
-            counts[key] = counts.get(key, 0) + 1
-        print(json.dumps(counts, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+            category_counts[item.category] = category_counts.get(item.category, 0) + 1
+        stats = {"sources": source_status, "categories": category_counts}
+        print(json.dumps(stats, ensure_ascii=False, sort_keys=True), file=sys.stderr)
     return 0
 
 

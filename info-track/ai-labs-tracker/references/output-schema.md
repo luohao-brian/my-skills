@@ -5,10 +5,16 @@
 ```json
 {
   "kind": "ai-vendor-updates",
-  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
+  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "period": "1w"},
+  "sources": {
+    "OpenAI News": {"ok": true, "count": 2, "selected": 2, "error": null},
+    "Anthropic News": {"ok": false, "count": 0, "selected": 0, "error": "TimeoutError"}
+  },
   "items": []
 }
 ```
+
+`sources` 固定包含全部来源。`ok` 区分采集成功与失败；`count` 是该来源在窗口内的候选数；`selected` 是脚本按 URL 去重后的输出数；`error` 只在失败时记录异常类型。`ok: true, count: 0` 表示采集成功但窗口内没有更新。
 
 每个 `items[]` 包含：
 
@@ -20,5 +26,3 @@
 - `category`：`AI厂商产品更新`、`AI厂商博客更新` 或 `-misc`。
 - `score`：兼容字段；厂商候选通常为 `0`。
 - `metadata`：来源分类等机器可读辅助字段。
-
-单个来源失败会输出 `FETCH_VENDOR_SKIPPED`，不会使其他来源失效。JSON 为空时如实报告，不放宽窗口或来源。

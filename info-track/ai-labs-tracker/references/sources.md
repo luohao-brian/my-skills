@@ -1,6 +1,6 @@
 # AI 厂商来源
 
-固定来源是输入边界。默认全部检查；来源失败时在 stderr 报告并继续，不以非官方来源补位。
+采集器固定检查下列来源，并在 JSON 的 `sources` 中记录各来源状态。
 
 | source | URL | 内容范围 |
 | --- | --- | --- |
@@ -13,8 +13,12 @@
 | Cursor Blog | https://cursor.com/cn/blog | Cursor 产品、工程与研究文章 |
 | Interconnects AI | https://www.interconnects.ai/feed | 模型与产业技术分析 |
 
+OpenAI、Anthropic、Claude、Google、DeepMind 和 Cursor 条目来自对应厂商站点；Interconnects AI 是固定的独立分析来源，不视为厂商官方来源。
+
 分类规则：
 
 - `AI厂商产品更新`：产品发布、功能更新、API/订阅变化、客户案例、商业合作和企业落地。
 - `AI厂商博客更新`：技术博客、研究、工程实践、模型机制、Agent harness、科学与系统架构。
-- `-misc`：与上述两类无直接关系的条目；成稿时丢弃。
+- `-misc`：无法归入上述两类的条目。
+
+单次时间窗口固定为 7 个自然日。未传 `--date` 时窗口截至今天；传入 `--date` 时，该日期是窗口起始日。
