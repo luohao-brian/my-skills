@@ -1,0 +1,173 @@
+{
+  "version": 3,
+  "verified_at": "2026-07-22",
+  "families": [
+    {"id": "qwen", "owner": "Qwen", "openness": "weights-only", "evidence": ["https://huggingface.co/Qwen/Qwen3.6-35B-A3B"]},
+    {"id": "glm", "owner": "zai-org", "openness": "weights-only", "evidence": ["https://huggingface.co/zai-org/GLM-5.2"]},
+    {"id": "deepseek", "owner": "deepseek-ai", "openness": "weights-only", "evidence": ["https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro"]},
+    {"id": "kimi", "owner": "moonshotai", "openness": "weights-only", "evidence": ["https://huggingface.co/moonshotai/Kimi-K2.7-Code"]},
+    {"id": "minimax", "owner": "MiniMaxAI", "openness": "weights-only", "evidence": ["https://huggingface.co/MiniMaxAI/MiniMax-M3"]},
+    {"id": "nemotron", "owner": "nvidia", "openness": "reproducible", "evidence": ["https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "https://huggingface.co/blog/nvidia/nemotron-open-models-data"]},
+    {"id": "mistral", "owner": "mistralai", "openness": "weights-only", "evidence": ["https://huggingface.co/mistralai/Mistral-Medium-3.5-128B"]},
+    {"id": "gemma", "owner": "google", "openness": "weights-only", "evidence": ["https://huggingface.co/google/gemma-4-31B-it"]},
+    {"id": "granite", "owner": "ibm-granite", "openness": "weights-only", "evidence": ["https://huggingface.co/ibm-granite/granite-4.1-8b"]},
+    {"id": "falcon", "owner": "tiiuae", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/tiiuae/Falcon-H1R-7B"]},
+    {"id": "hunyuan", "owner": "tencent", "openness": "weights-only", "evidence": ["https://huggingface.co/tencent/Hy3"]},
+    {"id": "seed", "owner": "ByteDance-Seed", "openness": "weights-only", "evidence": ["https://huggingface.co/ByteDance-Seed/Seed-OSS-36B-Base"]},
+    {"id": "minicpm", "owner": "openbmb", "openness": "weights-only", "evidence": ["https://huggingface.co/openbmb/MiniCPM5-1B"]},
+    {"id": "olmo", "owner": "allenai", "openness": "reproducible", "evidence": ["https://huggingface.co/allenai/Olmo-3-1125-32B"]},
+    {"id": "apertus", "owner": "swiss-ai", "openness": "reproducible", "evidence": ["https://huggingface.co/swiss-ai/Apertus-v1.1-4B"]},
+    {"id": "llm360", "owner": "LLM360", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/LLM360/K2-Think-V2"]}
+  ],
+  "flagship_models": {
+    "llm": [
+      {"id": "zai-org/GLM-5.2", "family": "glm"},
+      {"id": "deepseek-ai/DeepSeek-V4-Pro", "family": "deepseek"},
+      {"id": "deepseek-ai/DeepSeek-V4-Pro-Base", "family": "deepseek"},
+      {"id": "deepseek-ai/DeepSeek-V4-Pro-DSpark", "family": "deepseek"},
+      {"id": "deepseek-ai/DeepSeek-V4-Flash", "family": "deepseek"},
+      {"id": "deepseek-ai/DeepSeek-V4-Flash-Base", "family": "deepseek"},
+      {"id": "deepseek-ai/DeepSeek-V4-Flash-DSpark", "family": "deepseek"},
+      {"id": "MiniMaxAI/MiniMax-M2.7", "family": "minimax"},
+      {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "family": "nemotron"},
+      {"id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16", "family": "nemotron"},
+      {"id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16", "family": "nemotron"},
+      {"id": "mistralai/Leanstral-1.5-119B-A6B", "family": "mistral"},
+      {"id": "mistralai/Mistral-Medium-3.5-128B", "family": "mistral"},
+      {"id": "mistralai/Mistral-Small-4-119B-2603", "family": "mistral"},
+      {"id": "mistralai/Mistral-Large-3-675B-Instruct-2512", "family": "mistral"},
+      {"id": "mistralai/Ministral-3-14B-Instruct-2512", "family": "mistral"},
+      {"id": "mistralai/Ministral-3-8B-Instruct-2512", "family": "mistral"},
+      {"id": "mistralai/Ministral-3-3B-Instruct-2512", "family": "mistral"},
+      {"id": "mistralai/Devstral-2-123B-Instruct-2512", "family": "mistral"},
+      {"id": "mistralai/Devstral-Small-2-24B-Instruct-2512", "family": "mistral"},
+      {"id": "ibm-granite/granite-4.1-8b", "family": "granite"},
+      {"id": "ibm-granite/granite-4.1-3b", "family": "granite"},
+      {"id": "tiiuae/Falcon-H1R-7B", "family": "falcon"},
+      {"id": "tiiuae/Falcon-H1-Tiny-90M-Instruct", "family": "falcon"},
+      {"id": "tencent/Hy3", "family": "hunyuan"},
+      {"id": "ByteDance-Seed/Seed-OSS-36B-Base", "family": "seed"},
+      {"id": "ByteDance-Seed/Stable-DiffCoder-8B-Base", "family": "seed"},
+      {"id": "ByteDance-Seed/Cola-DLM", "family": "seed"},
+      {"id": "openbmb/MiniCPM5-1B", "family": "minicpm"},
+      {"id": "openbmb/MiniCPM5-1B-Base", "family": "minicpm"},
+      {"id": "allenai/Olmo-3-1125-32B", "family": "olmo"},
+      {"id": "allenai/Olmo-3.1-32B-Instruct", "family": "olmo"},
+      {"id": "allenai/Olmo-3-1025-7B", "family": "olmo"},
+      {"id": "allenai/Olmo-3-7B-Instruct-SFT", "family": "olmo"},
+      {"id": "allenai/Olmo-3-7B-Think", "family": "olmo"},
+      {"id": "swiss-ai/Apertus-70B-Instruct-2509", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-8B-Instruct-2509", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-70B-2509", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-8B-2509", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-4B", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-4B-Instruct", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-1.5B", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-1.5B-Instruct", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-0.5B", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.1-0.5B-Instruct", "family": "apertus"},
+      {"id": "LLM360/K2-Think-V2", "family": "llm360"},
+      {"id": "LLM360/K2-V2-Instruct", "family": "llm360"},
+      {"id": "LLM360/K2-V2", "family": "llm360"}
+    ],
+    "vlm": [
+      {"id": "Qwen/Qwen3.6-35B-A3B", "family": "qwen"},
+      {"id": "Qwen/Qwen3.6-27B", "family": "qwen"},
+      {"id": "Qwen/Qwen3.5-35B-A3B", "family": "qwen"},
+      {"id": "Qwen/Qwen3.5-35B-A3B-Base", "family": "qwen"},
+      {"id": "Qwen/Qwen3.5-27B", "family": "qwen"},
+      {"id": "Qwen/Qwen3.5-9B", "family": "qwen"},
+      {"id": "Qwen/Qwen3.5-4B", "family": "qwen"},
+      {"id": "moonshotai/Kimi-K2.7-Code", "family": "kimi"},
+      {"id": "moonshotai/Kimi-K2.6", "family": "kimi"},
+      {"id": "MiniMaxAI/MiniMax-M3", "family": "minimax"},
+      {"id": "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16", "family": "nemotron"},
+      {"id": "google/gemma-4-31B-it", "family": "gemma"},
+      {"id": "google/gemma-4-26B-A4B-it", "family": "gemma"},
+      {"id": "google/gemma-4-12B-it", "family": "gemma"},
+      {"id": "google/gemma-4-E4B-it", "family": "gemma"},
+      {"id": "google/gemma-4-E2B-it", "family": "gemma"},
+      {"id": "tencent/Hy-Embodied-VLM-1.0", "family": "hunyuan"},
+      {"id": "openbmb/MiniCPM-V-4.6", "family": "minicpm"},
+      {"id": "openbmb/MiniCPM-o-4_5", "family": "minicpm"}
+    ],
+    "image-generation": [
+      {"id": "zai-org/GLM-Image", "family": "glm"},
+      {"id": "tencent/HunyuanImage-3.0", "family": "hunyuan"},
+      {"id": "tencent/HunyuanImage-3.0-Instruct", "family": "hunyuan"}
+    ],
+    "video-generation": [
+      {"id": "tencent/HunyuanVideo-1.5", "family": "hunyuan"}
+    ],
+    "audio-tts": [
+      {"id": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", "family": "qwen"},
+      {"id": "zai-org/GLM-TTS", "family": "glm"},
+      {"id": "mistralai/Voxtral-4B-TTS-2603", "family": "mistral"}
+    ],
+    "audio-stt": [
+      {"id": "zai-org/GLM-ASR-Nano-2512", "family": "glm"},
+      {"id": "nvidia/nemotron-3.5-asr-streaming-0.6b", "family": "nemotron"},
+      {"id": "mistralai/Voxtral-Mini-4B-Realtime-2602", "family": "mistral"},
+      {"id": "allenai/OLMoASR", "family": "olmo"}
+    ],
+    "ocr": [
+      {"id": "zai-org/GLM-OCR", "family": "glm"},
+      {"id": "deepseek-ai/DeepSeek-OCR-2", "family": "deepseek"},
+      {"id": "tiiuae/Falcon-OCR", "family": "falcon"},
+      {"id": "tencent/HunyuanOCR", "family": "hunyuan"},
+      {"id": "allenai/olmOCR-2-7B-1025", "family": "olmo"}
+    ],
+    "translation": [
+      {"id": "tencent/Hy-MT2-30B-A3B", "family": "hunyuan"},
+      {"id": "tencent/Hy-MT2-7B", "family": "hunyuan"},
+      {"id": "tencent/Hy-MT2-1.8B", "family": "hunyuan"}
+    ],
+    "embedding": [
+      {"id": "nvidia/Nemotron-3-Embed-8B-BF16", "family": "nemotron"},
+      {"id": "nvidia/Nemotron-3-Embed-1B-BF16", "family": "nemotron"}
+    ],
+    "robotics": [
+      {"id": "tencent/Hy-Embodied-RxBrain-1.0", "family": "hunyuan"}
+    ]
+  },
+  "local_models": [
+    {"id": "Qwen/Qwen3.6-35B-A3B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.6-35B-A3B", "deployment": ["quantized"]},
+    {"id": "Qwen/Qwen3.6-27B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.6-27B", "deployment": ["quantized"]},
+    {"id": "zai-org/GLM-5.2-FP8", "family": "glm", "role": "llm", "canonical": "zai-org/GLM-5.2", "deployment": ["quantized"]},
+    {"id": "MiniMaxAI/MiniMax-M3-MXFP8", "family": "minimax", "role": "vlm", "canonical": "MiniMaxAI/MiniMax-M3", "deployment": ["quantized"]},
+    {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4", "family": "nemotron", "role": "llm", "canonical": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "deployment": ["quantized"]},
+    {"id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4", "family": "nemotron", "role": "llm", "canonical": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16", "deployment": ["quantized"]},
+    {"id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4", "family": "nemotron", "role": "llm", "canonical": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16", "deployment": ["quantized"]},
+    {"id": "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF", "family": "nemotron", "role": "llm", "canonical": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "nvidia/Nemotron-3-Embed-1B-NVFP4", "family": "nemotron", "role": "embedding", "canonical": "nvidia/Nemotron-3-Embed-1B-BF16", "deployment": ["quantized"]},
+    {"id": "google/gemma-4-31B-it-qat-q4_0-gguf", "family": "gemma", "role": "vlm", "canonical": "google/gemma-4-31B-it", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf", "family": "gemma", "role": "vlm", "canonical": "google/gemma-4-26B-A4B-it", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "google/gemma-4-12B-it-qat-q4_0-gguf", "family": "gemma", "role": "vlm", "canonical": "google/gemma-4-12B-it", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "ibm-granite/granite-4.1-8b-GGUF", "family": "granite", "role": "llm", "canonical": "ibm-granite/granite-4.1-8b", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "ibm-granite/granite-4.1-3b-GGUF", "family": "granite", "role": "llm", "canonical": "ibm-granite/granite-4.1-3b", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "ibm-granite/granite-vision-4.1-4b-GGUF", "family": "granite", "role": "vlm", "canonical": "ibm-granite/granite-vision-4.1-4b-GGUF", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "tencent/Hy3-FP8", "family": "hunyuan", "role": "llm", "canonical": "tencent/Hy3", "deployment": ["quantized"]},
+    {"id": "openbmb/MiniCPM5-1B-GGUF", "family": "minicpm", "role": "llm", "canonical": "openbmb/MiniCPM5-1B", "deployment": ["gguf", "ollama-compatible", "quantized", "on-device"]},
+    {"id": "openbmb/MiniCPM5-1B-MLX", "family": "minicpm", "role": "llm", "canonical": "openbmb/MiniCPM5-1B", "deployment": ["mlx", "on-device"]}
+  ],
+  "local_roots": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-3-12b-it",
+    "Qwen/Qwen3-8B",
+    "mistralai/Mistral-Small-24B-Instruct-2501",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+  ],
+  "local_publishers": [
+    "unsloth",
+    "mlx-community",
+    "bartowski",
+    "lmstudio-community"
+  ],
+  "model_overrides": {
+    "allenai/olmOCR-2-7B-1025": {"capabilities": ["ocr", "document"]},
+    "deepseek-ai/DeepSeek-OCR-2": {"capabilities": ["ocr", "document"]},
+    "tencent/HunyuanOCR": {"capabilities": ["ocr", "document"]},
+    "tiiuae/Falcon-OCR": {"capabilities": ["ocr", "document"]},
+    "zai-org/GLM-OCR": {"capabilities": ["ocr", "document"]}
+  }
+}

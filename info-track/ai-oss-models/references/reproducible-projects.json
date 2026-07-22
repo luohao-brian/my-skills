@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "verified_at": "2026-07-22",
+  "projects": [
+    {
+      "id": "olmo-3",
+      "name": "OLMo 3",
+      "url": "https://huggingface.co/collections/allenai/olmo-3",
+      "scope": "full-chain",
+      "openness": "reproducible",
+      "artifacts": [
+        {"id": "allenai/dolma3_mix-5.5T-1125", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/allenai/OLMo-core", "repo_type": "url", "role": "training-recipe", "depends_on": ["allenai/dolma3_mix-5.5T-1125"]},
+        {"id": "allenai/Olmo-3-1025-7B", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["allenai/dolma3_mix-5.5T-1125"]},
+        {"id": "allenai/Olmo-3-1125-32B", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["allenai/dolma3_mix-5.5T-1125"]},
+        {"id": "allenai/Dolci-Instruct-SFT", "repo_type": "dataset", "role": "sft-data", "depends_on": ["allenai/Olmo-3-1025-7B"]},
+        {"id": "allenai/Olmo-3-7B-Instruct-SFT", "repo_type": "model", "role": "sft-checkpoint", "depends_on": ["allenai/Olmo-3-1025-7B", "allenai/Dolci-Instruct-SFT"]},
+        {"id": "allenai/Olmo-3-7B-Think", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["allenai/Olmo-3-7B-Instruct-SFT"]},
+        {"id": "https://github.com/allenai/OLMo-core/tree/main/src/scripts", "repo_type": "url", "role": "eval-harness", "depends_on": ["allenai/Olmo-3-7B-Think"]}
+      ]
+    },
+    {
+      "id": "apertus",
+      "name": "Apertus",
+      "url": "https://huggingface.co/collections/swiss-ai/apertus",
+      "scope": "full-chain",
+      "openness": "reproducible",
+      "artifacts": [
+        {"id": "swiss-ai/apertus-pretrain-swiss", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/swiss-ai/apertus", "repo_type": "url", "role": "training-recipe", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
+        {"id": "swiss-ai/Apertus-70B-2509", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
+        {"id": "swiss-ai/Apertus-8B-2509", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
+        {"id": "swiss-ai/apertus-sft-mixture", "repo_type": "dataset", "role": "sft-data", "depends_on": ["swiss-ai/Apertus-70B-2509"]},
+        {"id": "swiss-ai/Apertus-70B-Instruct-2509", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["swiss-ai/Apertus-70B-2509", "swiss-ai/apertus-sft-mixture"]},
+        {"id": "swiss-ai/Apertus-8B-Instruct-2509", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["swiss-ai/Apertus-8B-2509", "swiss-ai/apertus-sft-mixture"]},
+        {"id": "https://github.com/swiss-ai/apertus-eval", "repo_type": "url", "role": "eval-harness", "depends_on": ["swiss-ai/Apertus-70B-Instruct-2509"]}
+      ]
+    },
+    {
+      "id": "nemotron-3",
+      "name": "NVIDIA Nemotron 3",
+      "url": "https://huggingface.co/collections/nvidia/nemotron-3",
+      "scope": "partial",
+      "openness": "partial-artifacts",
+      "artifacts": [
+        {"id": "https://huggingface.co/datasets/nvidia/nemotron-pre-training-datasets", "repo_type": "url", "role": "pretrain-data", "depends_on": []},
+        {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["https://huggingface.co/datasets/nvidia/nemotron-pre-training-datasets"]},
+        {"id": "nvidia/Nemotron-SFT-Agentic-v2", "repo_type": "dataset", "role": "sft-data", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
+        {"id": "nvidia/Nemotron-RL-Ultra-Training-Blends", "repo_type": "dataset", "role": "preference-data", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
+        {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4", "repo_type": "model", "role": "deployment-artifact", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
+        {"id": "https://github.com/NVIDIA-NeMo/NeMo-Evaluator", "repo_type": "url", "role": "eval-harness", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]}
+      ]
+    },
+    {
+      "id": "smollm3",
+      "name": "SmolLM3",
+      "url": "https://huggingface.co/collections/HuggingFaceTB/smollm3",
+      "scope": "full-chain",
+      "openness": "reproducible",
+      "artifacts": [
+        {"id": "HuggingFaceTB/smollm-corpus", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "HuggingFaceTB/smollm3-blueprint", "repo_type": "dataset", "role": "training-recipe", "depends_on": ["HuggingFaceTB/smollm-corpus"]},
+        {"id": "HuggingFaceTB/SmolLM3-3B-checkpoints", "repo_type": "model", "role": "intermediate-checkpoint", "depends_on": ["HuggingFaceTB/smollm3-blueprint"]},
+        {"id": "HuggingFaceTB/SmolLM3-3B-Base", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["HuggingFaceTB/SmolLM3-3B-checkpoints"]},
+        {"id": "HuggingFaceTB/SmolLM3-3B", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["HuggingFaceTB/SmolLM3-3B-Base"]}
+      ]
+    },
+    {
+      "id": "llm360-k2",
+      "name": "LLM360 K2",
+      "url": "https://huggingface.co/collections/LLM360/k2",
+      "scope": "partial",
+      "openness": "partial-artifacts",
+      "artifacts": [
+        {"id": "LLM360/K2Datasets", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/LLM360/Analysis360", "repo_type": "url", "role": "training-recipe", "depends_on": ["LLM360/K2Datasets"]},
+        {"id": "LLM360/K2-V2", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["LLM360/K2Datasets"]},
+        {"id": "LLM360/K2-V2-Instruct", "repo_type": "model", "role": "sft-checkpoint", "depends_on": ["LLM360/K2-V2"]},
+        {"id": "LLM360/K2-Think-V2", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["LLM360/K2-V2-Instruct"]}
+      ]
+    },
+    {
+      "id": "pythia",
+      "name": "Pythia",
+      "url": "https://huggingface.co/EleutherAI/pythia-12b",
+      "scope": "pretraining",
+      "openness": "reproducible",
+      "artifacts": [
+        {"id": "EleutherAI/pile-deduped-pythia-preshuffled", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/EleutherAI/pythia", "repo_type": "url", "role": "training-recipe", "depends_on": ["EleutherAI/pile-deduped-pythia-preshuffled"]},
+        {"id": "EleutherAI/neox-ckpt-pythia-12b-deduped", "repo_type": "model", "role": "intermediate-checkpoint", "depends_on": ["https://github.com/EleutherAI/pythia"]},
+        {"id": "EleutherAI/pythia-12b-deduped", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["EleutherAI/neox-ckpt-pythia-12b-deduped"]}
+      ]
+    },
+    {
+      "id": "bloom",
+      "name": "BLOOM",
+      "url": "https://huggingface.co/bigscience/bloom",
+      "scope": "pretraining",
+      "openness": "reproducible",
+      "artifacts": [
+        {"id": "https://huggingface.co/bigscience-data", "repo_type": "url", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/bigscience-workshop/Megatron-DeepSpeed", "repo_type": "url", "role": "training-recipe", "depends_on": ["https://huggingface.co/bigscience-data"]},
+        {"id": "bigscience/bloom-intermediate", "repo_type": "model", "role": "intermediate-checkpoint", "depends_on": ["https://github.com/bigscience-workshop/Megatron-DeepSpeed"]},
+        {"id": "bigscience/bloom", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["bigscience/bloom-intermediate"]}
+      ]
+    },
+    {
+      "id": "dclm",
+      "name": "DCLM",
+      "url": "https://huggingface.co/mlfoundations/dclm-7b-it",
+      "scope": "pretraining",
+      "openness": "partial-artifacts",
+      "artifacts": [
+        {"id": "mlfoundations/dclm-baseline-1.0", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/mlfoundations/dclm", "repo_type": "url", "role": "data-pipeline", "depends_on": ["mlfoundations/dclm-baseline-1.0"]},
+        {"id": "mlfoundations/dclm-7b-it", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["mlfoundations/dclm-baseline-1.0"]}
+      ]
+    },
+    {
+      "id": "cerebras-gpt",
+      "name": "Cerebras-GPT",
+      "url": "https://huggingface.co/collections/cerebras/cerebras-gpt",
+      "scope": "pretraining",
+      "openness": "partial-artifacts",
+      "artifacts": [
+        {"id": "https://huggingface.co/datasets/cerebras/SlimPajama-627B", "repo_type": "url", "role": "pretrain-data", "depends_on": []},
+        {"id": "https://github.com/Cerebras/modelzoo", "repo_type": "url", "role": "training-recipe", "depends_on": ["https://huggingface.co/datasets/cerebras/SlimPajama-627B"]},
+        {"id": "https://huggingface.co/cerebras/Cerebras-GPT-13B", "repo_type": "url", "role": "base-checkpoint", "depends_on": ["https://huggingface.co/datasets/cerebras/SlimPajama-627B"]}
+      ]
+    },
+    {
+      "id": "falcon",
+      "name": "Falcon",
+      "url": "https://huggingface.co/tiiuae/falcon-40b",
+      "scope": "pretraining",
+      "openness": "partial-artifacts",
+      "artifacts": [
+        {"id": "tiiuae/falcon-refinedweb", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
+        {"id": "tiiuae/falcon-40b", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["tiiuae/falcon-refinedweb"]}
+      ]
+    }
+  ]
+}

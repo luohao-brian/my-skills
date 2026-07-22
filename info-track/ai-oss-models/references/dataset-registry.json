@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "verified_at": "2026-07-22",
+  "datasets": [
+    {"id": "allenai/dolma3_mix-5.5T-1125", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["allenai/Olmo-3-1125-32B"], "related_projects": ["olmo-3"]},
+    {"id": "allenai/Dolci-Instruct-SFT", "roles": ["sft-data"], "uses": ["SFT"], "related_models": ["allenai/Olmo-3-7B-Instruct-SFT"], "related_projects": ["olmo-3"]},
+    {"id": "allenai/Dolci-Instruct-SFT-Tool-Use-SA", "roles": ["sft-data"], "uses": ["SFT", "Tool-use"], "related_models": ["allenai/Olmo-3-7B-Instruct-SFT"], "related_projects": ["olmo-3"]},
+    {"id": "allenai/OLMoASR-Mix", "priority": true, "roles": ["pretrain-data"], "uses": ["Audio", "STT"], "related_models": ["allenai/OLMoASR"], "related_projects": []},
+    {"id": "swiss-ai/apertus-pretrain-swiss", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["swiss-ai/Apertus-70B-2509"], "related_projects": ["apertus"]},
+    {"id": "swiss-ai/apertus-sft-mixture", "roles": ["sft-data"], "uses": ["SFT"], "related_models": ["swiss-ai/Apertus-70B-Instruct-2509"], "related_projects": ["apertus"]},
+    {"id": "nvidia/Nemotron-SFT-Agentic-v2", "roles": ["sft-data"], "uses": ["SFT", "Agent"], "related_models": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"], "related_projects": ["nemotron-3"]},
+    {"id": "nvidia/Nemotron-RL-Ultra-Training-Blends", "roles": ["preference-data"], "uses": ["RL", "后训练"], "related_models": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"], "related_projects": ["nemotron-3"]},
+    {"id": "nvidia/Nemotron-Pretraining-Code-v3", "roles": ["pretrain-data"], "uses": ["预训练", "代码"], "related_models": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"], "related_projects": ["nemotron-3"]},
+    {"id": "nvidia/Nemotron-CC-v2", "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"], "related_projects": ["nemotron-3"]},
+    {"id": "HuggingFaceTB/smollm-corpus", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["HuggingFaceTB/SmolLM3-3B-Base"], "related_projects": ["smollm3"]},
+    {"id": "HuggingFaceTB/smollm3-blueprint", "roles": ["training-recipe"], "uses": ["训练配置"], "related_models": ["HuggingFaceTB/SmolLM3-3B-Base"], "related_projects": ["smollm3"]},
+    {"id": "LLM360/K2Datasets", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["LLM360/K2-V2"], "related_projects": ["llm360-k2"]},
+    {"id": "EleutherAI/pile-deduped-pythia-preshuffled", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["EleutherAI/pythia-12b-deduped"], "related_projects": ["pythia"]},
+    {"id": "EleutherAI/pile_val_test", "roles": ["eval-dataset"], "uses": ["评测"], "related_models": ["EleutherAI/pythia-12b-deduped"], "related_projects": ["pythia"]},
+    {"id": "mlfoundations/dclm-baseline-1.0", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["mlfoundations/dclm-7b-it"], "related_projects": ["dclm"]},
+    {"id": "tiiuae/falcon-refinedweb", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": ["tiiuae/falcon-40b"], "related_projects": ["falcon"]},
+    {"id": "HuggingFaceFW/fineweb", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": [], "related_projects": []},
+    {"id": "HuggingFaceFW/fineweb-edu", "priority": true, "roles": ["pretrain-data"], "uses": ["预训练"], "related_models": [], "related_projects": []},
+    {"id": "openbmb/UltraData-SFT-2605", "priority": true, "roles": ["sft-data"], "uses": ["SFT"], "related_models": [], "related_projects": []},
+    {"id": "cais/hle", "priority": true, "roles": ["eval-dataset"], "uses": ["评测"], "related_models": [], "related_projects": []},
+    {"id": "openbmb/UltraX-Preview", "roles": ["pretrain-data"], "uses": ["预训练", "数据清洗"], "related_models": [], "related_projects": []},
+    {"id": "nvidia/Open-SWE-Traces", "roles": ["sft-data"], "uses": ["Agent", "代码"], "related_models": [], "related_projects": []},
+    {"id": "netflix/Vera-Layered-Video-Dataset", "roles": ["pretrain-data"], "uses": ["视频生成"], "related_models": [], "related_projects": []},
+    {"id": "MCG-NJU/VideoChat3-Academic2M", "roles": ["sft-data"], "uses": ["视频理解", "多模态"], "related_models": [], "related_projects": []}
+  ]
+}
