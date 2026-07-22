@@ -1,0 +1,81 @@
+{
+  "topics": {
+    "models": {
+      "label": "模型与评测",
+      "keywords": ["llm", "language model", "foundation model", "benchmark", "eval", "reasoning model", "multimodal", "diffusion", "image model", "video model", "gpt", "claude", "gemini", "deepseek", "qwen", "llama", "mistral", "kimi", "模型", "评测", "基准", "多模态", "推理模型", "文生图", "文生视频"]
+    },
+    "agents": {
+      "label": "Agent 与开发工具",
+      "keywords": ["agent", "agentic", "mcp", "model context protocol", "codex", "claude code", "openclaw", "hermes", "langgraph", "llamaindex", "crewai", "autogen", "dspy", "cline", "aider", "cursor", "opencode", "browser agent", "browser use", "computer use", "coding agent", "智能体", "代码助手", "编程助手"]
+    },
+    "systems": {
+      "label": "AI 系统与本地推理",
+      "keywords": ["inference", "serving", "quantization", "gguf", "ollama", "vllm", "sglang", "mlx", "triton", "tensorrt", "llama.cpp", "local llm", "self-host", "self hosted", "homelab", "distributed inference", "local inference", "本地部署", "量化", "推理服务", "显存", "私有部署"]
+    },
+    "semiconductors": {
+      "label": "芯片、半导体与算力",
+      "keywords": ["nvidia", "amd", "intel", "tsmc", "asml", "semiconductor", "ai chip", "gpu", "hbm", "cuda", "rocm", "accelerator", "npu", "fpga", "risc-v", "riscv", "chiplet", "interconnect", "datacenter", "data center", "export controls", "晶圆", "芯片", "半导体", "算力", "显卡", "数据中心", "先进制程"]
+    }
+  },
+  "bluesky_feeds": [
+    {"name": "LLM", "uri": "at://did:plc:3x2yyg4s6c6n26caev222yv3/app.bsky.feed.generator/whats-llm", "topic": "models"},
+    {"name": "AI Agents", "uri": "at://did:plc:mp33qrwuvsxucbzoh7kykslu/app.bsky.feed.generator/ai-agents", "topic": "agents"},
+    {"name": "MCP (AI Agents)", "uri": "at://did:plc:6bufmzjxp3hmyy6vaztm2bi3/app.bsky.feed.generator/aaao642ptet7a", "topic": "agents"},
+    {"name": "Semiconductor Popular", "uri": "at://did:plc:vw4jopm4ffmt6qzdh2u66sfd/app.bsky.feed.generator/aaamextu2beke", "topic": "semiconductors"},
+    {"name": "Open-Source Hardware", "uri": "at://did:plc:segbeysljfhv5rs7rmij7hpp/app.bsky.feed.generator/aaacekox36vpa", "topic": "semiconductors"}
+  ],
+  "hackernews_feeds": ["topstories", "beststories", "showstories", "askstories", "newstories"],
+  "lobsters": [
+    {"command": "hot", "channel": "hot"},
+    {"command": "active", "channel": "active"},
+    {"command": "newest", "channel": "newest"},
+    {"command": "tag", "channel": "ai", "args": ["ai"]},
+    {"command": "tag", "channel": "vibecoding", "args": ["vibecoding"]},
+    {"command": "tag", "channel": "hardware", "args": ["hardware"]},
+    {"command": "tag", "channel": "distributed", "args": ["distributed"]},
+    {"command": "tag", "channel": "scaling", "args": ["scaling"]}
+  ],
+  "lesswrong": [
+    {"command": "frontpage", "channel": "frontpage"},
+    {"command": "new", "channel": "new"},
+    {"command": "curated", "channel": "curated"},
+    {"command": "top-week", "channel": "top-week"}
+  ],
+  "producthunt": [{"command": "today", "channel": "today"}],
+  "v2ex_nodes": {
+    "models": ["aigc", "ml"],
+    "agents": ["aigc", "programmer"],
+    "systems": ["linux", "homelab", "server", "cloud", "nas"],
+    "semiconductors": ["hardware"]
+  },
+  "reddit_subreddits": {
+    "models": ["LocalLLaMA", "MachineLearning", "StableDiffusion", "comfyui", "singularity"],
+    "agents": ["AI_Agents", "codex", "ClaudeCode", "ClaudeAI", "OpenClaw", "mcp", "LangChain", "LlamaIndex", "crewai", "AutoGenAI", "DSPy", "CLine", "aider", "cursor", "opencode"],
+    "systems": ["LocalLLaMA", "LocalLLM", "selfhosted", "homelab", "HPC", "ollama"],
+    "semiconductors": ["hardware", "nvidia", "AMD", "intel", "IntelArc", "Semiconductors", "chipdesign", "FPGA", "VLSI", "computerarchitecture"]
+  },
+  "twitter_accounts": {
+    "models": ["ArtificialAnlys", "lmarena_ai", "karpathy", "simonw"],
+    "agents": ["openclaw", "NousResearch", "claude_code", "LangChainAI", "llama_index", "crewAIInc", "pyautogen", "DSPyOSS", "browser_use", "skyvernai"],
+    "systems": ["vllm_project", "ggerganov", "ollama", "SGLangRuntime"],
+    "semiconductors": ["ServeTheHome", "IanCutress", "anshelsag", "SemiAnalysis_"]
+  },
+  "zhihu": [
+    {"command": "hot", "channel": "hot"},
+    {"command": "recommend", "channel": "recommend"}
+  ],
+  "linux_do": [
+    {"command": "feed", "channel": "latest", "args": ["--view", "latest"]},
+    {"command": "feed", "channel": "hot", "args": ["--view", "hot"]}
+  ],
+  "bilibili": [
+    {"command": "dynamic", "channel": "following"},
+    {"command": "hot", "channel": "hot"},
+    {"command": "ranking", "channel": "ranking"}
+  ],
+  "polymarket": {
+    "tag_ids": [537, 103303],
+    "series_ids": [10030],
+    "terms": ["openai", "anthropic", "claude", "gpt", "gemini", "deepseek", "agi", "best ai model", "ai agent", "autonomous agent", "codex", "claude code", "openclaw", "hermes", "nvidia", "amd", "intel", "tsmc", "asml", "semiconductor", "ai chip", "gpu", "hbm", "export controls", "taiwan semiconductor", "datacenter"]
+  }
+}

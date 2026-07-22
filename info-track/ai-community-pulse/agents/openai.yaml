@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Community Pulse"
+  short_description: "Collect fixed-channel AI community and ecosystem hot topics"
+  default_prompt: "Use $ai-community-pulse to collect recent AI model, agent, local inference, and semiconductor topics from fixed community channels and render a Chinese Markdown brief."
