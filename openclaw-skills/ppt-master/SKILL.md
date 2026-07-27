@@ -47,7 +47,20 @@ metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https:
 python3 {baseDir}/scripts/project_manager.py init <name> --format ppt169 --dir <absolute-projects-root>
 ```
 
-源文件通过 `scripts/source_to_md.py` 标准化；需要归档进项目时传绝对项目路径。移动用户原件前必须确认用户确实授权移动，否则使用 `--copy`。
+非 Markdown 输入先转换；Markdown 输入直接读取：
+
+```bash
+python3 {baseDir}/scripts/source_to_md.py <non-markdown-files-or-URLs...>
+```
+
+需要把源文件归档进项目时，单独调用：
+
+```bash
+python3 {baseDir}/scripts/project_manager.py import-sources \
+  <absolute-project-path> <source-files-or-dirs...> --copy
+```
+
+`<absolute-project-path>` 是 `import-sources` 的位置参数。只有用户明确授权移动原件时，才把 `--copy` 改为 `--move`。不要向 `source_to_md.py` 传项目路径或不存在的 `--project` 参数。
 
 ## 发布门禁
 

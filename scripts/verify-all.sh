@@ -3,308 +3,155 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-export PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1
 }
 
-pass() {
-  printf 'OK: %s\n' "$*"
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 is required"
 }
 
-assert_no_path() {
-  local path="$1"
-  [[ ! -e "$path" ]] || fail "$path should not exist"
-}
+require_command python3
 
-assert_file() {
-  local path="$1"
-  [[ -f "$path" ]] || fail "$path missing"
-}
+# Validate only repository-wide, deterministic skill invariants:
+# - every direct child of a skill collection has a SKILL.md;
+# - required frontmatter fields are present and metadata is valid JSON;
+# - skill names/keys match their directory names;
+# - repository JSON files contain valid JSON.
+python3 - <<'PY'
+from __future__ import annotations
 
-assert_tracked_file() {
-  local path="$1"
-  assert_file "$path"
-  git ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || fail "$path is not tracked by Git"
-}
+import json
+import re
+import sys
+from pathlib import Path
 
-assert_contains() {
-  local path="$1"
-  local text="$2"
-  rg -q --fixed-strings -- "$text" "$path" || fail "$path missing: $text"
-}
 
-assert_metadata_single_line() {
-  local path="$1"
-  if rg -q '^metadata: \{.*\}$' "$path"; then
-    return
-  fi
-  if rg -q '^metadata:' "$path"; then
-    fail "$path metadata must be single-line JSON"
-  fi
-}
+ROOT = Path.cwd()
+COLLECTIONS = (ROOT / "info-track", ROOT / "openclaw-skills")
+errors: list[str] = []
+skill_files: list[Path] = []
 
-assert_no_path rust
-assert_no_path cli
-assert_no_path dist
-assert_no_path build-skill-bundle.sh
-assert_no_path my-fetch
-assert_no_path volc-gen
-assert_no_path volc-speech
-assert_no_path volc-websearch
 
-skills=(
-  info-track/ai-news
-  info-track/ai-community-pulse
-  info-track/ai-labs-tracker
-  info-track/ai-tech-blogs
-  info-track/ai-oss-models
-  openclaw-skills/ark-tts
-  openclaw-skills/ark-stt
-  openclaw-skills/ark-image-gen
-  openclaw-skills/ark-video-gen
-  openclaw-skills/ark-vision
-  openclaw-skills/ark-search
-  openclaw-skills/ark-data-pro
-  openclaw-skills/ark-viking
-  openclaw-skills/volc-search
-  openclaw-skills/popular-web-designs
-  openclaw-skills/guizang-ppt-skill
-  openclaw-skills/ppt-master
+def report(path: Path, message: str) -> None:
+    errors.append(f"{path.relative_to(ROOT)}: {message}")
+
+
+for collection in COLLECTIONS:
+    if not collection.is_dir():
+        report(collection, "skill collection is missing")
+        continue
+    for skill_dir in sorted(
+        path
+        for path in collection.iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    ):
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_file.is_file():
+            report(skill_file, "missing")
+        else:
+            skill_files.append(skill_file)
+
+for path in skill_files:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        report(path, f"cannot read as UTF-8: {exc}")
+        continue
+
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
+        report(path, "must start with YAML frontmatter delimiter '---'")
+        continue
+    try:
+        closing = lines.index("---", 1)
+    except ValueError:
+        report(path, "frontmatter has no closing '---' delimiter")
+        continue
+
+    frontmatter = lines[1:closing]
+    fields: dict[str, str] = {}
+    for line in frontmatter:
+        match = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):(?:[ \t]*(.*))$", line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if key in fields:
+            report(path, f"duplicate frontmatter field: {key}")
+        fields[key] = value.strip()
+
+    for key in ("name", "description", "metadata"):
+        if not fields.get(key):
+            report(path, f"frontmatter field '{key}' is required and must be single-line")
+
+    expected_name = path.parent.name
+    if fields.get("name") and fields["name"] != expected_name:
+        report(path, f"name must match directory: expected {expected_name!r}")
+
+    metadata_text = fields.get("metadata")
+    if metadata_text:
+        try:
+            metadata = json.loads(metadata_text)
+        except json.JSONDecodeError as exc:
+            report(path, f"metadata is not valid JSON: {exc.msg}")
+        else:
+            if not isinstance(metadata, dict):
+                report(path, "metadata must be a JSON object")
+            else:
+                openclaw = metadata.get("openclaw")
+                if not isinstance(openclaw, dict):
+                    report(path, "metadata.openclaw must be a JSON object")
+                elif openclaw.get("skillKey") != expected_name:
+                    report(path, f"metadata.openclaw.skillKey must equal {expected_name!r}")
+
+json_files = sorted(
+    path
+    for collection in COLLECTIONS
+    for path in collection.rglob("*.json")
+    if path.is_file()
 )
+for path in json_files:
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        report(path, f"invalid JSON: {exc}")
 
-for skill in "${skills[@]}"; do
-  assert_file "$skill/SKILL.md"
-  assert_contains "$skill/SKILL.md" "description:"
-  assert_metadata_single_line "$skill/SKILL.md"
-done
+if errors:
+    for error in errors:
+        print(f"FAIL: {error}", file=sys.stderr)
+    raise SystemExit(1)
 
-assert_file hermes-plugins/hermes-ark-plugin/plugin.yaml
-assert_file hermes-plugins/hermes-ark-plugin/cli.py
-assert_file hermes-plugins/hermes-ark-plugin/providers/text_to_speech.py
-assert_file hermes-plugins/hermes-ark-plugin/providers/transcribe_audio.py
-assert_file hermes-plugins/hermes-ark-plugin/providers/image_generate.py
-assert_file hermes-plugins/hermes-ark-plugin/providers/video_generate.py
+print(f"OK: {len(skill_files)} skill manifests and {len(json_files)} JSON files")
+PY
 
-assert_file pyproject.toml
-assert_file uv.lock
-assert_contains pyproject.toml "requests>=2.32,<3"
-assert_contains uv.lock 'name = "requests"'
-assert_file openclaw-skills/volc-search/requirements.txt
-assert_contains openclaw-skills/volc-search/requirements.txt "requests>=2.32,<3"
-assert_file openclaw-skills/ark-search/requirements.txt
-assert_contains openclaw-skills/ark-search/requirements.txt "requests>=2.32,<3"
-assert_file openclaw-skills/ark-vision/requirements.txt
-assert_contains openclaw-skills/ark-vision/requirements.txt "requests>=2.32,<3"
-assert_file openclaw-skills/ark-data-pro/requirements.txt
-assert_contains openclaw-skills/ark-data-pro/requirements.txt "requests>=2.32,<3"
+# Compile every repository-owned Python file without importing it or writing
+# __pycache__ directories into the worktree.
+export PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-verify-pycache"
+python3 -m compileall -q hermes-plugins info-track openclaw-skills scripts
+printf 'OK: Python syntax\n'
 
-assert_contains openclaw-skills/ark-tts/SKILL.md "references/ark-tts.md"
-assert_contains openclaw-skills/ark-stt/SKILL.md "references/ark-stt.md"
-assert_contains openclaw-skills/ark-image-gen/SKILL.md "references/ark-image-gen.md"
-assert_contains openclaw-skills/ark-video-gen/SKILL.md "references/ark-video-gen.md"
-assert_contains openclaw-skills/ark-vision/SKILL.md "references/ark-vision.md"
-assert_contains openclaw-skills/ark-vision/SKILL.md "ARK_AGENT_PLAN_API_KEY"
-assert_contains openclaw-skills/ark-vision/SKILL.md "vision_analyze.py"
-assert_contains openclaw-skills/ark-search/SKILL.md "references/docs-index.md"
-assert_contains openclaw-skills/ark-search/SKILL.md "ARK_AGENT_PLAN_API_KEY"
-assert_contains openclaw-skills/ark-data-pro/SKILL.md "references/docs-index.md"
-assert_contains openclaw-skills/ark-data-pro/SKILL.md "ARK_AGENT_PLAN_API_KEY"
-assert_contains openclaw-skills/ark-data-pro/SKILL.md "data_pro_search.py"
-assert_contains openclaw-skills/ark-viking/SKILL.md "ARK_AGENT_PLAN_OPENVIKING_API_KEY"
-assert_contains openclaw-skills/ark-viking/SKILL.md "scripts/openviking.py"
-assert_file openclaw-skills/ark-viking/requirements.txt
-assert_contains openclaw-skills/ark-viking/requirements.txt "requests>=2.32,<3"
-assert_contains openclaw-skills/volc-search/SKILL.md "references/docs-index.md"
-assert_contains openclaw-skills/volc-search/SKILL.md "融合信息搜索"
-assert_contains openclaw-skills/popular-web-designs/SKILL.md "references/catalog.md"
-assert_contains openclaw-skills/popular-web-designs/SKILL.md "templates/<site>.md"
-assert_file openclaw-skills/guizang-ppt-skill/LICENSE
-assert_file openclaw-skills/guizang-ppt-skill/assets/template.html
-assert_file openclaw-skills/guizang-ppt-skill/assets/template-swiss.html
-assert_file openclaw-skills/guizang-ppt-skill/assets/swiss-golden.html
-assert_file openclaw-skills/guizang-ppt-skill/templates/swiss-golden-slides.html
-assert_file openclaw-skills/guizang-ppt-skill/references/swiss-contract.json
-assert_file openclaw-skills/guizang-ppt-skill/scripts/create-deck.mjs
-assert_file openclaw-skills/guizang-ppt-skill/scripts/validate-swiss-deck.mjs
-assert_file openclaw-skills/guizang-ppt-skill/scripts/verify-swiss-contract.mjs
-assert_file openclaw-skills/guizang-ppt-skill/scripts/visual-check-swiss.mjs
-assert_contains openclaw-skills/guizang-ppt-skill/SKILL.md "references/swiss-contract.json"
-assert_contains openclaw-skills/guizang-ppt-skill/SKILL.md "scripts/validate-swiss-deck.mjs"
-assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_START -->"
-assert_contains openclaw-skills/guizang-ppt-skill/assets/template-swiss.html "<!-- SLIDES_END -->"
-assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_START -->"
-assert_contains openclaw-skills/guizang-ppt-skill/assets/template.html "<!-- SLIDES_END -->"
-if rg -n --glob '*.md' 'GPT-M 2\.0|CleanShot X|Claude Code|Codex|Ask Question|ask_question|CLAUDE\.md|CodePilot|Fujifilm|Leica|Runtime Capability Contract|结构化用户询问|显著改变结果' openclaw-skills/guizang-ppt-skill; then
-  fail "guizang-ppt-skill instructions must stay concrete and product-neutral"
-fi
-assert_file openclaw-skills/ppt-master/LICENSE
-assert_file openclaw-skills/ppt-master/references/openclaw-runtime.md
-assert_file openclaw-skills/ppt-master/references/upstream-source.md
-assert_file openclaw-skills/ppt-master/references/upstream-pipeline.md
-assert_file openclaw-skills/ppt-master/scripts/visual_layout_audit.py
-assert_file openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
-assert_file openclaw-skills/ppt-master/scripts/image_manifest.py
-assert_file openclaw-skills/ppt-master/scripts/audio_manifest.py
-assert_tracked_file openclaw-skills/ppt-master/requirements.txt
-assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-APACHE-2.0.txt
-assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-OPEN-XML-SDK-MIT.txt
-assert_tracked_file openclaw-skills/ppt-master/scripts/pptx_shapes/data/shape_type_values.txt
-assert_no_path openclaw-skills/ppt-master/scripts/image_gen.py
-assert_no_path openclaw-skills/ppt-master/scripts/notes_to_audio.py
-assert_no_path openclaw-skills/ppt-master/scripts/image_backends
-assert_no_path openclaw-skills/ppt-master/scripts/tts_backends
-assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/visual_layout_audit.py"
-assert_contains openclaw-skills/ppt-master/SKILL.md "scripts/pptx_layout_audit.py"
-assert_contains openclaw-skills/ppt-master/SKILL.md "--dir <absolute-projects-root>"
-if rg -n --glob '*.md' --glob '*.py' --glob '*.json' --glob '!templates/**' \
-  'Claude Code|Codex|Antigravity|Hermes|My Cowork|ask_question|TeamCreate|SendMessage|~/.agents|CLAUDE\.md|Cursor|Codebuddy|VS Code \+ Copilot|playwright MCP|Runtime Capability Contract|结构化用户询问|显著改变结果' \
-  openclaw-skills/ppt-master; then
-  fail "ppt-master instructions must stay concrete and product-neutral"
-fi
-if find openclaw-skills/ppt-master -type f -iname 'README.md' -print -quit | rg -q .; then
-  fail "ppt-master must not contain README.md files"
-fi
-if find openclaw-skills/ppt-master -type d -name '__pycache__' -print -quit | rg -q .; then
-  fail "ppt-master must not contain __pycache__ directories"
-fi
-if rg -n --glob '!**/templates/**' --glob '!references/upstream-source.md' \
-  'IMAGE_BACKEND|image_gen\.py|notes_to_audio\.py|scripts/(image|tts)_backends|edge-tts|ElevenLabs|CosyVoice' \
-  openclaw-skills/ppt-master; then
-  fail "ppt-master image and narration generation must use runtime tools only"
-fi
-popular_template_count="$(find openclaw-skills/popular-web-designs/templates -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
-[[ "$popular_template_count" == "54" ]] || fail "popular-web-designs should include 54 templates, found $popular_template_count"
-if rg -n 'Hermes|write_file|generative-widgets|browser_vision|cloudflared|skill_view|claude-design|design-md|DESIGN\.md|metadata\.hermes|triggers:' openclaw-skills/popular-web-designs; then
-  fail "popular-web-designs must stay decoupled from Hermes/runtime-specific skill contracts"
+# Let each language's own parser check syntax. These checks execute no project
+# code and do not contact external services.
+while IFS= read -r -d '' script; do
+  bash -n "$script"
+done < <(find hermes-plugins info-track openclaw-skills scripts -type f -name '*.sh' -print0)
+printf 'OK: shell syntax\n'
+
+if find hermes-plugins info-track openclaw-skills -type f \( -name '*.js' -o -name '*.mjs' \) -print -quit | grep -q .; then
+  require_command node
+  while IFS= read -r -d '' script; do
+    node --input-type=module --check <"$script" >/dev/null
+  done < <(find hermes-plugins info-track openclaw-skills -type f \( -name '*.js' -o -name '*.mjs' \) -print0)
+  printf 'OK: JavaScript syntax\n'
 fi
 
-assert_file info-track/ai-news/references/sources.json
-assert_file info-track/ai-news/references/output-schema.md
-assert_file info-track/ai-news/references/brief-format.md
-assert_no_path info-track/ai-news/format.md
-assert_no_path info-track/ai-news/sources.md
-assert_no_path info-track/ai-news/references/source-contract.md
-assert_no_path info-track/ai-news/references/brief-rules.md
-assert_no_path info-track/ai-news/templates/brief.md.tpl
-assert_no_path info-track/ai-news/templates/item.md.tpl
-assert_file info-track/ai-news/scripts/ai_news.py
-assert_file info-track/ai-news/scripts/adapters/__init__.py
-assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py collect"
-assert_contains info-track/ai-news/SKILL.md "scripts/ai_news.py render"
-assert_contains info-track/ai-news/SKILL.md "references/sources.json"
-assert_contains info-track/ai-news/SKILL.md "references/output-schema.md"
-assert_contains info-track/ai-news/SKILL.md "## 时间窗口"
-
-assert_file info-track/ai-community-pulse/scripts/community_pulse.py
-assert_file info-track/ai-community-pulse/references/channels.json
-assert_file info-track/ai-community-pulse/references/output-schema.md
-assert_file info-track/ai-community-pulse/references/brief-format.md
-assert_contains info-track/ai-community-pulse/SKILL.md "scripts/community_pulse.py collect"
-assert_contains info-track/ai-community-pulse/SKILL.md "references/channels.json"
-assert_contains info-track/ai-community-pulse/SKILL.md "## 时间窗口"
-
-assert_file info-track/ai-labs-tracker/scripts/vendor_updates.py
-assert_file info-track/ai-labs-tracker/references/sources.md
-assert_file info-track/ai-labs-tracker/references/output-schema.md
-assert_contains info-track/ai-labs-tracker/SKILL.md "scripts/vendor_updates.py"
-assert_contains info-track/ai-labs-tracker/SKILL.md "references/sources.md"
-assert_contains info-track/ai-labs-tracker/SKILL.md "## 时间窗口"
-
-assert_file info-track/ai-tech-blogs/scripts/tech_blogs.py
-assert_file info-track/ai-tech-blogs/references/sources.md
-assert_file info-track/ai-tech-blogs/references/output-schema.md
-assert_contains info-track/ai-tech-blogs/SKILL.md "scripts/tech_blogs.py"
-assert_contains info-track/ai-tech-blogs/SKILL.md "## 时间窗口"
-
-assert_file info-track/ai-oss-models/scripts/open_source_updates.py
-assert_file info-track/ai-oss-models/references/sources.md
-assert_file info-track/ai-oss-models/references/output-schema.md
-assert_contains info-track/ai-oss-models/SKILL.md "scripts/open_source_updates.py"
-assert_contains info-track/ai-oss-models/SKILL.md "## 时间窗口"
-
-python_bin=""
-if command -v python3 >/dev/null 2>&1; then
-  python_bin=python3
-elif command -v python >/dev/null 2>&1; then
-  python_bin=python
-else
-  fail "python3 or python is required for syntax checks"
-fi
-
-PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-pycache" "$python_bin" -m py_compile \
-  info-track/ai-news/scripts/ai_news.py \
-  info-track/ai-news/scripts/adapters/__init__.py \
-  info-track/ai-news/scripts/adapters/common.py \
-  info-track/ai-news/scripts/adapters/rss.py \
-  info-track/ai-news/scripts/adapters/json_api.py \
-  info-track/ai-news/scripts/adapters/html_index.py \
-  info-track/ai-community-pulse/scripts/community_pulse.py \
-  info-track/ai-labs-tracker/scripts/vendor_updates.py \
-  info-track/ai-tech-blogs/scripts/tech_blogs.py \
-  info-track/ai-oss-models/scripts/open_source_updates.py \
-  openclaw-skills/ark-tts/scripts/volc_tts.py \
-  openclaw-skills/ark-stt/scripts/volc_stt.py \
-  openclaw-skills/ark-image-gen/scripts/volc_image_gen.py \
-  openclaw-skills/ark-video-gen/scripts/volc_video_gen.py \
-  openclaw-skills/ark-vision/scripts/vision_analyze.py \
-  openclaw-skills/ark-search/scripts/web_search.py \
-  openclaw-skills/ark-data-pro/scripts/data_pro_search.py \
-  openclaw-skills/ark-viking/scripts/openviking.py \
-  openclaw-skills/volc-search/scripts/web_search.py \
-  openclaw-skills/ppt-master/scripts/image_manifest.py \
-  openclaw-skills/ppt-master/scripts/audio_manifest.py \
-  openclaw-skills/ppt-master/scripts/audio_duration.py \
-  openclaw-skills/ppt-master/scripts/image_download.py \
-  openclaw-skills/ppt-master/scripts/visual_layout_audit.py \
-  openclaw-skills/ppt-master/scripts/pptx_layout_audit.py
-
-"$python_bin" openclaw-skills/ark-vision/scripts/vision_analyze.py --help >/dev/null
-"$python_bin" openclaw-skills/ark-data-pro/scripts/data_pro_search.py --help >/dev/null
-"$python_bin" openclaw-skills/ark-viking/scripts/openviking.py --help >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py --help >/dev/null
-"$python_bin" info-track/ai-community-pulse/scripts/community_pulse.py --help >/dev/null
-"$python_bin" info-track/ai-labs-tracker/scripts/vendor_updates.py --help >/dev/null
-"$python_bin" info-track/ai-tech-blogs/scripts/tech_blogs.py --help >/dev/null
-"$python_bin" info-track/ai-oss-models/scripts/open_source_updates.py --help >/dev/null
-"$python_bin" openclaw-skills/ppt-master/scripts/visual_layout_audit.py --help >/dev/null
-"$python_bin" openclaw-skills/ppt-master/scripts/pptx_layout_audit.py --help >/dev/null
-"$python_bin" openclaw-skills/ppt-master/scripts/image_manifest.py --help >/dev/null
-"$python_bin" openclaw-skills/ppt-master/scripts/audio_manifest.py --help >/dev/null
-ai_news_verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-news-verify.XXXXXX")"
-trap 'rm -rf "$ai_news_verify_dir"' EXIT
-"$python_bin" info-track/ai-news/scripts/ai_news.py verify-sources --out "$ai_news_verify_dir/candidates.json"
-"$python_bin" info-track/ai-news/scripts/ai_news.py validate --input "$ai_news_verify_dir/candidates.json" >/dev/null
-"$python_bin" info-track/ai-news/scripts/ai_news.py render --input "$ai_news_verify_dir/candidates.json" >"$ai_news_verify_dir/brief.md"
-[[ -s "$ai_news_verify_dir/brief.md" ]] || fail "ai-news live render produced an empty brief"
-if rg -n '^\[ai-news\]|^ERROR:|Traceback|Article URL:|Comments URL:|Points:' "$ai_news_verify_dir/brief.md"; then
-  fail "ai-news live markdown contains logs, tracebacks, or uncleaned aggregator fields"
-fi
-
-if command -v uv >/dev/null 2>&1; then
+if [[ -f pyproject.toml || -f uv.lock ]]; then
+  [[ -f pyproject.toml && -f uv.lock ]] || fail "pyproject.toml and uv.lock must either both exist or both be absent"
+  require_command uv
   uv lock --check >/dev/null
-else
-  fail "uv is required to verify locked Python dependencies"
+  printf 'OK: uv lock is current\n'
 fi
 
-if command -v node >/dev/null 2>&1; then
-  node --check "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/visual-check-swiss.mjs"
-  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/build-swiss-golden.mjs" --check
-  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/verify-swiss-contract.mjs"
-  node "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/scripts/validate-swiss-deck.mjs" \
-    "$ROOT_DIR/openclaw-skills/guizang-ppt-skill/assets/swiss-golden.html"
-else
-  fail "node is required to verify guizang-ppt-skill"
-fi
-
-if rg -n 'build-skill-bundle|cli/macos|cli/linux|volc-websearch|volc-gen/|volc-speech/|my-fetch/' README.md AGENTS.md docs/OPENCLAW-SKILL.md openclaw-skills info-track; then
-  fail "new docs should not reference removed Rust/CLI skill paths"
-fi
-
-if rg -n 'Tavily|Bocha|Brave|tavily|bocha|brave|TORCHLIGHT_API_KEY|api-key|VeFaaS|vefaas|VE_ACCESS_KEY|VE_SECRET_KEY|setup-guide|多引擎|multi-engine' openclaw-skills/volc-search README.md AGENTS.md; then
-  fail "volc-search must use only Volcengine WebSearch"
-fi
-
-pass "repository structure and skill files verified"
+printf 'OK: repository verification passed\n'

@@ -112,12 +112,11 @@ bash scripts/verify-all.sh
 
 The check validates:
 
-- grouped `SKILL.md` discovery
-- single-line `metadata` JSON
-- referenced files and scripts
-- Swiss PPT manifest、22 页 golden deck、模板 class/recipe 契约
-- PPT Master 渐进式入口、上游来源、SVG 多视口布局审计与原生 PPTX 几何审计
-- Python syntax compilation
-- absence of removed Rust / CLI / bundle directories
+- every skill directory contains `SKILL.md`
+- required frontmatter fields and valid single-line `metadata` JSON
+- `name` / `metadata.openclaw.skillKey` match the skill directory
+- repository JSON syntax
+- Python、JavaScript and shell syntax
+- `pyproject.toml` and `uv.lock` consistency
 
-Live API verification requires real credentials and should be run manually per skill.
+The verifier does not run skill commands or access external services. Behavioral and live API checks are run manually for the affected skill when needed.
