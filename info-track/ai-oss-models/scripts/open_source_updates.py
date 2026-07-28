@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import html
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -51,17 +53,28 @@ FLAGSHIP_ROLES = [
     "embedding",
     "robotics",
 ]
-LOCAL_FILTERS = ["gguf", "mlx", "quantized", "on-device"]
+DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetune", "adapter"]
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
-LOCAL_HOT_TRENDING = 20
-LOCAL_HOT_DOWNLOADS = 10_000
-LOCAL_HOT_LIKES = 50
+DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
+LOCAL_QUERY_LIMIT = 200
+LOCAL_REPORT_MAX = 20
+LOCAL_PUBLISHER_MAX = 3
+LOCAL_HOT_TRENDING = 4
+LOCAL_HOT_DOWNLOADS = 2_000
+LOCAL_HOT_LIKES = 20
 LOCAL_BREAKOUT_TRENDING = 50
 LOCAL_BREAKOUT_DOWNLOADS = 100_000
 LOCAL_BREAKOUT_LIKES = 100
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
 DATASET_HOT_LIKES = 20
+OWNER_QUERY_LIMIT = 100
+NOTABLE_DISCOVERY_MIN = 8
+NOTABLE_DISCOVERY_MAX = 12
+NOTABLE_DATASET_MAX = 5
+NOTABLE_OWNER_MAX = 2
+CARD_EXCERPT_CHARS = 1_600
+CARD_FETCH_WORKERS = 12
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "text-generation": {"input": ["text"], "output": ["text"]},
@@ -191,14 +204,29 @@ def hf_api_bases() -> list[str]:
     return values or DEFAULT_HF_API_BASES
 
 
-def fetch_text(url: str, timeout: int = 45, retries: int = 1) -> str:
+def huggingface_token() -> str:
+    return (os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN") or "").strip()
+
+
+def is_huggingface_host(url: str) -> bool:
+    hostname = (urllib.parse.urlparse(url).hostname or "").lower()
+    return hostname == "huggingface.co" or hostname.endswith(".huggingface.co")
+
+
+def fetch_text(
+    url: str,
+    timeout: int = 30,
+    retries: int = 1,
+    accept: str = "application/json",
+) -> str:
     last_error: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            request = urllib.request.Request(
-                url,
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-            )
+            headers = {"User-Agent": USER_AGENT, "Accept": accept}
+            token = huggingface_token()
+            if token and is_huggingface_host(url):
+                headers["Authorization"] = f"Bearer {token}"
+            request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read().decode("utf-8", errors="replace")
         except Exception as exc:
@@ -322,6 +350,16 @@ def base_model_links(row: dict[str, Any]) -> list[tuple[str, str]]:
         elif value:
             links.setdefault(value, relation)
     return list(links.items())
+
+
+def derivation_facets(row: dict[str, Any]) -> list[str]:
+    return sorted(
+        {
+            relation
+            for _, relation in base_model_links(row)
+            if relation in DERIVATIVE_RELATIONS
+        }
+    )
 
 
 def deployment_facets(row: dict[str, Any]) -> list[str]:
@@ -455,6 +493,7 @@ def model_metadata(
             "evidence": family.get("evidence", []),
         },
         "base_models": [model for model, _ in base_model_links(row)],
+        "derivation": derivation_facets(row),
         "pipeline_tag": row.get("pipeline_tag") or "",
         "downloads": row.get("downloads") or 0,
         "likes": row.get("likes") or 0,
@@ -462,6 +501,7 @@ def model_metadata(
         "createdAt": row.get("createdAt") or "",
         "lastModified": row.get("lastModified") or "",
         "selection": record.get("selection", []),
+        "pending_registry": bool(record.get("pending_registry")),
     }
 
 
@@ -499,26 +539,39 @@ def model_item(
         if canonical:
             summary = f"{model_id.split('/')[-1]} 是 {canonical} 的热门或重点本地部署版本，本窗口内发生{event_label(event_name)}。"
         else:
-            summary = f"{model_id.split('/')[-1]} 是当前热门本地部署模型，本窗口内发生{event_label(event_name)}。"
+            summary = f"{model_id.split('/')[-1]} 是当前热门衍生或本地部署模型，本窗口内发生{event_label(event_name)}。"
+    elif track == "discovery":
+        summary = (
+            f"{model_id.split('/')[-1]} 来自已登记官方发布者，"
+            f"本窗口内发生{event_label(event_name)}，待纳入注册表确认。"
+        )
     else:
         summary = f"{model_id.split('/')[-1]} 是白名单中的{ROLE_LABELS.get(role, role)}，本窗口内发生{event_label(event_name)}。"
-    return {
+    item = {
         "title": model_id,
         "url": f"https://huggingface.co/{model_id}",
         "summary": summary,
         "date": date,
         "event": event_name,
         "source": "Hugging Face Models",
-        "category": role if track == "flagship" else "local",
+        "category": role if track in {"flagship", "discovery"} else "local",
         "metadata": model_metadata(row, record, registry, inherited),
     }
+    if track == "discovery":
+        item["repo_type"] = "model"
+    return item
 
 
 def query_local_candidates() -> list[dict[str, Any]]:
     rows: dict[str, dict[str, Any]] = {}
 
     def query(value: str) -> list[dict[str, Any]]:
-        params = [("filter", value), ("sort", "trendingScore"), ("direction", "-1"), ("limit", "100")]
+        params = [
+            ("filter", value),
+            ("sort", "trendingScore"),
+            ("direction", "-1"),
+            ("limit", str(LOCAL_QUERY_LIMIT)),
+        ]
         try:
             result = hf_api(expanded_model_query(params), retries=0)
         except Exception as exc:
@@ -526,8 +579,8 @@ def query_local_candidates() -> list[dict[str, Any]]:
             return []
         return result if isinstance(result, list) else []
 
-    with ThreadPoolExecutor(max_workers=len(LOCAL_FILTERS)) as executor:
-        results = executor.map(query, LOCAL_FILTERS)
+    with ThreadPoolExecutor(max_workers=len(DERIVATIVE_FILTERS)) as executor:
+        results = executor.map(query, DERIVATIVE_FILTERS)
         for result in results:
             for row in result:
                 model_id = str(row.get("id") or "")
@@ -560,10 +613,17 @@ def is_breakout_local(row: dict[str, Any]) -> bool:
     )
 
 
-def local_role(row: dict[str, Any]) -> str:
+def model_role(row: dict[str, Any], default: str = "unknown") -> str:
     pipeline = str(row.get("pipeline_tag") or "")
+    capabilities = set(capability_facets(row))
+    if "ocr" in capabilities:
+        return "ocr"
     if pipeline in {"image-text-to-text", "image-to-text", "video-text-to-text", "any-to-any"}:
         return "vlm"
+    if pipeline in {"text-to-image", "image-to-image"}:
+        return "image-generation"
+    if pipeline in {"text-to-video", "image-to-video", "video-to-video"}:
+        return "video-generation"
     if pipeline in {"automatic-speech-recognition", "audio-text-to-text"}:
         return "audio-stt"
     if pipeline in {"text-to-speech", "text-to-audio"}:
@@ -572,7 +632,11 @@ def local_role(row: dict[str, Any]) -> str:
         return "translation"
     if pipeline == "sentence-similarity":
         return "embedding"
-    return "llm"
+    if pipeline == "robotics":
+        return "robotics"
+    if pipeline == "text-generation":
+        return "llm"
+    return default
 
 
 def find_local_root(
@@ -620,14 +684,20 @@ def local_discovery_items(
             continue
         event = event_in_window(row, start, end)
         deployment = set(deployment_facets(row))
-        if not event or not deployment & LOCAL_DEPLOYMENTS or not is_hot_local(row):
+        derivation = set(derivation_facets(row))
+        if (
+            not event
+            or not (deployment & LOCAL_DEPLOYMENTS or derivation & DERIVATIVE_RELATIONS)
+            or not is_hot_local(row)
+        ):
             continue
         matched = find_local_root(row, root_ids, model_rows)
         canonical, inherited = matched if matched else (None, None)
         publisher = model_id.split("/", 1)[0]
         trusted_publisher = publisher in trusted_publishers
         breakout = is_breakout_local(row)
-        if canonical is None and not trusted_publisher and not breakout:
+        derivative = bool(derivation & DERIVATIVE_RELATIONS)
+        if canonical is None and not trusted_publisher and not breakout and not derivative:
             continue
         base_record = flagship.get(str(canonical or ""), {})
         selection = ["hot"]
@@ -637,10 +707,12 @@ def local_discovery_items(
             selection.append("trusted-publisher")
         if breakout:
             selection.append("breakout")
+        if derivative:
+            selection.append("derivative")
         record = {
             "id": model_id,
             "track": "local",
-            "role": base_record.get("role") or local_role(row),
+            "role": base_record.get("role") or model_role(row, default="llm"),
             "family": base_record.get("family"),
             "canonical": canonical,
             "selection": selection,
@@ -649,49 +721,81 @@ def local_discovery_items(
     return items
 
 
-def query_owner_discoveries(owners: list[str]) -> list[dict[str, Any]]:
+def query_owner_models(
+    owners: list[str],
+    start: dt.date,
+) -> tuple[list[dict[str, Any]], dict[str, bool], dict[str, str]]:
     rows: dict[str, dict[str, Any]] = {}
+    coverage: dict[str, bool] = {}
+    errors: dict[str, str] = {}
 
-    def query(owner: str) -> list[dict[str, Any]]:
-        params = [("author", owner), ("sort", "lastModified"), ("direction", "-1"), ("limit", "30")]
+    def query(owner: str) -> tuple[str, list[dict[str, Any]], str | None]:
+        params = [
+            ("author", owner),
+            ("sort", "lastModified"),
+            ("direction", "-1"),
+            ("limit", str(OWNER_QUERY_LIMIT)),
+        ]
         try:
             result = hf_api(expanded_model_query(params), retries=0)
-        except Exception:
-            return []
-        return result if isinstance(result, list) else []
+        except Exception as exc:
+            return owner, [], type(exc).__name__
+        return owner, result if isinstance(result, list) else [], None
 
     with ThreadPoolExecutor(max_workers=min(12, len(owners) or 1)) as executor:
         results = executor.map(query, owners)
-        for result in results:
+        for owner, result, error in results:
+            if error:
+                coverage[owner] = False
+                errors[f"owner:{owner}"] = error
+                continue
             for row in result:
                 model_id = str(row.get("id") or "")
                 if model_id:
                     rows.setdefault(model_id, row)
-    return list(rows.values())
+            oldest = min(
+                (iso_date(row.get("lastModified")) for row in result),
+                default=None,
+                key=lambda value: value or dt.date.max,
+            )
+            coverage[owner] = len(result) < OWNER_QUERY_LIMIT or bool(oldest and oldest < start)
+    return list(rows.values()), coverage, errors
 
 
-def discovery_items(
+def model_discovery_items(
     rows: list[dict[str, Any]],
     known_ids: set[str],
+    registry: dict[str, Any],
     start: dt.date,
     end: dt.date,
 ) -> list[dict[str, Any]]:
+    owner_family_candidates: dict[str, list[str]] = {}
+    for entry in registry.get("families", []):
+        owner_family_candidates.setdefault(str(entry["owner"]), []).append(str(entry["id"]))
+    owner_families = {
+        owner: family_ids[0]
+        for owner, family_ids in owner_family_candidates.items()
+        if len(family_ids) == 1
+    }
     items: list[dict[str, Any]] = []
     for row in rows:
         model_id = str(row.get("id") or "")
         event = event_in_window(row, start, end)
         if not model_id or model_id in known_ids or not event:
             continue
+        owner = model_id.split("/", 1)[0]
+        record = {
+            "id": model_id,
+            "track": "discovery",
+            "role": model_role(row),
+            "family": owner_families.get(owner),
+            "selection": ["trusted-publisher", "pending-registry"],
+            "pending_registry": True,
+        }
         items.append(
-            {
-                "id": model_id,
-                "url": f"https://huggingface.co/{model_id}",
-                "event": event[0],
-                "date": event[1],
-                "pipeline_tag": row.get("pipeline_tag") or "",
-            }
+            model_item(row, record, registry, event)
         )
-    return sorted(items, key=lambda item: (item["date"], item["id"]), reverse=True)
+    return sorted(items, key=notable_model_sort_key, reverse=True)
 
 
 def dataset_size(row: dict[str, Any]) -> str | None:
@@ -722,10 +826,18 @@ def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, 
     event_name, date = event
     uses = [str(value) for value in record.get("uses", [])]
     use_text = "、".join(uses) if uses else "开放数据"
-    return {
+    pending_registry = bool(record.get("pending_registry"))
+    if pending_registry:
+        summary = (
+            f"{dataset_id.split('/')[-1]} 是本窗口命中的 HF 热门新数据集，"
+            "用途和交付内容需结合 dataset card 确认，待纳入注册表。"
+        )
+    else:
+        summary = f"{dataset_id.split('/')[-1]} 是白名单中的{use_text}数据集，本窗口内发生{event_label(event_name)}。"
+    item = {
         "title": dataset_id,
         "url": f"https://huggingface.co/datasets/{dataset_id}",
-        "summary": f"{dataset_id.split('/')[-1]} 是白名单中的{use_text}数据集，本窗口内发生{event_label(event_name)}。",
+        "summary": summary,
         "date": date,
         "event": event_name,
         "source": "Hugging Face Datasets",
@@ -742,8 +854,197 @@ def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, 
             "createdAt": row.get("createdAt") or "",
             "lastModified": row.get("lastModified") or "",
             "selection": record.get("selection", []),
+            "pending_registry": pending_registry,
         },
     }
+    if pending_registry:
+        item["repo_type"] = "dataset"
+    return item
+
+
+def new_dataset_items(
+    rows: list[dict[str, Any]],
+    known_ids: set[str],
+    start: dt.date,
+    end: dt.date,
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        dataset_id = str(row.get("id") or "")
+        event = event_in_window(row, start, end)
+        if not dataset_id or dataset_id in known_ids or not event or not is_hot_dataset(row):
+            continue
+        record = {
+            "id": dataset_id,
+            "selection": ["hot", "pending-registry"],
+            "pending_registry": True,
+        }
+        items.append(dataset_item(row, record, event))
+    return sorted(items, key=notable_dataset_sort_key, reverse=True)
+
+
+def notable_model_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    metadata = item.get("metadata") or {}
+    selection = metadata.get("selection") or []
+    return (
+        "trusted-publisher" in selection,
+        item.get("event") == "published",
+        int(metadata.get("trendingScore") or 0),
+        int(metadata.get("likes") or 0),
+        int(metadata.get("downloads") or 0),
+        item.get("date", ""),
+        item.get("title", ""),
+    )
+
+
+def notable_dataset_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    metadata = item.get("metadata") or {}
+    return (
+        int(metadata.get("trendingScore") or 0),
+        item.get("event") == "published",
+        item.get("date", ""),
+        int(metadata.get("likes") or 0),
+        int(metadata.get("downloads") or 0),
+        item.get("title", ""),
+    )
+
+
+def select_diverse_models(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    ranked = sorted(items, key=notable_model_sort_key, reverse=True)
+    selected: list[dict[str, Any]] = []
+    selected_titles: set[str] = set()
+    owner_counts: dict[str, int] = {}
+    direction_counts: dict[str, int] = {}
+
+    def add(item: dict[str, Any]) -> bool:
+        title = str(item.get("title") or "")
+        owner = title.split("/", 1)[0]
+        direction = str(item.get("category") or "unknown")
+        if not title or title in selected_titles or owner_counts.get(owner, 0) >= NOTABLE_OWNER_MAX:
+            return False
+        selected.append(item)
+        selected_titles.add(title)
+        owner_counts[owner] = owner_counts.get(owner, 0) + 1
+        direction_counts[direction] = direction_counts.get(direction, 0) + 1
+        return True
+
+    for item in ranked:
+        direction = str(item.get("category") or "unknown")
+        if direction_counts.get(direction, 0) == 0:
+            add(item)
+        if len(selected) >= limit:
+            return selected
+
+    for item in ranked:
+        direction = str(item.get("category") or "unknown")
+        if direction_counts.get(direction, 0) < 3:
+            add(item)
+        if len(selected) >= limit:
+            return selected
+
+    for item in ranked:
+        title = str(item.get("title") or "")
+        if title and title not in selected_titles:
+            selected.append(item)
+            selected_titles.add(title)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def select_notable_discoveries(
+    models: list[dict[str, Any]],
+    datasets: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    selected_datasets = sorted(datasets, key=notable_dataset_sort_key, reverse=True)[:NOTABLE_DATASET_MAX]
+    model_limit = max(0, NOTABLE_DISCOVERY_MAX - len(selected_datasets))
+    selected_models = select_diverse_models(models, model_limit)
+    total = len(selected_models) + len(selected_datasets)
+    if total < NOTABLE_DISCOVERY_MIN:
+        missing = NOTABLE_DISCOVERY_MIN - total
+        selected_titles = {str(item.get("title") or "") for item in selected_models}
+        extra_models = [
+            item
+            for item in sorted(models, key=notable_model_sort_key, reverse=True)
+            if str(item.get("title") or "") not in selected_titles
+        ][:missing]
+        selected_models.extend(extra_models)
+    return {"models": selected_models, "datasets": selected_datasets}
+
+
+def extract_card_excerpt(text: str) -> str:
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) == 3:
+            text = parts[2]
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for raw_line in text.splitlines():
+        line = html.unescape(raw_line).strip()
+        if not line or line.startswith(("#", "|", "[!", "<")):
+            if current:
+                paragraph = " ".join(current)
+                if len(paragraph) >= 60:
+                    paragraphs.append(paragraph)
+                current = []
+            continue
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"\s+", " ", line)
+        if line:
+            current.append(line)
+    if current:
+        paragraph = " ".join(current)
+        if len(paragraph) >= 60:
+            paragraphs.append(paragraph)
+    paragraphs = [
+        paragraph
+        for paragraph in paragraphs
+        if not re.search(r"\b(?:from\s+\w+\s+import|import\s+\w+)", paragraph)
+    ]
+    excerpt = "\n\n".join(paragraphs[:3]).strip()
+    if len(excerpt) > CARD_EXCERPT_CHARS:
+        excerpt = excerpt[:CARD_EXCERPT_CHARS].rsplit(" ", 1)[0].rstrip() + "…"
+    return excerpt
+
+
+def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
+    prefix = "datasets/" if repo_type == "dataset" else ""
+    quoted_id = urllib.parse.quote(repo_id, safe="/")
+    card_url = f"https://huggingface.co/{prefix}{repo_id}/blob/main/README.md"
+    last_error: Exception | None = None
+    for base in hf_api_bases():
+        raw_url = f"{base}/{prefix}{quoted_id}/raw/main/README.md"
+        try:
+            excerpt = extract_card_excerpt(
+                fetch_text(raw_url, timeout=15, retries=0, accept="text/markdown,text/plain")
+            )
+            if excerpt:
+                return {"url": card_url, "excerpt": excerpt, "ok": True}
+        except Exception as exc:
+            last_error = exc
+    return {
+        "url": card_url,
+        "excerpt": "",
+        "ok": False,
+        "error": type(last_error).__name__ if last_error else "EmptyCard",
+    }
+
+
+def enrich_items_with_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    copied = [{**item, "metadata": dict(item.get("metadata") or {})} for item in items]
+
+    def enrich(item: dict[str, Any]) -> dict[str, Any]:
+        repo_type = str(item.get("repo_type") or "model")
+        item["metadata"]["card"] = fetch_card(str(item.get("title") or ""), repo_type)
+        return item
+
+    with ThreadPoolExecutor(max_workers=min(CARD_FETCH_WORKERS, len(copied) or 1)) as executor:
+        return list(executor.map(enrich, copied))
 
 
 def artifact_specs(projects: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -853,6 +1154,47 @@ def sort_popular_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
+def select_popular_derivatives(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = sort_popular_items(items)
+    selected: list[dict[str, Any]] = []
+    selected_titles: set[str] = set()
+    publisher_counts: dict[str, int] = {}
+
+    def facets(item: dict[str, Any]) -> set[str]:
+        metadata = item.get("metadata") or {}
+        return set(metadata.get("deployment") or []) | set(metadata.get("derivation") or [])
+
+    def add(item: dict[str, Any], enforce_publisher_cap: bool = True) -> bool:
+        title = str(item.get("title") or "")
+        publisher = title.split("/", 1)[0]
+        if not title or title in selected_titles:
+            return False
+        if enforce_publisher_cap and publisher_counts.get(publisher, 0) >= LOCAL_PUBLISHER_MAX:
+            return False
+        selected.append(item)
+        selected_titles.add(title)
+        publisher_counts[publisher] = publisher_counts.get(publisher, 0) + 1
+        return True
+
+    for facet in ["merge", "finetune", "adapter", "gguf", "mlx", "on-device", "quantized"]:
+        for item in ranked:
+            if facet in facets(item) and add(item):
+                break
+        if len(selected) >= LOCAL_REPORT_MAX:
+            return sort_popular_items(selected)
+
+    for item in ranked:
+        add(item)
+        if len(selected) >= LOCAL_REPORT_MAX:
+            return sort_popular_items(selected)
+
+    for item in ranked:
+        add(item, enforce_publisher_cap=False)
+        if len(selected) >= LOCAL_REPORT_MAX:
+            break
+    return sort_popular_items(selected)
+
+
 def source_status(rows: dict[str, Any], errors: dict[str, str], selected: int) -> dict[str, Any]:
     return {
         "ok": bool(rows) or not errors,
@@ -874,7 +1216,9 @@ def emit_payload(payload: dict[str, Any], output: str | None) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Collect whitelisted Hugging Face model and dataset updates in a fixed 7-day window.")
+    parser = argparse.ArgumentParser(
+        description="Collect registered and notable Hugging Face model and dataset updates in a fixed 7-day window."
+    )
     parser.add_argument("--date", help="Window start date, YYYY-MM-DD")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
     parser.add_argument("--stats", action="store_true", help="Print group counts to stderr")
@@ -893,11 +1237,53 @@ def main() -> int:
     local = local_index(model_registry)
     project_model_ids, project_dataset_ids = artifact_specs(project_registry)
     dataset_records = {str(entry["id"]): entry for entry in dataset_registry.get("datasets", [])}
+    owners = list(
+        dict.fromkeys(str(entry["owner"]) for entry in model_registry.get("families", []))
+    )
 
-    requested_model_ids = list(flagship) + list(local) + project_model_ids + list(model_registry.get("local_roots", []))
-    requested_dataset_ids = list(dataset_records) + project_dataset_ids
-    model_rows, model_errors = fetch_many(requested_model_ids, fetch_model)
-    dataset_rows, dataset_errors = fetch_many(requested_dataset_ids, fetch_dataset)
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        owner_future = executor.submit(query_owner_models, owners, start)
+        local_future = executor.submit(query_local_candidates)
+        dataset_future = executor.submit(query_trending_datasets)
+        owner_rows_list, owner_coverage, owner_errors = owner_future.result()
+        local_candidates = local_future.result()
+        trending_datasets = dataset_future.result()
+
+    cached_model_rows = {
+        str(row.get("id") or ""): row
+        for row in owner_rows_list + local_candidates
+        if row.get("id")
+    }
+    relevant_model_ids = list(flagship) + list(local) + project_model_ids
+    requested_model_ids: list[str] = []
+    for model_id in dict.fromkeys(relevant_model_ids):
+        if model_id in cached_model_rows:
+            continue
+        owner = model_id.split("/", 1)[0]
+        if owner_coverage.get(owner) is True:
+            continue
+        requested_model_ids.append(model_id)
+
+    trending_dataset_rows = {
+        str(row.get("id") or ""): row
+        for row in trending_datasets
+        if row.get("id")
+    }
+    requested_dataset_ids = [
+        dataset_id
+        for dataset_id in dict.fromkeys(list(dataset_records) + project_dataset_ids)
+        if dataset_id not in trending_dataset_rows
+    ]
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        model_future = executor.submit(fetch_many, requested_model_ids, fetch_model)
+        dataset_exact_future = executor.submit(fetch_many, requested_dataset_ids, fetch_dataset)
+        exact_model_rows, exact_model_errors = model_future.result()
+        exact_dataset_rows, dataset_errors = dataset_exact_future.result()
+
+    model_rows = {**cached_model_rows, **exact_model_rows}
+    dataset_rows = {**trending_dataset_rows, **exact_dataset_rows}
+    model_errors = {**owner_errors, **exact_model_errors}
 
     flagship_groups: dict[str, list[dict[str, Any]]] = {role: [] for role in FLAGSHIP_ROLES}
     for model_id, record in flagship.items():
@@ -917,15 +1303,12 @@ def main() -> int:
         selection = (["priority"] if priority else []) + (["hot"] if is_hot_local(row) else [])
         local_items.append(model_item(row, {**record, "selection": selection}, model_registry, event, inherited))
 
-    local_candidates = query_local_candidates()
     known_ids = set(flagship) | set(local)
     local_items.extend(
         local_discovery_items(local_candidates, model_registry, model_rows, start, end, known_ids)
     )
     local_items = list({item["title"]: item for item in local_items}.values())
 
-    trending_datasets = query_trending_datasets()
-    trending_dataset_rows = {str(row.get("id") or ""): row for row in trending_datasets if row.get("id")}
     dataset_items: list[dict[str, Any]] = []
     for dataset_id, record in dataset_records.items():
         row = trending_dataset_rows.get(dataset_id) or dataset_rows.get(dataset_id)
@@ -936,46 +1319,67 @@ def main() -> int:
             dataset_items.append(dataset_item(row, {**record, "selection": selection}, event))
 
     reproducible_items = project_items(project_registry, model_rows, dataset_rows, start, end)
-    owners = [str(entry["owner"]) for entry in model_registry.get("families", [])]
-    discoveries = discovery_items(query_owner_discoveries(owners), known_ids, start, end)
     known_dataset_ids = set(dataset_records)
-    for row in trending_datasets:
-        dataset_id = str(row.get("id") or "")
-        event = event_in_window(row, start, end)
-        if dataset_id and dataset_id not in known_dataset_ids and event and is_hot_dataset(row):
-            discoveries.append(
-                {
-                    "id": dataset_id,
-                    "repo_type": "dataset",
-                    "url": f"https://huggingface.co/datasets/{dataset_id}",
-                    "event": event[0],
-                    "date": event[1],
-                    "trendingScore": row.get("trendingScore") or 0,
-                }
-            )
+    model_discoveries = model_discovery_items(
+        owner_rows_list,
+        known_ids | set(project_model_ids),
+        model_registry,
+        start,
+        end,
+    )
+    dataset_discoveries = new_dataset_items(
+        trending_datasets,
+        known_dataset_ids | set(project_dataset_ids),
+        start,
+        end,
+    )
     discoveries = sorted(
-        discoveries,
-        key=lambda item: (item.get("date", ""), item.get("trendingScore", 0), item.get("id", "")),
+        model_discoveries + dataset_discoveries,
+        key=lambda item: (item.get("date", ""), item.get("title", "")),
         reverse=True,
+    )
+    notable_discoveries = select_notable_discoveries(
+        model_discoveries,
+        dataset_discoveries,
     )
 
     flagship_groups = {role: sort_items(rows) for role, rows in flagship_groups.items()}
-    local_items = sort_popular_items(local_items)
+    local_items = select_popular_derivatives(local_items)
     dataset_items = sort_popular_items(dataset_items)
+    flagship_groups = {
+        role: enrich_items_with_cards(rows) if rows else []
+        for role, rows in flagship_groups.items()
+    }
+    dataset_items = enrich_items_with_cards(dataset_items) if dataset_items else []
+    notable_discoveries = {
+        "models": enrich_items_with_cards(notable_discoveries["models"]),
+        "datasets": enrich_items_with_cards(notable_discoveries["datasets"]),
+    }
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
+    notable_model_count = len(notable_discoveries["models"])
+    notable_dataset_count = len(notable_discoveries["datasets"])
 
     payload = {
         "kind": "ai-oss-models",
         "window": {"start": start.isoformat(), "end": end.isoformat()},
         "sources": {
-            "huggingface_models": source_status(model_rows, model_errors, flagship_count + len(local_items)),
-            "huggingface_datasets": source_status(dataset_rows, dataset_errors, len(dataset_items)),
+            "huggingface_models": source_status(
+                model_rows,
+                model_errors,
+                flagship_count + len(local_items) + notable_model_count,
+            ),
+            "huggingface_datasets": source_status(
+                dataset_rows,
+                dataset_errors,
+                len(dataset_items) + notable_dataset_count,
+            ),
         },
         "groups": {
             "flagship": flagship_groups,
             "local": local_items,
             "reproducible": reproducible_items,
             "datasets": dataset_items,
+            "notable_discoveries": notable_discoveries,
         },
         "discoveries": discoveries,
     }
@@ -990,7 +1394,14 @@ def main() -> int:
                     "local": len(local_items),
                     "reproducible": len(reproducible_items),
                     "datasets": len(dataset_items),
+                    "notable_discoveries": {
+                        "models": notable_model_count,
+                        "datasets": notable_dataset_count,
+                        "total": notable_model_count + notable_dataset_count,
+                    },
                     "discoveries": len(discoveries),
+                    "exact_model_queries": len(requested_model_ids),
+                    "exact_dataset_queries": len(requested_dataset_ids),
                 },
                 ensure_ascii=False,
                 sort_keys=True,

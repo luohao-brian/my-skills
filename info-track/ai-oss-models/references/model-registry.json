@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "verified_at": "2026-07-22",
+  "version": 4,
+  "verified_at": "2026-07-28",
   "families": [
     {"id": "qwen", "owner": "Qwen", "openness": "weights-only", "evidence": ["https://huggingface.co/Qwen/Qwen3.6-35B-A3B"]},
     {"id": "glm", "owner": "zai-org", "openness": "weights-only", "evidence": ["https://huggingface.co/zai-org/GLM-5.2"]},
@@ -8,6 +8,7 @@
     {"id": "kimi", "owner": "moonshotai", "openness": "weights-only", "evidence": ["https://huggingface.co/moonshotai/Kimi-K2.7-Code"]},
     {"id": "minimax", "owner": "MiniMaxAI", "openness": "weights-only", "evidence": ["https://huggingface.co/MiniMaxAI/MiniMax-M3"]},
     {"id": "nemotron", "owner": "nvidia", "openness": "reproducible", "evidence": ["https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "https://huggingface.co/blog/nvidia/nemotron-open-models-data"]},
+    {"id": "cosmos3", "owner": "nvidia", "openness": "weights-only", "evidence": ["https://huggingface.co/nvidia/Cosmos3-Super-Text2Image-4Step", "https://huggingface.co/nvidia/Cosmos3-Super-Image2Video-4Step"]},
     {"id": "mistral", "owner": "mistralai", "openness": "weights-only", "evidence": ["https://huggingface.co/mistralai/Mistral-Medium-3.5-128B"]},
     {"id": "gemma", "owner": "google", "openness": "weights-only", "evidence": ["https://huggingface.co/google/gemma-4-31B-it"]},
     {"id": "granite", "owner": "ibm-granite", "openness": "weights-only", "evidence": ["https://huggingface.co/ibm-granite/granite-4.1-8b"]},
@@ -78,6 +79,7 @@
       {"id": "Qwen/Qwen3.5-27B", "family": "qwen"},
       {"id": "Qwen/Qwen3.5-9B", "family": "qwen"},
       {"id": "Qwen/Qwen3.5-4B", "family": "qwen"},
+      {"id": "moonshotai/Kimi-K3", "family": "kimi"},
       {"id": "moonshotai/Kimi-K2.7-Code", "family": "kimi"},
       {"id": "moonshotai/Kimi-K2.6", "family": "kimi"},
       {"id": "MiniMaxAI/MiniMax-M3", "family": "minimax"},
@@ -89,15 +91,19 @@
       {"id": "google/gemma-4-E2B-it", "family": "gemma"},
       {"id": "tencent/Hy-Embodied-VLM-1.0", "family": "hunyuan"},
       {"id": "openbmb/MiniCPM-V-4.6", "family": "minicpm"},
-      {"id": "openbmb/MiniCPM-o-4_5", "family": "minicpm"}
+      {"id": "openbmb/MiniCPM-o-4_5", "family": "minicpm"},
+      {"id": "swiss-ai/Apertus-v1.5-70B", "family": "apertus"},
+      {"id": "swiss-ai/Apertus-v1.5-8B", "family": "apertus"}
     ],
     "image-generation": [
       {"id": "zai-org/GLM-Image", "family": "glm"},
       {"id": "tencent/HunyuanImage-3.0", "family": "hunyuan"},
-      {"id": "tencent/HunyuanImage-3.0-Instruct", "family": "hunyuan"}
+      {"id": "tencent/HunyuanImage-3.0-Instruct", "family": "hunyuan"},
+      {"id": "nvidia/Cosmos3-Super-Text2Image-4Step", "family": "cosmos3"}
     ],
     "video-generation": [
-      {"id": "tencent/HunyuanVideo-1.5", "family": "hunyuan"}
+      {"id": "tencent/HunyuanVideo-1.5", "family": "hunyuan"},
+      {"id": "nvidia/Cosmos3-Super-Image2Video-4Step", "family": "cosmos3"}
     ],
     "audio-tts": [
       {"id": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", "family": "qwen"},
@@ -108,7 +114,9 @@
       {"id": "zai-org/GLM-ASR-Nano-2512", "family": "glm"},
       {"id": "nvidia/nemotron-3.5-asr-streaming-0.6b", "family": "nemotron"},
       {"id": "mistralai/Voxtral-Mini-4B-Realtime-2602", "family": "mistral"},
-      {"id": "allenai/OLMoASR", "family": "olmo"}
+      {"id": "allenai/OLMoASR", "family": "olmo"},
+      {"id": "Qwen/Qwen3-ASR-1.7B-hf", "family": "qwen"},
+      {"id": "Qwen/Qwen3-ASR-0.6B-hf", "family": "qwen"}
     ],
     "ocr": [
       {"id": "zai-org/GLM-OCR", "family": "glm"},
