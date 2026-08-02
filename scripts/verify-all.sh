@@ -132,6 +132,14 @@ export PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/my-skills-verify-pycache"
 python3 -m compileall -q hermes-plugins info-track openclaw-skills scripts
 printf 'OK: Python syntax\n'
 
+python3 scripts/verify-ppt-master-runtime.py
+
+python3 -m unittest discover -s openclaw-skills/ppt-master/scripts/tests -p 'test_*.py'
+printf 'OK: ppt-master unit tests\n'
+
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+printf 'OK: repository tooling unit tests\n'
+
 # Let each language's own parser check syntax. These checks execute no project
 # code and do not contact external services.
 while IFS= read -r -d '' script; do

@@ -15,18 +15,114 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any, Iterable
 
 
-def _rect(shape: Any) -> dict[str, int]:
+Matrix = tuple[float, float, float, float, float, float]
+IDENTITY: Matrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+
+def _compose(outer: Matrix, inner: Matrix) -> Matrix:
+    """Return the affine transform outer(inner(point))."""
+    a, b, c, d, e, f = outer
+    g, h, i, j, k, l = inner
+    return (
+        a * g + c * h,
+        b * g + d * h,
+        a * i + c * j,
+        b * i + d * j,
+        a * k + c * l + e,
+        b * k + d * l + f,
+    )
+
+
+def _translate(x: float, y: float) -> Matrix:
+    return (1.0, 0.0, 0.0, 1.0, x, y)
+
+
+def _rotate(degrees: float) -> Matrix:
+    radians = math.radians(degrees)
+    cosine, sine = math.cos(radians), math.sin(radians)
+    return (cosine, sine, -sine, cosine, 0.0, 0.0)
+
+
+def _scale(x: float, y: float) -> Matrix:
+    return (x, 0.0, 0.0, y, 0.0, 0.0)
+
+
+def _around(center_x: float, center_y: float, transform: Matrix) -> Matrix:
+    return _compose(
+        _translate(center_x, center_y),
+        _compose(transform, _translate(-center_x, -center_y)),
+    )
+
+
+def _apply(matrix: Matrix, x: float, y: float) -> tuple[float, float]:
+    a, b, c, d, e, f = matrix
+    return a * x + c * y + e, b * x + d * y + f
+
+
+def _bbox(points: list[tuple[float, float]]) -> dict[str, int]:
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    x1, y1 = min(xs), min(ys)
+    x2, y2 = max(xs), max(ys)
     return {
-        "x": int(shape.left),
-        "y": int(shape.top),
-        "width": int(shape.width),
-        "height": int(shape.height),
+        "x": int(round(x1)),
+        "y": int(round(y1)),
+        "width": int(round(x2 - x1)),
+        "height": int(round(y2 - y1)),
     }
+
+
+def _group_child_transform(group: Any) -> Matrix:
+    """Map a group's child coordinate system into its parent's coordinates."""
+    xfrm = group._element.grpSpPr.xfrm
+    child_width, child_height = float(xfrm.chExt.cx), float(xfrm.chExt.cy)
+    if child_width == 0 or child_height == 0:
+        return IDENTITY
+    scale_x = float(xfrm.ext.cx) / child_width
+    scale_y = float(xfrm.ext.cy) / child_height
+    base = (
+        scale_x,
+        0.0,
+        0.0,
+        scale_y,
+        float(xfrm.off.x) - float(xfrm.chOff.x) * scale_x,
+        float(xfrm.off.y) - float(xfrm.chOff.y) * scale_y,
+    )
+    center_x = float(xfrm.off.x) + float(xfrm.ext.cx) / 2
+    center_y = float(xfrm.off.y) + float(xfrm.ext.cy) / 2
+    orient = IDENTITY
+    if bool(getattr(xfrm, "flipH", False)) or bool(getattr(xfrm, "flipV", False)):
+        orient = _around(
+            center_x,
+            center_y,
+            _scale(-1.0 if xfrm.flipH else 1.0, -1.0 if xfrm.flipV else 1.0),
+        )
+    rotation = float(getattr(xfrm, "rot", 0.0) or 0.0)
+    if rotation:
+        orient = _compose(_around(center_x, center_y, _rotate(rotation)), orient)
+    return _compose(orient, base)
+
+
+def _shape_rect(shape: Any, parent_transform: Matrix) -> dict[str, int]:
+    left, top = float(shape.left), float(shape.top)
+    width, height = float(shape.width), float(shape.height)
+    corners = [
+        (left, top),
+        (left + width, top),
+        (left + width, top + height),
+        (left, top + height),
+    ]
+    rotation = float(getattr(shape, "rotation", 0.0) or 0.0)
+    if rotation:
+        local_rotation = _around(left + width / 2, top + height / 2, _rotate(rotation))
+        corners = [_apply(local_rotation, x, y) for x, y in corners]
+    return _bbox([_apply(parent_transform, x, y) for x, y in corners])
 
 
 def _area(rect: dict[str, int]) -> int:
@@ -49,14 +145,29 @@ def _contains(outer: dict[str, int], inner: dict[str, int], tolerance: int) -> b
     )
 
 
-def _iter_leaf_shapes(shapes: Iterable[Any], parent: str = "slide") -> Iterable[tuple[Any, str]]:
+def _iter_leaf_shapes(
+    shapes: Iterable[Any],
+    parent: str = "slide",
+    transform: Matrix = IDENTITY,
+) -> Iterable[tuple[Any, str, dict[str, int]]]:
     for index, shape in enumerate(shapes, start=1):
         name = str(getattr(shape, "name", "") or f"shape-{index}")
         path = f"{parent}/{name}"
         if hasattr(shape, "shapes"):
-            yield from _iter_leaf_shapes(shape.shapes, path)
+            child_transform = _compose(transform, _group_child_transform(shape))
+            yield from _iter_leaf_shapes(shape.shapes, path, child_transform)
         else:
-            yield shape, path
+            yield shape, path, _shape_rect(shape, transform)
+
+
+def _is_connector(shape: Any) -> bool:
+    shape_type = getattr(shape, "shape_type", None)
+    return getattr(shape_type, "name", "") == "LINE" or str(shape_type) == "LINE (9)"
+
+
+def _has_invalid_size(shape: Any, box: dict[str, int]) -> bool:
+    zero_dimensions = int(box["width"] <= 0) + int(box["height"] <= 0)
+    return zero_dimensions == 2 or (zero_dimensions == 1 and not _is_connector(shape))
 
 
 def _shape_text(shape: Any) -> str:
@@ -98,8 +209,7 @@ def audit_pptx(
 
     for page_number, slide in enumerate(presentation.slides, start=1):
         records: list[dict[str, Any]] = []
-        for shape, path in _iter_leaf_shapes(slide.shapes):
-            box = _rect(shape)
+        for shape, path, box in _iter_leaf_shapes(slide.shapes):
             text = _shape_text(shape)
             record = {
                 "name": path,
@@ -108,7 +218,7 @@ def audit_pptx(
                 "text": text,
             }
             records.append(record)
-            if box["width"] <= 0 or box["height"] <= 0:
+            if _has_invalid_size(shape, box):
                 issues.append(
                     {
                         "severity": "error",
@@ -141,10 +251,9 @@ def audit_pptx(
                     continue
                 if not same_parent and ratio <= 0.12:
                     continue
-                severity = "error" if ratio > 0.75 else "warning"
                 issues.append(
                     {
-                        "severity": severity,
+                        "severity": "warning",
                         "code": "text_frame_overlap",
                         "slide": page_number,
                         "shape": left["name"],

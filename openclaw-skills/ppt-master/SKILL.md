@@ -1,98 +1,43 @@
 ---
 name: ppt-master
-description: 将 PDF、DOCX、PPTX、网页、Markdown 或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。
+description: 将 PDF、DOCX、PPTX、网页、Markdown、新闻或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。
 metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master","requires":{"anyBins":["python3","python"]}}}
 ---
 
 # PPT Master
 
-把 SVG 作为页面设计源，经过静态契约检查、浏览器几何检查和原生 PPTX 检查后发布。
+PPT Master 是路由式演示文稿工作流。SVG 生成路线以完整页面 SVG 为设计真相来源，经过静态、浏览器和 PPTX 包级检查后发布。
 
-## 先读
+## 必读顺序
 
-1. 始终读取 `references/openclaw-runtime.md`，确定外部项目目录、依赖和发布门禁。
-2. 读取 `workflows/routing.md`，按输入和用户意图选择主流程或独立 workflow。
-3. 新建 SVG/PPTX 演示时读取 `references/upstream-pipeline.md`；只读取其中当前阶段直接引用的详细 reference。
-4. 处理现有 PPTX、模板、动画或旁白时，只读取 routing 指定的 workflow 及其直接引用，不要预加载完整主流程。
+1. 始终读取 [`references/openclaw-runtime.md`](references/openclaw-runtime.md)，确定外部项目目录、依赖、媒体能力和发布门禁。
+2. 读取 [`workflows/routing.md`](workflows/routing.md)，只选择一个顶层路线。
+3. 按路由读取对应 authority：
+   - 新建或重构演示：[`workflows/generate-pptx.md`](workflows/generate-pptx.md)
+   - 创建复用模板：[`workflows/create-template.md`](workflows/create-template.md)
+   - 填充原生 PPTX：[`workflows/template-fill-pptx.md`](workflows/template-fill-pptx.md)
+   - 原生增强 PPTX：[`workflows/native-enhance-pptx.md`](workflows/native-enhance-pptx.md)
+4. 只读取所选路线明确触发的 profile、stage、governance 和 reference，不预加载其他路线。
 
-## 缺少输入或工具时
+## OpenClaw 执行边界
 
-- 用户只说“做一份 PPT”时，默认使用 16:9 画布并交付可编辑 PPTX；页数、受众和视觉方向从原始材料与用途推断，写入 `design_spec.md` 后继续。只有源文件打不开、用户点名的模板或品牌素材未提供、要求互相冲突，或下一步会移动/覆盖用户原件时，才暂停并询问。
-- 需要用户回答时直接提问；不要为不同模型、IDE 或运行产品写不同分支。
-- 需要搜索、读取网页、生成图片、检查浏览器页面或委派任务时，只调用本轮工具列表里真实存在的工具名。没有对应工具就执行相关 workflow 写明的替代步骤；没有替代步骤则报告哪一步未完成。
-- AI 配图必须调用本轮可用的通用图片生成工具。不要选择图片 provider、模型、API 或密钥；没有图片生成工具时停止 AI 配图步骤并报告缺少该能力。
-- 旁白必须调用本轮可用的通用 TTS 工具。不要选择 TTS provider、模型、音色或密钥；没有 TTS 工具时停止旁白步骤并报告缺少该能力。
-
-## 不可破坏的边界
-
-- 使用 `{baseDir}` 解析 skill 内脚本、模板和 references；不要假设 cwd 中存在 `skills/ppt-master`。
-- 项目、截图、预览、备份和导出必须写入用户指定的绝对路径；未指定时写入仓库外的 workspace 或系统临时目录。禁止在 `{baseDir}` 或当前源码仓库创建 `projects/`、`outputs/`、`.preview/` 或导出文件。
-- SVG 生成保持当前主执行者、逐页、顺序执行；每页写入前重新读取项目 `spec_lock.md`。
-- `svg_output/` 是生成式路径的页面设计真相来源。模板和设计说明只能约束页面，不能补上 SVG 中缺失的可见内容。
-- SVG 使用内联属性。禁止 `<style>`、`class`、外部 stylesheet 和未被转换器支持的 CSS/视觉属性。
-- 用户确认过的画布、页数、受众、风格、配色、图标、字体和图片策略必须写入 `design_spec.md` 与 `spec_lock.md`；两者冲突时以 `spec_lock.md` 为准。
-- 不用批处理脚本代替逐页设计。确定性脚本只负责转换、检查、后处理和导出。
+- 使用 `{baseDir}` 解析本 skill 内脚本、模板和 reference；禁止假设 cwd 中存在 `skills/ppt-master`，也不要拼接安装目录绝对路径。
+- 初始化时必须向 `project_manager.py init` 传 `--dir <absolute-projects-root>`。项目、预览、备份和导出写入用户指定目录；未指定时写入当前运行时 workspace 下的独立目录。禁止写入 `{baseDir}` 或本源码仓库。
+- AI 配图与旁白通过当前 Agent 已有的工具或 skill 执行；先发现并读取真实接口，再把 PPT Master 的语义请求映射过去。PPT Master 不绑定 Agent、provider、模型、密钥或运行时配置。先读 [`references/runtime-media.md`](references/runtime-media.md)。
+- SVG 页面由当前主执行者逐页手工创作；不得用脚本批量生成页面，也不得把页面创作委派给另一个执行者。
+- `svg_output/` 是 SVG 路线完整的可见页面设计源。模板和 design spec 只能约束页面，不能补充 SVG 中缺失的可见内容。
+- 用户已经确认的画布、页数、受众、风格、配色、字体、图片策略和动画/旁白结果必须写入项目工件；`spec_lock.md` 与其他说明冲突时以 lock 为准。
 
 ## 最小主流程
 
 ```text
-资料标准化 → 外部项目初始化 → 策略确认与 spec_lock → 逐页 SVG
-→ 静态检查 → 浏览器多视口几何检查 → notes
-→ finalize → PPTX 导出 → 原生 PPTX 几何检查
+资料标准化 → 外部项目初始化 → 路由/模板决定 → 策略与 spec_lock
+→ 配图准备 → 逐页 SVG → 静态与浏览器检查 → notes/后处理
+→ PPTX 导出 → 包结构与几何检查 → 视觉复核 → 交付
 ```
 
-初始化时强制指定仓库外目录：
+默认使用 16:9；用户未指定页数、受众或视觉方向时，从材料与用途推断并写入设计工件后继续。只有缺少不可替代的源文件/模板/品牌资产、要求冲突，或操作会移动/覆盖用户原件时才暂停询问。
 
-```bash
-python3 {baseDir}/scripts/project_manager.py init <name> --format ppt169 --dir <absolute-projects-root>
-```
+## 交付合同
 
-非 Markdown 输入先转换；Markdown 输入直接读取：
-
-```bash
-python3 {baseDir}/scripts/source_to_md.py <non-markdown-files-or-URLs...>
-```
-
-需要把源文件归档进项目时，单独调用：
-
-```bash
-python3 {baseDir}/scripts/project_manager.py import-sources \
-  <absolute-project-path> <source-files-or-dirs...> --copy
-```
-
-`<absolute-project-path>` 是 `import-sources` 的位置参数。只有用户明确授权移动原件时，才把 `--copy` 改为 `--move`。不要向 `source_to_md.py` 传项目路径或不存在的 `--project` 参数。
-
-## 发布门禁
-
-所有 SVG 完成后，先运行：
-
-```bash
-python3 {baseDir}/scripts/project_manager.py validate <project>
-python3 {baseDir}/scripts/svg_quality_checker.py <project>
-python3 {baseDir}/scripts/visual_layout_audit.py <project>
-```
-
-必须检查并处理：
-
-- 文字或视觉元素互相遮挡；
-- 元素越出 SVG 画布、浏览器窗口或容器型分组；
-- `viewBox`、内联 style、字体、颜色或转换器能力不匹配；
-- 多视口缩放后溢出、裁切、零尺寸或异常变形；
-- 内容只挤在局部、画布利用明显不足，或紧贴多侧边缘。
-
-任一 error 未解决不得导出。warning 必须修复、确认是有意留白/叠放，或在交付说明中记录；不得静默跳过。
-
-通过后按顺序运行，不能合并步骤：
-
-```bash
-python3 {baseDir}/scripts/total_md_split.py <project>
-python3 {baseDir}/scripts/finalize_svg.py <project>
-python3 {baseDir}/scripts/svg_to_pptx.py <project>
-python3 {baseDir}/scripts/pptx_layout_audit.py <project>/exports/<deck>.pptx
-```
-
-原生 PPTX 检查失败时修改 `svg_output/`，重新执行静态与浏览器检查，再 finalize/export；不要直接在导出包里掩盖源问题。
-
-## 交付
-
-只交付外部项目目录中的最终 PPTX、必要的预览和检查报告。报告包括：页数、画布、三个门禁的结果、仍保留的 warning 及理由、最终绝对路径。依赖浏览器、外部凭证或字体而无法完成的检查要明确标注未验证范围。
+最终报告必须包含：项目和 PPTX 的绝对路径、页面数与画布、模板选择依据、图片/旁白能力实际使用情况、确定性门禁结果、仍保留 warning 的理由，以及因凭证、字体、浏览器或本机 Office 能力而未验证的范围。

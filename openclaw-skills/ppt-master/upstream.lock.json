@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/hugohe3/ppt-master.git",
+  "subtree": "skills/ppt-master",
+  "base_commit": "6b42a6a652f9d6e9fc0c81e634c9fdfe771eee10",
+  "reviewed_through": "8858c4960b870f12baf952994fbd0c76ab5ba4ec",
+  "excluded_commits": [
+    {
+      "commit": "82ec87edb3c3109f716aea55f87ddaf4a5131dcf",
+      "reason": "The independent attribution/runtime identity guard conflicts with the OpenClaw package metadata and runtime adapter contract."
+    },
+    {
+      "commit": "3d1f26448576be29104cf69e28c950afcbbe400c",
+      "reason": "This documentation preflight requires the excluded independent identity guard."
+    },
+    {
+      "commit": "8858c4960b870f12baf952994fbd0c76ab5ba4ec",
+      "reason": "This extends the excluded independent identity guard into shared runtime bootstrap code."
+    }
+  ],
+  "required_local_contracts": [
+    "OpenClaw metadata and {baseDir} command paths",
+    "absolute caller-selected project roots",
+    "provider-neutral image and TTS manifests",
+    "SVG and exported-PPTX layout audits",
+    "target-host font preflight and explicit SVG-to-PowerPoint typeface parity",
+    "role-aware body readability regression gate"
+  ]
+}

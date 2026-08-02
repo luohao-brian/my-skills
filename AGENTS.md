@@ -73,6 +73,7 @@
 ## Skill 文案与规则写法
 
 - Skill 的消费对象是运行时 agent，不是 skill 作者、维护者或人工读者。
+- 文档、示例、提示词和测试 fixture 不得写入暴露操作系统或用户名的本机绝对路径；使用 `$HOME`、`<repo-root>`、`<workspace>` 或 `{baseDir}` 等可移植占位符。此规则依靠编辑时审查，不要为它新增广泛的正则扫描或低 ROI verifier。
 - 规则写成动作、顺序、范围、字段、边界、失败报告和输出格式。
 - 不要把作者维护决策写成 agent 行为。
 - 规则型 info-track skill 不要规定具体搜索引擎、provider、fallback 工具、抓取绕路、重试顺序或查询写法。

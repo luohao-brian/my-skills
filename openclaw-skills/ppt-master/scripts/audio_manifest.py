@@ -22,6 +22,7 @@ configure_utf8_stdio()
 
 VALID_STATUSES = {"Pending", "Generated", "Failed"}
 SUPPORTED_AUDIO = {".mp3", ".m4a", ".wav"}
+MAX_TTS_CHARS = 4000
 
 
 def natural_key(path: Path) -> list[object]:
@@ -76,6 +77,10 @@ def load_manifest(path: Path) -> dict:
             raise ValueError(f"{prefix}.status must be one of {sorted(VALID_STATUSES)}")
         if Path(task["output_path"]).suffix.lower() not in SUPPORTED_AUDIO:
             raise ValueError(f"{prefix}.output_path must end in mp3, m4a, or wav")
+        if len(task["text"]) > MAX_TTS_CHARS:
+            raise ValueError(
+                f"{prefix}.text is {len(task['text'])} characters; runtime TTS limit is {MAX_TTS_CHARS}"
+            )
         forbidden = {"provider", "backend", "model", "voice", "voice_id"}.intersection(task)
         if forbidden:
             raise ValueError(f"{prefix} contains runtime-owned fields: {', '.join(sorted(forbidden))}")
@@ -107,6 +112,11 @@ def prepare(project: Path) -> Path:
         text = spoken_text(note.read_text(encoding="utf-8"))
         if not text:
             raise ValueError(f"empty spoken text: {note}")
+        if len(text) > MAX_TTS_CHARS:
+            raise ValueError(
+                f"spoken text exceeds runtime TTS limit ({len(text)} > {MAX_TTS_CHARS}): {note}; "
+                "shorten this slide's narration before generating audio"
+            )
         old = previous.get(note.stem, {})
         old_output = Path(old.get("output_path", "")) if old.get("output_path") else None
         if old_output and old_output.suffix.lower() in SUPPORTED_AUDIO and old_output.is_file():
@@ -123,6 +133,10 @@ def prepare(project: Path) -> Path:
         }
         if status == "Generated" and old.get("duration_seconds"):
             task["duration_seconds"] = old["duration_seconds"]
+        if status == "Generated" and old.get("transcript_path"):
+            transcript = Path(old["transcript_path"])
+            if transcript.is_file():
+                task["transcript_path"] = str(transcript.resolve())
         tasks.append(task)
 
     save_manifest(manifest_path, {"project": str(project), "tasks": tasks})
@@ -147,6 +161,7 @@ def record_audio(manifest_path: Path, data: dict, slide: str, source: Path) -> P
     task = find_task(data, slide)
     target = Path(task["output_path"])
     target.parent.mkdir(parents=True, exist_ok=True)
+    source_transcript = source.with_suffix(".transcript.json")
     if source.resolve() != target.resolve():
         source_suffix = source.suffix.lower()
         if source_suffix not in SUPPORTED_AUDIO:
@@ -154,6 +169,12 @@ def record_audio(manifest_path: Path, data: dict, slide: str, source: Path) -> P
         target = target.with_suffix(source_suffix)
         shutil.copy2(source, target)
         task["output_path"] = str(target.resolve())
+        if source_transcript.is_file():
+            target_transcript = target.with_suffix(".transcript.json")
+            shutil.copy2(source_transcript, target_transcript)
+            task["transcript_path"] = str(target_transcript.resolve())
+    elif source_transcript.is_file():
+        task["transcript_path"] = str(source_transcript.resolve())
     if not target.is_file() or target.stat().st_size == 0:
         raise ValueError(f"audio file is missing or empty: {target}")
     task["duration_seconds"] = round(duration_seconds(target), 3)
@@ -218,7 +239,19 @@ def main() -> int:
         print(f"OK: {len(data['tasks'])} audio task(s)")
         return 0
     if args.command == "pending":
-        tasks = [task for task in data["tasks"] if task["status"] != "Generated"]
+        tasks = [
+            {
+                "slide": task["slide"],
+                "note_path": task["note_path"],
+                "output_path": task["output_path"],
+                "capability_request": {
+                    "text": task["text"],
+                    "preferred_output_path": task["output_path"],
+                },
+            }
+            for task in data["tasks"]
+            if task["status"] != "Generated"
+        ]
         print(json.dumps({"tasks": tasks}, ensure_ascii=False, indent=2))
         return 0
     if args.command == "record":

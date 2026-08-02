@@ -1,6 +1,6 @@
 # Image Generation Prompts
 
-> Generated from the image task manifest; use `image_manifest.py` to validate and record regenerated images.
+> Upstream visual-reference fixture; not an executable OpenClaw provider manifest.
 > Do not hand-edit — re-run the command to refresh.
 
 > Project: {baseDir}/references/ai-image-comparison/palette

@@ -1,72 +1,80 @@
 # OpenClaw Runtime Contract
 
-## Upstream baseline
+## Upstream baseline and overlay
 
 - Repository: `https://github.com/hugohe3/ppt-master`
-- Imported commit: `85cf22eaf4a74a511c4bff9b33a15fc0f7b33e87`
-- Imported at: `2026-07-15`
-- This copy starts from the recorded GitHub baseline and adds the runtime and release checks below.
+- Imported core commit: `6b42a6a652f9d6e9fc0c81e634c9fdfe771eee10` (2026-07-31)
+- The OpenClaw overlay retains single-line metadata, `{baseDir}` resolution, external project roots, runtime-neutral media, and deterministic SVG/PPTX release checks.
+- The later upstream independent-identity guard is intentionally not imported because it rejects the OpenClaw metadata and runtime adapter contract. See [`upstream-source.md`](upstream-source.md).
 
-## Install dependencies
+## Dependencies
 
-Use a dedicated Python environment. Do not install into the source tree.
+Install into an external environment, never into the skill directory:
 
 ```bash
-python3 -m venv <external-cache>/ppt-master-venv
-<external-cache>/ppt-master-venv/bin/python -m pip install -r {baseDir}/requirements.txt
+uv venv <external-cache>/ppt-master-venv
+uv pip install --python <external-cache>/ppt-master-venv/bin/python \
+  -r {baseDir}/requirements.txt
 <external-cache>/ppt-master-venv/bin/python -m playwright install chromium
 ```
 
-The layout audit also tries an installed Google Chrome channel when Playwright's managed Chromium is unavailable.
+The browser audit may use installed Chrome when Playwright-managed Chromium is unavailable.
 
-## Keep projects outside source repositories
+Resolve the Python executable once after dependency setup and reuse that exact
+executable for every PPT Master command. Do not assume an activated virtual
+environment or a modified `PATH` survives across Agent tool calls. Before
+starting work, use the resolved interpreter to import the dependencies needed
+by the selected route (including Pillow for raster images and Playwright for
+the browser audit); a failed import is an environment failure, not a corrupt
+project asset. The command examples below use `python3` as a placeholder for
+that resolved executable.
 
-Resolve an absolute project root before initialization. Use the user's requested output directory; otherwise use an external workspace or an OS temporary directory. Never use `{baseDir}/projects`, the current source repository, or a relative `projects/` path.
+## External project root
+
+Resolve an absolute project root before initialization. Prefer the user-selected output directory; otherwise use a dedicated directory inside the current runtime workspace. Never use `{baseDir}/projects`, a relative `projects/`, or a source-repository directory.
 
 ```bash
-PROJECTS_ROOT="<absolute external directory>"
+PROJECTS_ROOT="<absolute runtime-workspace directory>"
 python3 {baseDir}/scripts/project_manager.py init <name> --format ppt169 --dir "$PROJECTS_ROOT"
 ```
 
-Pass the resulting absolute project path to every later command. Preview, review, backup, and export artifacts then remain inside that external project.
+Pass the resulting absolute project path to every subsequent command.
+
+## Runtime media
+
+Read [`runtime-media.md`](runtime-media.md) before AI image or narration work. Discover the current Agent's available tools/skills and adapt to their declared schemas. The workflow may request an image or TTS capability, but must not bind itself to an Agent, provider, model, key, or one fixed parameter spelling.
 
 ## Release gate
 
-Run these against authored `svg_output/` before finalization:
+Run against authored `svg_output/` before export:
 
 ```bash
-python3 {baseDir}/scripts/project_manager.py validate <project>
-python3 {baseDir}/scripts/svg_quality_checker.py <project>
-python3 {baseDir}/scripts/visual_layout_audit.py <project>
+python3 {baseDir}/scripts/project_manager.py validate <absolute-project>
+python3 {baseDir}/scripts/svg_quality_checker.py <absolute-project>
+python3 {baseDir}/scripts/visual_layout_audit.py <absolute-project>
 ```
 
-The static checker owns SVG/PPTX compatibility, inline-style validity, forbidden CSS/classes, `viewBox`, IDs, fonts, and `spec_lock` drift. The browser audit owns rendered geometry:
+The static checker owns source-contract violations. The browser audit owns rendered bounds and derives four viewport equivalence classes from the SVG canvas: native, fractional same-aspect, wider, and taller. It waits for fonts and image resources before measuring.
 
-- visible elements outside the SVG canvas or browser viewport;
-- text/text collisions and container-like group overflow;
-- broken or zero-size rendered elements;
-- multi-viewport scaling at `1280x720`, `1024x768`, `1440x900`, and `720x1280`;
-- content-span underuse and edge crowding.
+- Objective failures block: invalid/non-positive rendered geometry, broken resources, or visible content outside the SVG canvas.
+- Heuristics are advisory: likely collisions, container overflow, low utilization, and edge crowding. Fix, explain as intentional, or record a release note.
+- Repeating the same element issue across viewports is one issue with occurrence details, not four independent failures.
 
-Errors block export. Warnings require one of: fix, confirm intentional design, or record a concise release note. Do not silently ignore warnings.
-
-After export, inspect the actual PPTX geometry:
+After export, validate the actual package and DrawingML geometry:
 
 ```bash
-python3 {baseDir}/scripts/pptx_layout_audit.py <project>/exports/<deck>.pptx
+python3 {baseDir}/scripts/pptx_delivery_check.py <absolute-pptx>
+python3 {baseDir}/scripts/pptx_layout_audit.py <absolute-pptx>
 ```
 
-This checks slide dimensions, shapes outside slide bounds, text-frame collisions, and spatial utilization in the generated package. Fix the SVG source and re-export when the native PPTX audit finds a problem.
+The delivery checker owns package integrity and release blockers. The layout audit catches shapes outside slides and degenerate geometry; text-frame overlap, utilization, and edge crowding are advisory because intentional overlays are common. Group children are measured in slide coordinates, including nested scale/offset transforms. A horizontal or vertical connector is valid when only one dimension is zero.
+
+When an export-side issue traces to SVG geometry, repair `svg_output/`, rerun the pre-export checks, and export again. Do not edit the package merely to hide the source defect.
 
 ## Visual review
 
-Use `workflows/visual-review.md` after the deterministic release gate when human-level judgement is still needed for contrast, hierarchy, narrative emphasis, or image meaning. Deterministic checks are mandatory; judgement review is an additional layer.
+Deterministic checks cannot judge narrative hierarchy, contrast, image meaning, template fit, or overall polish. Render the final deck and inspect a montage after package checks; use [`../workflows/stages/visual-review.md`](../workflows/stages/visual-review.md) when its route trigger applies.
 
 ## Failure reporting
 
-Report:
-
-1. the exact command and exit code;
-2. the affected page and element IDs when available;
-3. whether the issue is a blocking geometry/style error or a judgement warning;
-4. which artifacts were not produced.
+Report the exact command/exit code, affected page and element when available, whether the finding is blocking or advisory, artifacts not produced, and the recovery action taken.

@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,7 +29,6 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-DEFAULT_VIEWPORTS = ((1280, 720), (1024, 768), (1440, 900), (720, 1280))
 MAX_ISSUES_PER_CODE = 30
 
 
@@ -133,6 +133,49 @@ def _parse_viewports(raw: str) -> list[tuple[int, int]]:
     return viewports
 
 
+def _canvas_dimensions(svg_path: Path) -> tuple[float, float]:
+    try:
+        root = ET.parse(svg_path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise ValueError(f"could not read SVG canvas from {svg_path}: {exc}") from exc
+    view_box = (root.get("viewBox") or "").replace(",", " ").split()
+    if len(view_box) == 4:
+        try:
+            width, height = float(view_box[2]), float(view_box[3])
+        except ValueError as exc:
+            raise ValueError(f"invalid viewBox in {svg_path}") from exc
+    else:
+        def numeric(value: str | None) -> float:
+            return float((value or "").strip().removesuffix("px"))
+        try:
+            width, height = numeric(root.get("width")), numeric(root.get("height"))
+        except ValueError as exc:
+            raise ValueError(f"SVG has no numeric canvas dimensions: {svg_path}") from exc
+    if width <= 0 or height <= 0:
+        raise ValueError(f"SVG canvas must be positive: {svg_path}")
+    return width, height
+
+
+def _derived_viewports(svg_path: Path) -> list[tuple[int, int]]:
+    """Cover native, fractional same-aspect, wider, and taller viewport classes."""
+    width, height = _canvas_dimensions(svg_path)
+    native_scale = max(1.0, 320.0 / min(width, height))
+    native = (round(width * native_scale), round(height * native_scale))
+    fractional_scale = max(0.67 * native_scale, 320.0 / min(width, height))
+    fractional = (round(width * fractional_scale), round(height * fractional_scale))
+    candidates = [
+        native,
+        fractional,
+        (round(native[0] * 1.25), native[1]),
+        (native[0], round(native[1] * 1.25)),
+    ]
+    unique: list[tuple[int, int]] = []
+    for viewport in candidates:
+        if viewport not in unique:
+            unique.append(viewport)
+    return unique
+
+
 def _launch_browser(playwright: Any) -> Any:
     attempts: list[str] = []
     for kwargs in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
@@ -157,6 +200,16 @@ async ({pageName, minWidthUse, minHeightUse}) => {
       #stage>svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%}
     </style></head><body><main id="stage">${payload.content}</main></body>`;
   await document.fonts.ready;
+  const imageFailures=[];
+  await Promise.all([...document.querySelectorAll('#stage svg image')].map(el => new Promise(resolve => {
+    const href=(el.href && el.href.baseVal) || el.getAttribute('href') || el.getAttribute('xlink:href');
+    if (!href) { imageFailures.push('(missing href)'); resolve(); return; }
+    const probe=new Image();
+    const timer=setTimeout(() => { imageFailures.push(href + ' (timeout)'); resolve(); }, 5000);
+    probe.onload=() => { clearTimeout(timer); resolve(); };
+    probe.onerror=() => { clearTimeout(timer); imageFailures.push(href); resolve(); };
+    probe.src=new URL(href, location.href).href;
+  })));
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
   const svg = document.querySelector('#stage > svg');
@@ -220,6 +273,8 @@ async ({pageName, minWidthUse, minHeightUse}) => {
   const canvas = {x:viewBox.x,y:viewBox.y,width:viewBox.width,height:viewBox.height};
   const viewport = {x:0,y:0,width:innerWidth,height:innerHeight};
 
+  for (const href of imageFailures) push('error','broken_image_resource',null,`image resource did not load: ${href}`);
+
   if (svg.querySelector('style')) push('error','forbidden_style_element',null,'SVG contains <style>; use inline attributes');
   for (const el of [svg, ...svg.querySelectorAll('[class]')].filter(el => el.hasAttribute('class'))) {
     push('error','forbidden_class', {selector:selector(el)}, 'SVG class attributes are outside the inline-style contract');
@@ -247,9 +302,20 @@ async ({pageName, minWidthUse, minHeightUse}) => {
       if (hit.width > 1.5 && hit.height > 1.5 && area(hit) > 4) {
         const ratio=area(hit)/Math.max(1,Math.min(area(a.root),area(b.root)));
         if (ratio > 0.015) {
-          const severity=ratio > 0.08 ? 'error' : 'warning';
-          push(severity,'text_overlap',a,`"${textLabel(a.el)}" overlaps "${textLabel(b.el)}" (${b.selector}); intersection ratio ${ratio.toFixed(3)}`,{other:b.selector});
+          push('warning','text_overlap',a,`"${textLabel(a.el)}" overlaps "${textLabel(b.el)}" (${b.selector}); intersection ratio ${ratio.toFixed(3)}`,{other:b.selector});
         }
+      }
+    }
+  }
+
+  for (const group of [...svg.querySelectorAll('g[data-pptx-bounds]')]) {
+    const values=(group.getAttribute('data-pptx-bounds') || '').trim().split(/[ ,]+/).map(Number);
+    if (values.length !== 4 || values.some(value => !Number.isFinite(value))) continue;
+    const frame={x:values[0],y:values[1],width:values[2],height:values[3]};
+    for (const child of [...group.querySelectorAll('text,image,use')].filter(visible)) {
+      const box=rootBox(child);
+      if (box && !contains(frame,box,2.5)) {
+        push('warning','declared_bounds_overflow',{selector:selector(child)},`content exceeds ${selector(group)} data-pptx-bounds`,{container:selector(group)});
       }
     }
   }
@@ -326,9 +392,8 @@ async ({pageName, minWidthUse, minHeightUse}) => {
 
 
 def _deduplicate_issues(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[tuple[Any, ...]] = set()
+    indexed: dict[tuple[Any, ...], dict[str, Any]] = {}
     counts: dict[str, int] = {}
-    issues: list[dict[str, Any]] = []
     for result in results:
         viewport = result["viewport"]
         viewport_label = f"{viewport['width']}x{viewport['height']}"
@@ -339,15 +404,22 @@ def _deduplicate_issues(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 issue.get("element"),
                 issue.get("other"),
             )
-            if key in seen:
+            occurrence = {"viewport": viewport_label, "detail": issue.get("detail")}
+            if key in indexed:
+                indexed[key]["occurrences"].append(occurrence)
                 continue
-            seen.add(key)
             code = str(issue.get("code"))
             if counts.get(code, 0) >= MAX_ISSUES_PER_CODE:
                 continue
             counts[code] = counts.get(code, 0) + 1
-            issues.append({"page": result["page"], "viewport": viewport_label, **issue})
-    return issues
+            record = {
+                "page": result["page"],
+                "viewport": viewport_label,
+                **issue,
+                "occurrences": [occurrence],
+            }
+            indexed[key] = record
+    return list(indexed.values())
 
 
 def audit(
@@ -399,8 +471,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pages", nargs="+", help="Page filename prefixes or exact names")
     parser.add_argument(
         "--viewports",
-        default=",".join(f"{w}x{h}" for w, h in DEFAULT_VIEWPORTS),
-        help="Comma-separated WIDTHxHEIGHT list",
+        default="auto",
+        help="'auto' derives canvas equivalence classes; otherwise comma-separated WIDTHxHEIGHT",
     )
     parser.add_argument("--server-url", help="Reuse an existing preview server for this project")
     parser.add_argument("--report", help="JSON report path (default: <project>/.review/layout-audit.json)")
@@ -432,7 +504,11 @@ def main(argv: list[str] | None = None) -> int:
             if match not in pages:
                 pages.append(match)
     try:
-        viewports = _parse_viewports(args.viewports)
+        viewports = (
+            _derived_viewports(svg_dir / pages[0])
+            if args.viewports.strip().lower() == "auto"
+            else _parse_viewports(args.viewports)
+        )
     except (TypeError, ValueError) as exc:
         _stderr(str(exc))
         return 2

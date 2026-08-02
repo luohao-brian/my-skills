@@ -2,7 +2,7 @@
 
 Builds native PowerPoint notes-slide XML and the slide<->notesSlide<->notesMaster
 relationships from a plan's ``notes`` field, reusing the SVG pipeline's notes
-renderer so embedded notes also feed the narration workflow.
+renderer so embedded notes also feed the runtime-neutral audio manifest.
 """
 
 from __future__ import annotations

@@ -27,19 +27,16 @@ IMAGE_FORMATS = {
     ".jpeg": "JPEG",
     ".webp": "WEBP",
 }
-
-
-def tool_aspect_ratio(value: str) -> str:
-    """Map an exact layout ratio to the generic image tool's three directions."""
+def normalized_aspect_ratio(value: str) -> str:
+    """Validate a provider-neutral positive W:H ratio without narrowing providers."""
     try:
-        width, height = (float(part) for part in value.split(":", 1))
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"invalid aspect_ratio '{value}'; expected W:H") from exc
+        width_text, height_text = value.split(":", 1)
+        width, height = float(width_text), float(height_text)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ValueError(f"invalid aspect_ratio '{value}'; expected positive W:H") from exc
     if width <= 0 or height <= 0:
-        raise ValueError(f"invalid aspect_ratio '{value}'; values must be positive")
-    if abs(width - height) < 1e-9:
-        return "square"
-    return "landscape" if width > height else "portrait"
+        raise ValueError(f"invalid aspect_ratio '{value}'; expected positive W:H")
+    return value
 
 
 def load_manifest(path: Path) -> dict:
@@ -78,7 +75,7 @@ def load_manifest(path: Path) -> dict:
             raise ValueError(
                 f"{prefix}.status must be one of {sorted(VALID_STATUSES)}"
             )
-        tool_aspect_ratio(item["aspect_ratio"])
+        normalized_aspect_ratio(item["aspect_ratio"])
     return data
 
 
@@ -95,12 +92,16 @@ def save_manifest(path: Path, data: dict) -> None:
 
 
 def task_view(item: dict, manifest_path: Path) -> dict:
+    output_path = str((manifest_path.parent / item["filename"]).resolve())
     return {
         "filename": item["filename"],
-        "prompt": item["prompt"],
-        "aspect_ratio": tool_aspect_ratio(item["aspect_ratio"]),
-        "requested_aspect_ratio": item["aspect_ratio"],
-        "output_path": str((manifest_path.parent / item["filename"]).resolve()),
+        "output_path": output_path,
+        "capability_request": {
+            "prompt": item["prompt"],
+            "aspect_ratio": normalized_aspect_ratio(item["aspect_ratio"]),
+            "count": 1,
+            "preferred_output_path": output_path,
+        },
     }
 
 
@@ -109,7 +110,7 @@ def render_markdown(data: dict) -> str:
         "# Image Generation Tasks",
         "",
         "> Generated from `image_prompts.json` by `image_manifest.py render-md`.",
-        "> The image tool receives `Prompt` and `Tool aspect`; the exact layout ratio remains in the manifest.",
+        "> Map the provider-neutral capability request to the selected image tool/skill schema.",
         "",
     ]
     for index, item in enumerate(data["items"], start=1):
@@ -118,8 +119,7 @@ def render_markdown(data: dict) -> str:
                 f"## {index}. {item['filename']}",
                 "",
                 f"- Status: `{item['status']}`",
-                f"- Requested ratio: `{item['aspect_ratio']}`",
-                f"- Tool aspect: `{tool_aspect_ratio(item['aspect_ratio'])}`",
+                f"- Requested aspect ratio: `{normalized_aspect_ratio(item['aspect_ratio'])}`",
                 "",
                 "**Prompt**",
                 "",

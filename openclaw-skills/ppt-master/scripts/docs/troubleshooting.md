@@ -59,29 +59,26 @@ PowerPoint's manual Convert-to-Shape behavior is unsupported. `svg_final/` is su
 2. Export with the project-relative audio directory:
 
 ```bash
-python3 {baseDir}/scripts/audio_manifest.py prepare <project_path>
-# Call the runtime TTS tool for every Pending task, then:
-python3 {baseDir}/scripts/audio_manifest.py verify <project_path>/audio/audio_tasks.json
+python3 {baseDir}/scripts/audio_manifest.py prepare <absolute-project>
+python3 {baseDir}/scripts/audio_manifest.py pending <absolute-project>/audio/audio_tasks.json
 python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio
 ```
 
 `--recorded-narration` prepares PowerPoint recorded timings and narrations. If it fails, check:
 - every slide has a matching `m4a`, `mp3`, or `wav` file in `audio/`
-- each audio duration is readable by `ffprobe`, WAV metadata, or `afinfo`
+- `ffprobe` is installed and can read each audio duration
 - the deck is not using `--animation-trigger on-click`
 
 Use `--narration-audio-dir audio` only when you intentionally want lower-level, partial audio embedding instead of PowerPoint recorded timings.
 
 ## Dependency Checklist
 
-Most tools use the standard library. Install extra dependencies only when needed:
+Do not maintain a package list in this document. The component
+`requirements.txt` is the dependency source of truth; install it into a
+uv-managed virtual environment:
 
 ```bash
-pip install -r requirements.txt
+uv venv <external-venv>
+uv pip install --python <external-venv>/bin/python \
+  -r {baseDir}/requirements.txt
 ```
-
-Important optional packages:
-- `python-pptx` for PPTX export
-- `Pillow` for image utilities
-- `numpy` for watermark removal
-- `PyMuPDF` for PDF conversion
