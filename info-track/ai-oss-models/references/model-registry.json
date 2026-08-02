@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "verified_at": "2026-07-28",
+  "version": 6,
+  "verified_at": "2026-08-02",
   "families": [
     {"id": "qwen", "owner": "Qwen", "openness": "weights-only", "evidence": ["https://huggingface.co/Qwen/Qwen3.6-35B-A3B"]},
     {"id": "glm", "owner": "zai-org", "openness": "weights-only", "evidence": ["https://huggingface.co/zai-org/GLM-5.2"]},
@@ -18,7 +18,17 @@
     {"id": "minicpm", "owner": "openbmb", "openness": "weights-only", "evidence": ["https://huggingface.co/openbmb/MiniCPM5-1B"]},
     {"id": "olmo", "owner": "allenai", "openness": "reproducible", "evidence": ["https://huggingface.co/allenai/Olmo-3-1125-32B"]},
     {"id": "apertus", "owner": "swiss-ai", "openness": "reproducible", "evidence": ["https://huggingface.co/swiss-ai/Apertus-v1.1-4B"]},
-    {"id": "llm360", "owner": "LLM360", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/LLM360/K2-Think-V2"]}
+    {"id": "llm360", "owner": "LLM360", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/LLM360/K2-Think-V2"]},
+    {"id": "nanbeige", "owner": "Nanbeige", "openness": "weights-only", "evidence": ["https://huggingface.co/Nanbeige/Nanbeige4.2-3B", "https://arxiv.org/abs/2607.22083"]},
+    {"id": "agents-a1", "owner": "InternScience", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/InternScience/Agents-A1-4B", "https://github.com/InternScience/Agents-A1"]},
+    {"id": "laguna", "owner": "poolside", "openness": "weights-only", "evidence": ["https://huggingface.co/poolside/Laguna-S-2.1"]},
+    {"id": "ornith", "owner": "deepreinforce-ai", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/deepreinforce-ai/Ornith-1.0-35B"]},
+    {"id": "gpt-oss", "owner": "openai", "openness": "weights-only", "evidence": ["https://huggingface.co/openai/gpt-oss-120b"]},
+    {"id": "llama", "owner": "meta-llama", "openness": "weights-only", "evidence": ["https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct"]},
+    {"id": "microsoft-open", "owner": "microsoft", "openness": "weights-only", "evidence": ["https://huggingface.co/microsoft/Fara1.5-27B"]},
+    {"id": "baidu-open", "owner": "baidu", "openness": "weights-only", "evidence": ["https://huggingface.co/baidu/Unlimited-OCR"]},
+    {"id": "cohere-open", "owner": "CohereLabs", "openness": "weights-only", "evidence": ["https://huggingface.co/CohereLabs/command-a-03-2025"]},
+    {"id": "smollm", "owner": "HuggingFaceTB", "openness": "reproducible", "evidence": ["https://huggingface.co/HuggingFaceTB/SmolLM3-3B"]}
   ],
   "flagship_models": {
     "llm": [
@@ -69,11 +79,17 @@
       {"id": "swiss-ai/Apertus-v1.1-0.5B-Instruct", "family": "apertus"},
       {"id": "LLM360/K2-Think-V2", "family": "llm360"},
       {"id": "LLM360/K2-V2-Instruct", "family": "llm360"},
-      {"id": "LLM360/K2-V2", "family": "llm360"}
+      {"id": "LLM360/K2-V2", "family": "llm360"},
+      {"id": "Nanbeige/Nanbeige4.2-3B", "family": "nanbeige"},
+      {"id": "Nanbeige/Nanbeige4.2-3B-Base", "family": "nanbeige"},
+      {"id": "poolside/Laguna-S-2.1", "family": "laguna"},
+      {"id": "deepreinforce-ai/Ornith-1.0-35B", "family": "ornith"}
     ],
     "vlm": [
       {"id": "Qwen/Qwen3.6-35B-A3B", "family": "qwen"},
       {"id": "Qwen/Qwen3.6-27B", "family": "qwen"},
+      {"id": "InternScience/Agents-A1-4B", "family": "agents-a1"},
+      {"id": "InternScience/Agents-A1", "family": "agents-a1"},
       {"id": "Qwen/Qwen3.5-35B-A3B", "family": "qwen"},
       {"id": "Qwen/Qwen3.5-35B-A3B-Base", "family": "qwen"},
       {"id": "Qwen/Qwen3.5-27B", "family": "qwen"},
@@ -162,6 +178,17 @@
     "meta-llama/Llama-3.1-8B-Instruct",
     "google/gemma-3-12b-it",
     "Qwen/Qwen3-8B",
+    "Qwen/Qwen3.5-4B",
+    "Qwen/Qwen3.5-9B",
+    "Qwen/Qwen3.5-27B",
+    "Qwen/Qwen3.6-27B",
+    "Qwen/Qwen3.6-35B-A3B",
+    "google/gemma-4-12B-it",
+    "google/gemma-4-31B-it",
+    "Nanbeige/Nanbeige4.2-3B",
+    "InternScience/Agents-A1-4B",
+    "poolside/Laguna-S-2.1",
+    "deepreinforce-ai/Ornith-1.0-35B",
     "mistralai/Mistral-Small-24B-Instruct-2501",
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
   ],
@@ -176,6 +203,14 @@
     "deepseek-ai/DeepSeek-OCR-2": {"capabilities": ["ocr", "document"]},
     "tencent/HunyuanOCR": {"capabilities": ["ocr", "document"]},
     "tiiuae/Falcon-OCR": {"capabilities": ["ocr", "document"]},
-    "zai-org/GLM-OCR": {"capabilities": ["ocr", "document"]}
+    "zai-org/GLM-OCR": {"capabilities": ["ocr", "document"]},
+    "unsloth/Kimi-K3-GGUF": {"variant_group": "kimi-k3-packaging"},
+    "unsloth/Kimi-K3": {"variant_group": "kimi-k3-packaging"},
+    "unsloth/DeepSeek-V4-Flash-0731-GGUF": {"variant_group": "deepseek-v4-flash-0731-packaging"},
+    "unsloth/DeepSeek-V4-Flash-0731": {"variant_group": "deepseek-v4-flash-0731-packaging"},
+    "nota-ai/Solar-Open2-250B-Nota-NVFP4": {"variant_group": "solar-open2-250b-nota-4bit"},
+    "nota-ai/Solar-Open2-250B-Nota-INT4": {"variant_group": "solar-open2-250b-nota-4bit"},
+    "nota-ai/Solar-Open2-250B-Nota-INT4-GlobalPruned": {"variant_group": "solar-open2-250b-nota-4bit"},
+    "nota-ai/Solar-Open2-250B-Nota-NVFP4-GlobalPruned": {"variant_group": "solar-open2-250b-nota-4bit"}
   }
 }

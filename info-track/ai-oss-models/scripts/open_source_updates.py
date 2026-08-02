@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -57,24 +58,36 @@ DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetun
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
 DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
 LOCAL_QUERY_LIMIT = 200
+GLOBAL_TRENDING_LIMIT = 500
+GLOBAL_RECENT_LIMIT = 1_000
 LOCAL_REPORT_MAX = 20
 LOCAL_PUBLISHER_MAX = 3
+LOCAL_PUBLISHER_COVERAGE_MAX = 8
 LOCAL_HOT_TRENDING = 4
 LOCAL_HOT_DOWNLOADS = 2_000
 LOCAL_HOT_LIKES = 20
 LOCAL_BREAKOUT_TRENDING = 50
 LOCAL_BREAKOUT_DOWNLOADS = 100_000
 LOCAL_BREAKOUT_LIKES = 100
+DISCOVERY_HOT_TRENDING = 15
+DISCOVERY_HOT_DOWNLOADS = 2_000
+DISCOVERY_HOT_LIKES = 20
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
 DATASET_HOT_LIKES = 20
+DATASET_TRENDING_LIMIT = 200
+DATASET_RECENT_LIMIT = 500
+DATASET_OWNER_LIMIT = 100
 OWNER_QUERY_LIMIT = 100
 NOTABLE_DISCOVERY_MIN = 8
 NOTABLE_DISCOVERY_MAX = 12
 NOTABLE_DATASET_MAX = 5
+NOTABLE_TRUSTED_DATASET_MAX = 3
+NOTABLE_HOT_DATASET_MIN = 2
 NOTABLE_OWNER_MAX = 2
 CARD_EXCERPT_CHARS = 1_600
 CARD_FETCH_WORKERS = 12
+SNAPSHOT_VERSION = 1
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "text-generation": {"input": ["text"], "output": ["text"]},
@@ -153,6 +166,100 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def trending_snapshot_path() -> Path:
+    override = (os.getenv("AI_OSS_MODELS_STATE_DIR") or "").strip()
+    if override:
+        return Path(override).expanduser() / "trending-snapshot.json"
+    cache_root = (os.getenv("XDG_CACHE_HOME") or "").strip()
+    base = Path(cache_root).expanduser() if cache_root else Path.home() / ".cache"
+    return base / "ai-oss-models" / "trending-snapshot.json"
+
+
+def load_trending_snapshot(path: Path) -> dict[str, Any]:
+    try:
+        payload = load_json(path)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+    if payload.get("version") != SNAPSHOT_VERSION:
+        return {}
+    models = payload.get("models")
+    return payload if isinstance(models, dict) else {}
+
+
+def annotate_trending_deltas(
+    rows: list[dict[str, Any]],
+    previous: dict[str, Any],
+) -> None:
+    previous_models = previous.get("models") or {}
+    previous_observed_at = previous.get("observed_at") or ""
+    for rank, row in enumerate(rows, start=1):
+        model_id = str(row.get("id") or "")
+        old = previous_models.get(model_id) if isinstance(previous_models, dict) else None
+        old = old if isinstance(old, dict) else {}
+        old_rank = old.get("rank")
+        row["_trend"] = {
+            "rank": rank,
+            "rank_delta": int(old_rank) - rank if isinstance(old_rank, int) else None,
+            "score_delta": float(row.get("trendingScore") or 0)
+            - float(old.get("trendingScore") or 0)
+            if old
+            else None,
+            "downloads_delta": int(row.get("downloads") or 0) - int(old.get("downloads") or 0)
+            if old
+            else None,
+            "likes_delta": int(row.get("likes") or 0) - int(old.get("likes") or 0)
+            if old
+            else None,
+            "previous_observed_at": previous_observed_at or None,
+        }
+
+
+def write_trending_snapshot(path: Path, rows: list[dict[str, Any]], observed_at: str) -> None:
+    payload = {
+        "version": SNAPSHOT_VERSION,
+        "observed_at": observed_at,
+        "models": {
+            str(row.get("id")): {
+                "rank": rank,
+                "trendingScore": row.get("trendingScore") or 0,
+                "downloads": row.get("downloads") or 0,
+                "likes": row.get("likes") or 0,
+            }
+            for rank, row in enumerate(rows, start=1)
+            if row.get("id")
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def write_trending_snapshot_safely(
+    path: Path,
+    rows: list[dict[str, Any]],
+    observed_at: str,
+) -> bool:
+    try:
+        write_trending_snapshot(path, rows, observed_at)
+    except OSError as exc:
+        print(
+            f"HF_TREND_SNAPSHOT_SKIPPED reason={type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
+
 def validate_registries(
     models: dict[str, Any],
     projects: dict[str, Any],
@@ -185,9 +292,20 @@ def validate_registries(
     for project in projects.get("projects", []):
         if project.get("openness") not in OPENNESS_LEVELS:
             raise ValueError(f"invalid openness for project {project.get('id')}")
-        for artifact in project.get("artifacts", []):
+        artifacts = project.get("artifacts", [])
+        artifact_ids = [str(artifact.get("id") or "") for artifact in artifacts]
+        if len(artifact_ids) != len(set(artifact_ids)):
+            raise ValueError(f"duplicate artifact id in project {project.get('id')}")
+        known_artifact_ids = set(artifact_ids)
+        for artifact in artifacts:
             if artifact.get("role") not in ARTIFACT_ROLES:
                 raise ValueError(f"invalid artifact role in project {project.get('id')}")
+            missing_dependencies = set(artifact.get("depends_on", [])) - known_artifact_ids
+            if missing_dependencies:
+                missing = ", ".join(sorted(str(value) for value in missing_dependencies))
+                raise ValueError(
+                    f"unknown artifact dependency in project {project.get('id')}: {missing}"
+                )
     seen_datasets: set[str] = set()
     for entry in datasets.get("datasets", []):
         dataset_id = str(entry["id"])
@@ -226,6 +344,10 @@ def fetch_text(
             token = huggingface_token()
             if token and is_huggingface_host(url):
                 headers["Authorization"] = f"Bearer {token}"
+            github_token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
+            if github_token and (urllib.parse.urlparse(url).hostname or "").lower() == "api.github.com":
+                headers["Authorization"] = f"Bearer {github_token}"
+                headers["X-GitHub-Api-Version"] = "2022-11-28"
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read().decode("utf-8", errors="replace")
@@ -403,8 +525,6 @@ def architecture_facet(row: dict[str, Any]) -> str:
         return "moe"
     if "diffusers" in tags:
         return "diffusion"
-    if config:
-        return "dense"
     return "unknown"
 
 
@@ -462,6 +582,16 @@ def local_index(registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def publisher_tier(model_id: str, registry: dict[str, Any]) -> str:
+    owner = model_id.split("/", 1)[0]
+    registered_owners = {str(entry["owner"]) for entry in registry.get("families", [])}
+    if owner in registered_owners:
+        return "registered-owner"
+    if owner in {str(value) for value in registry.get("local_publishers", [])}:
+        return "local-ecosystem-publisher"
+    return "unregistered"
+
+
 def model_metadata(
     row: dict[str, Any],
     record: dict[str, Any],
@@ -500,6 +630,9 @@ def model_metadata(
         "trendingScore": row.get("trendingScore") or 0,
         "createdAt": row.get("createdAt") or "",
         "lastModified": row.get("lastModified") or "",
+        "publisher_tier": record.get("publisher_tier") or publisher_tier(model_id, registry),
+        "variant_group": override.get("variant_group") or record.get("variant_group"),
+        "trend": row.get("_trend") or {},
         "selection": record.get("selection", []),
         "pending_registry": bool(record.get("pending_registry")),
     }
@@ -520,7 +653,11 @@ ROLE_LABELS = {
 
 
 def event_label(event: str) -> str:
-    return "新发布" if event == "published" else "仓库更新"
+    return {
+        "published": "新发布",
+        "repository-updated": "仓库更新",
+        "trending-observed": "当前热门",
+    }.get(event, event)
 
 
 def model_item(
@@ -536,13 +673,23 @@ def model_item(
     track = str(record.get("track") or "")
     if track == "local":
         canonical = str(record.get("canonical") or "")
+        signal_text = (
+            f"截至 {date} 仍处于 HF 热门"
+            if event_name == "trending-observed"
+            else f"本窗口内发生{event_label(event_name)}"
+        )
         if canonical:
-            summary = f"{model_id.split('/')[-1]} 是 {canonical} 的热门或重点本地部署版本，本窗口内发生{event_label(event_name)}。"
+            summary = f"{model_id.split('/')[-1]} 是 {canonical} 的热门或重点本地部署版本，{signal_text}。"
         else:
-            summary = f"{model_id.split('/')[-1]} 是当前热门衍生或本地部署模型，本窗口内发生{event_label(event_name)}。"
+            summary = f"{model_id.split('/')[-1]} 是热门衍生或本地部署模型，{signal_text}。"
     elif track == "discovery":
+        source_label = (
+            "已登记官方发布者"
+            if record.get("publisher_tier") == "registered-owner"
+            else "全局热门候选发布者"
+        )
         summary = (
-            f"{model_id.split('/')[-1]} 来自已登记官方发布者，"
+            f"{model_id.split('/')[-1]} 来自{source_label}，"
             f"本窗口内发生{event_label(event_name)}，待纳入注册表确认。"
         )
     else:
@@ -589,6 +736,35 @@ def query_local_candidates() -> list[dict[str, Any]]:
     return list(rows.values())
 
 
+def query_global_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
+    errors: dict[str, str] = {}
+
+    def query(sort: str, limit: int) -> tuple[str, list[dict[str, Any]], str | None]:
+        params = [
+            ("sort", sort),
+            ("direction", "-1"),
+            ("limit", str(limit)),
+        ]
+        try:
+            result = hf_api(expanded_model_query(params), retries=0)
+        except Exception as exc:
+            return sort, [], type(exc).__name__
+        return sort, result if isinstance(result, list) else [], None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(query, "trendingScore", GLOBAL_TRENDING_LIMIT),
+            executor.submit(query, "lastModified", GLOBAL_RECENT_LIMIT),
+        ]
+        results = [future.result() for future in futures]
+
+    by_sort = {sort: rows for sort, rows, _ in results}
+    for sort, _, error in results:
+        if error:
+            errors[f"global:{sort}"] = error
+    return by_sort.get("trendingScore", []), by_sort.get("lastModified", []), errors
+
+
 def popularity_values(row: dict[str, Any]) -> tuple[float, int, int]:
     return (
         float(row.get("trendingScore") or 0),
@@ -611,6 +787,42 @@ def is_breakout_local(row: dict[str, Any]) -> bool:
         and downloads >= LOCAL_BREAKOUT_DOWNLOADS
         and likes >= LOCAL_BREAKOUT_LIKES
     )
+
+
+def is_hot_discovery(row: dict[str, Any]) -> bool:
+    trending, downloads, likes = popularity_values(row)
+    return trending >= DISCOVERY_HOT_TRENDING and (
+        downloads >= DISCOVERY_HOT_DOWNLOADS or likes >= DISCOVERY_HOT_LIKES
+    )
+
+
+def local_signal(
+    row: dict[str, Any],
+    start: dt.date,
+    end: dt.date,
+    include_persistent_hot: bool = True,
+) -> tuple[str, str] | None:
+    event = event_in_window(row, start, end)
+    if event:
+        return event
+    if include_persistent_hot and is_hot_local(row):
+        return "trending-observed", end.isoformat()
+    return None
+
+
+def registered_local_selection(
+    row: dict[str, Any],
+    event: tuple[str, str] | None,
+    priority: bool,
+    include_current_hot: bool,
+) -> list[str] | None:
+    if event is None:
+        return None
+    if include_current_hot:
+        if not is_hot_local(row):
+            return None
+        return (["priority"] if priority else []) + ["hot"]
+    return ["priority"] if priority else None
 
 
 def model_role(row: dict[str, Any], default: str = "unknown") -> str:
@@ -673,16 +885,19 @@ def local_discovery_items(
     start: dt.date,
     end: dt.date,
     known_ids: set[str],
+    include_persistent_hot: bool = True,
 ) -> list[dict[str, Any]]:
+    if not include_persistent_hot:
+        return []
     flagship = flagship_index(registry)
     root_ids = set(flagship) | {str(value) for value in registry.get("local_roots", [])}
-    trusted_publishers = {str(value) for value in registry.get("local_publishers", [])}
+    local_publishers = {str(value) for value in registry.get("local_publishers", [])}
     items: list[dict[str, Any]] = []
     for row in rows:
         model_id = str(row.get("id") or "")
         if not model_id or model_id in known_ids:
             continue
-        event = event_in_window(row, start, end)
+        event = local_signal(row, start, end, include_persistent_hot)
         deployment = set(deployment_facets(row))
         derivation = set(derivation_facets(row))
         if (
@@ -694,7 +909,7 @@ def local_discovery_items(
         matched = find_local_root(row, root_ids, model_rows)
         canonical, inherited = matched if matched else (None, None)
         publisher = model_id.split("/", 1)[0]
-        trusted_publisher = publisher in trusted_publishers
+        trusted_publisher = publisher in local_publishers
         breakout = is_breakout_local(row)
         derivative = bool(derivation & DERIVATIVE_RELATIONS)
         if canonical is None and not trusted_publisher and not breakout and not derivative:
@@ -705,6 +920,8 @@ def local_discovery_items(
             selection.append("flagship-lineage")
         if trusted_publisher:
             selection.append("trusted-publisher")
+        if publisher in local_publishers:
+            selection.append("local-ecosystem-publisher")
         if breakout:
             selection.append("breakout")
         if derivative:
@@ -716,6 +933,7 @@ def local_discovery_items(
             "family": base_record.get("family"),
             "canonical": canonical,
             "selection": selection,
+            "publisher_tier": publisher_tier(model_id, registry),
         }
         items.append(model_item(row, record, registry, event, inherited))
     return items
@@ -768,6 +986,7 @@ def model_discovery_items(
     registry: dict[str, Any],
     start: dt.date,
     end: dt.date,
+    allow_unregistered_hot: bool = True,
 ) -> list[dict[str, Any]]:
     owner_family_candidates: dict[str, list[str]] = {}
     for entry in registry.get("families", []):
@@ -777,6 +996,7 @@ def model_discovery_items(
         for owner, family_ids in owner_family_candidates.items()
         if len(family_ids) == 1
     }
+    registered_owners = set(owner_family_candidates)
     items: list[dict[str, Any]] = []
     for row in rows:
         model_id = str(row.get("id") or "")
@@ -784,13 +1004,29 @@ def model_discovery_items(
         if not model_id or model_id in known_ids or not event:
             continue
         owner = model_id.split("/", 1)[0]
+        registered_owner = owner in registered_owners
+        if not registered_owner and (
+            not allow_unregistered_hot or not is_hot_discovery(row)
+        ):
+            continue
+        if not registered_owner and (
+            set(deployment_facets(row)) & LOCAL_DEPLOYMENTS
+            or set(derivation_facets(row)) & DERIVATIVE_RELATIONS
+        ):
+            continue
+        selection = ["pending-registry"]
+        if registered_owner:
+            selection.append("trusted-publisher")
+        else:
+            selection.extend(["hot", "global-discovery"])
         record = {
             "id": model_id,
             "track": "discovery",
             "role": model_role(row),
             "family": owner_families.get(owner),
-            "selection": ["trusted-publisher", "pending-registry"],
+            "selection": selection,
             "pending_registry": True,
+            "publisher_tier": publisher_tier(model_id, registry),
         }
         items.append(
             model_item(row, record, registry, event)
@@ -813,12 +1049,74 @@ def is_hot_dataset(row: dict[str, Any]) -> bool:
     )
 
 
-def query_trending_datasets() -> list[dict[str, Any]]:
-    query = urllib.parse.urlencode(
-        {"sort": "trendingScore", "direction": "-1", "limit": "100", "full": "true"}
+def query_dataset_candidates(
+    owners: list[str],
+    include_global: bool = True,
+) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, str]]:
+    specs: list[tuple[str, dict[str, str]]] = []
+    if include_global:
+        specs.extend(
+            [
+                (
+                    "global:trending",
+                    {
+                        "sort": "trendingScore",
+                        "direction": "-1",
+                        "limit": str(DATASET_TRENDING_LIMIT),
+                    },
+                ),
+                (
+                    "global:recent",
+                    {
+                        "sort": "lastModified",
+                        "direction": "-1",
+                        "limit": str(DATASET_RECENT_LIMIT),
+                    },
+                ),
+            ]
+        )
+    specs.extend(
+        (
+            f"owner:{owner}",
+            {
+                "author": owner,
+                "sort": "lastModified",
+                "direction": "-1",
+                "limit": str(DATASET_OWNER_LIMIT),
+            },
+        )
+        for owner in owners
     )
-    result = hf_api("/api/datasets?" + query, retries=0)
-    return result if isinstance(result, list) else []
+
+    def query(spec: tuple[str, dict[str, str]]) -> tuple[str, list[dict[str, Any]], str | None]:
+        key, params = spec
+        query_string = urllib.parse.urlencode({**params, "full": "true"})
+        try:
+            result = hf_api("/api/datasets?" + query_string, retries=0)
+        except Exception as exc:
+            return key, [], type(exc).__name__
+        return key, result if isinstance(result, list) else [], None
+
+    rows: dict[str, dict[str, Any]] = {}
+    counts = {"trending": 0, "recent": 0, "official_owner": 0}
+    errors: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=min(12, len(specs) or 1)) as executor:
+        for key, result, error in executor.map(query, specs):
+            if error:
+                errors[f"dataset:{key}"] = error
+                continue
+            if key == "global:trending":
+                counts["trending"] = len(result)
+            elif key == "global:recent":
+                counts["recent"] = len(result)
+            else:
+                counts["official_owner"] += len(result)
+            for row in result:
+                dataset_id = str(row.get("id") or "")
+                if dataset_id:
+                    rows.setdefault(dataset_id, row)
+    counts["union"] = len(rows)
+    return list(rows.values()), counts, errors
 
 
 def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, str]) -> dict[str, Any]:
@@ -828,8 +1126,13 @@ def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, 
     use_text = "、".join(uses) if uses else "开放数据"
     pending_registry = bool(record.get("pending_registry"))
     if pending_registry:
+        discovery_kind = (
+            "HF 热门新数据集"
+            if "hot" in record.get("selection", [])
+            else "已登记官方发布者的新数据集"
+        )
         summary = (
-            f"{dataset_id.split('/')[-1]} 是本窗口命中的 HF 热门新数据集，"
+            f"{dataset_id.split('/')[-1]} 是本窗口命中的{discovery_kind}，"
             "用途和交付内容需结合 dataset card 确认，待纳入注册表。"
         )
     else:
@@ -865,22 +1168,39 @@ def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, 
 def new_dataset_items(
     rows: list[dict[str, Any]],
     known_ids: set[str],
+    trusted_owners: set[str],
     start: dt.date,
     end: dt.date,
+    allow_hot_discovery: bool = True,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for row in rows:
         dataset_id = str(row.get("id") or "")
         event = event_in_window(row, start, end)
-        if not dataset_id or dataset_id in known_ids or not event or not is_hot_dataset(row):
+        owner = dataset_id.split("/", 1)[0]
+        hot = allow_hot_discovery and is_hot_dataset(row)
+        trusted_owner = owner in trusted_owners
+        if not dataset_id or dataset_id in known_ids or not event or not (hot or trusted_owner):
             continue
+        selection = ["pending-registry"]
+        if hot:
+            selection.append("hot")
+        if trusted_owner:
+            selection.append("trusted-publisher")
         record = {
             "id": dataset_id,
-            "selection": ["hot", "pending-registry"],
+            "selection": selection,
             "pending_registry": True,
         }
         items.append(dataset_item(row, record, event))
     return sorted(items, key=notable_dataset_sort_key, reverse=True)
+
+
+def strip_live_popularity(items: Iterable[dict[str, Any]]) -> None:
+    for item in items:
+        metadata = item.get("metadata") or {}
+        for key in ("trendingScore", "downloads", "likes", "trend"):
+            metadata.pop(key, None)
 
 
 def notable_model_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
@@ -900,6 +1220,7 @@ def notable_model_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
 def notable_dataset_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
     metadata = item.get("metadata") or {}
     return (
+        "trusted-publisher" in (metadata.get("selection") or []),
         int(metadata.get("trendingScore") or 0),
         item.get("event") == "published",
         item.get("date", ""),
@@ -952,11 +1273,55 @@ def select_diverse_models(items: list[dict[str, Any]], limit: int) -> list[dict[
     return selected
 
 
+def select_diverse_datasets(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    ranked = sorted(items, key=notable_dataset_sort_key, reverse=True)
+    selected: list[dict[str, Any]] = []
+    selected_titles: set[str] = set()
+    owner_counts: dict[str, int] = {}
+
+    def add(item: dict[str, Any], owner_cap: int | None) -> bool:
+        title = str(item.get("title") or "")
+        owner = title.split("/", 1)[0]
+        if not title or title in selected_titles:
+            return False
+        if owner_cap is not None and owner_counts.get(owner, 0) >= owner_cap:
+            return False
+        selected.append(item)
+        selected_titles.add(title)
+        owner_counts[owner] = owner_counts.get(owner, 0) + 1
+        return True
+
+    for item in ranked:
+        selection = (item.get("metadata") or {}).get("selection") or []
+        if "trusted-publisher" in selection:
+            add(item, 1)
+        if len(selected) >= min(limit, NOTABLE_TRUSTED_DATASET_MAX):
+            break
+
+    for item in ranked:
+        selection = (item.get("metadata") or {}).get("selection") or []
+        hot_count = sum(
+            "hot" in ((entry.get("metadata") or {}).get("selection") or [])
+            for entry in selected
+        )
+        if hot_count >= NOTABLE_HOT_DATASET_MIN:
+            break
+        if "hot" in selection:
+            add(item, 2)
+
+    for owner_cap in (1, 2, None):
+        for item in ranked:
+            add(item, owner_cap)
+            if len(selected) >= limit:
+                return selected
+    return selected
+
+
 def select_notable_discoveries(
     models: list[dict[str, Any]],
     datasets: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
-    selected_datasets = sorted(datasets, key=notable_dataset_sort_key, reverse=True)[:NOTABLE_DATASET_MAX]
+    selected_datasets = select_diverse_datasets(datasets, NOTABLE_DATASET_MAX)
     model_limit = max(0, NOTABLE_DISCOVERY_MAX - len(selected_datasets))
     selected_models = select_diverse_models(models, model_limit)
     total = len(selected_models) + len(selected_datasets)
@@ -1047,6 +1412,82 @@ def enrich_items_with_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         return list(executor.map(enrich, copied))
 
 
+def huggingface_repo_from_url(value: str) -> tuple[str, str] | None:
+    parsed = urllib.parse.urlparse(value)
+    if (parsed.hostname or "").lower() not in {"huggingface.co", "www.huggingface.co"}:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) >= 3 and parts[0] == "datasets":
+        return "dataset", "/".join(parts[1:3])
+    if len(parts) >= 2 and parts[0] not in {"collections", "spaces"}:
+        return "model", "/".join(parts[:2])
+    return None
+
+
+def github_repo_api_url(value: str) -> str | None:
+    parsed = urllib.parse.urlparse(value)
+    if (parsed.hostname or "").lower() not in {"github.com", "www.github.com"}:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 2:
+        return None
+    repo = parts[1].removesuffix(".git")
+    return f"https://api.github.com/repos/{parts[0]}/{repo}"
+
+
+def query_project_urls(
+    registry: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    by_api: dict[str, list[str]] = {}
+    for project in registry.get("projects", []):
+        for artifact in project.get("artifacts", []):
+            if artifact.get("repo_type") != "url":
+                continue
+            artifact_url = str(artifact.get("id") or "")
+            api_url = github_repo_api_url(artifact_url)
+            if api_url:
+                by_api.setdefault(api_url, []).append(artifact_url)
+
+    def fetch(api_url: str) -> tuple[str, dict[str, Any] | None, str | None]:
+        try:
+            payload = json.loads(fetch_text(api_url, retries=0))
+        except Exception as exc:
+            parts = [part for part in urllib.parse.urlparse(api_url).path.split("/") if part]
+            web_url = f"https://github.com/{parts[1]}/{parts[2]}" if len(parts) >= 3 else ""
+            try:
+                feed_text = fetch_text(
+                    web_url + "/commits.atom",
+                    retries=0,
+                    accept="application/atom+xml,application/xml",
+                )
+                feed = ET.fromstring(feed_text)
+                updated = feed.findtext("{http://www.w3.org/2005/Atom}entry/{http://www.w3.org/2005/Atom}updated")
+                if not updated:
+                    raise ValueError("missing Atom updated timestamp")
+                payload = {"created_at": "", "pushed_at": updated, "html_url": web_url}
+            except Exception:
+                return api_url, None, type(exc).__name__
+        return api_url, payload if isinstance(payload, dict) else None, None
+
+    rows: dict[str, dict[str, Any]] = {}
+    errors: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=min(8, len(by_api) or 1)) as executor:
+        for api_url, payload, error in executor.map(fetch, by_api):
+            artifact_urls = by_api[api_url]
+            if error or payload is None:
+                for artifact_url in artifact_urls:
+                    errors[artifact_url] = error or "UnexpectedResponse"
+                continue
+            for artifact_url in artifact_urls:
+                rows[artifact_url] = {
+                    "id": artifact_url,
+                    "createdAt": payload.get("created_at") or "",
+                    "lastModified": payload.get("pushed_at") or payload.get("updated_at") or "",
+                    "url": payload.get("html_url") or artifact_url,
+                }
+    return rows, errors
+
+
 def artifact_specs(projects: dict[str, Any]) -> tuple[list[str], list[str]]:
     models: list[str] = []
     datasets: list[str] = []
@@ -1057,6 +1498,12 @@ def artifact_specs(projects: dict[str, Any]) -> tuple[list[str], list[str]]:
                 models.append(str(artifact["id"]))
             elif repo_type == "dataset":
                 datasets.append(str(artifact["id"]))
+            elif repo_type == "url":
+                resolved = huggingface_repo_from_url(str(artifact.get("id") or ""))
+                if resolved and resolved[0] == "model":
+                    models.append(resolved[1])
+                elif resolved and resolved[0] == "dataset":
+                    datasets.append(resolved[1])
     return models, datasets
 
 
@@ -1075,6 +1522,7 @@ def project_items(
     registry: dict[str, Any],
     model_rows: dict[str, dict[str, Any]],
     dataset_rows: dict[str, dict[str, Any]],
+    url_rows: dict[str, dict[str, Any]],
     start: dt.date,
     end: dt.date,
 ) -> list[dict[str, Any]]:
@@ -1082,24 +1530,39 @@ def project_items(
     for project in registry.get("projects", []):
         changed: list[dict[str, Any]] = []
         for artifact in project.get("artifacts", []):
-            repo_type = artifact.get("repo_type")
-            row = model_rows.get(str(artifact.get("id"))) if repo_type == "model" else dataset_rows.get(str(artifact.get("id"))) if repo_type == "dataset" else None
+            artifact_id = str(artifact.get("id") or "")
+            repo_type = str(artifact.get("repo_type") or "")
+            resolved = huggingface_repo_from_url(artifact_id) if repo_type == "url" else None
+            effective_type, repo_id = resolved if resolved else (repo_type, artifact_id)
+            row = (
+                model_rows.get(repo_id)
+                if effective_type == "model"
+                else dataset_rows.get(repo_id)
+                if effective_type == "dataset"
+                else url_rows.get(artifact_id)
+                if repo_type == "url"
+                else None
+            )
             if row is None:
                 continue
             event = event_in_window(row, start, end)
             if not event:
                 continue
-            repo_id = str(artifact["id"])
-            prefix = "datasets/" if repo_type == "dataset" else ""
+            prefix = "datasets/" if effective_type == "dataset" else ""
+            artifact_url = (
+                str(row.get("url") or artifact_id)
+                if repo_type == "url" and not resolved
+                else f"https://huggingface.co/{prefix}{repo_id}"
+            )
             changed.append(
                 {
                     "id": repo_id,
-                    "repo_type": repo_type,
+                    "repo_type": effective_type,
                     "role": artifact.get("role"),
                     "depends_on": artifact.get("depends_on", []),
                     "event": event[0],
                     "date": event[1],
-                    "url": f"https://huggingface.co/{prefix}{repo_id}",
+                    "url": artifact_url,
                 }
             )
         if not changed:
@@ -1113,7 +1576,7 @@ def project_items(
                 "summary": f"{project['name']} 在本窗口内更新了 " + "、".join(roles) + " 交付件。",
                 "date": changed[0]["date"],
                 "event": "artifact-updated",
-                "source": "Hugging Face",
+                "source": "Hugging Face / GitHub",
                 "category": "reproducible",
                 "metadata": {
                     "project": project["id"],
@@ -1154,8 +1617,55 @@ def sort_popular_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
+def sort_local_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        items,
+        key=lambda item: (
+            int((item.get("metadata") or {}).get("trendingScore") or 0),
+            "priority" in ((item.get("metadata") or {}).get("selection") or []),
+            int((item.get("metadata") or {}).get("likes") or 0),
+            int((item.get("metadata") or {}).get("downloads") or 0),
+            item.get("date", ""),
+            item.get("title", ""),
+        ),
+        reverse=True,
+    )
+
+
+def local_variant_key(item: dict[str, Any]) -> str:
+    metadata = item.get("metadata") or {}
+    variant_group = str(metadata.get("variant_group") or "").strip()
+    if variant_group:
+        publisher = str(item.get("title") or "").split("/", 1)[0]
+        return f"explicit:{publisher}:{variant_group}"
+    return str(item.get("title") or "")
+
+
+def collapse_local_variants(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for item in sort_local_items(items):
+        groups.setdefault(local_variant_key(item), []).append(item)
+    collapsed: list[dict[str, Any]] = []
+    for variants in groups.values():
+        representative = variants[0]
+        if len(variants) > 1:
+            representative["metadata"]["variants"] = [
+                {
+                    "id": variant.get("title"),
+                    "url": variant.get("url"),
+                    "deployment": (variant.get("metadata") or {}).get("deployment") or [],
+                    "downloads": (variant.get("metadata") or {}).get("downloads") or 0,
+                    "likes": (variant.get("metadata") or {}).get("likes") or 0,
+                    "trendingScore": (variant.get("metadata") or {}).get("trendingScore") or 0,
+                }
+                for variant in variants
+            ]
+        collapsed.append(representative)
+    return sort_local_items(collapsed)
+
+
 def select_popular_derivatives(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    ranked = sort_popular_items(items)
+    ranked = sort_local_items(items)
     selected: list[dict[str, Any]] = []
     selected_titles: set[str] = set()
     publisher_counts: dict[str, int] = {}
@@ -1176,23 +1686,33 @@ def select_popular_derivatives(items: list[dict[str, Any]]) -> list[dict[str, An
         publisher_counts[publisher] = publisher_counts.get(publisher, 0) + 1
         return True
 
+    covered_publishers: set[str] = set()
+    for item in ranked:
+        publisher = str(item.get("title") or "").split("/", 1)[0]
+        if not publisher or publisher in covered_publishers:
+            continue
+        if add(item):
+            covered_publishers.add(publisher)
+        if len(covered_publishers) >= LOCAL_PUBLISHER_COVERAGE_MAX:
+            break
+
     for facet in ["merge", "finetune", "adapter", "gguf", "mlx", "on-device", "quantized"]:
         for item in ranked:
             if facet in facets(item) and add(item):
                 break
         if len(selected) >= LOCAL_REPORT_MAX:
-            return sort_popular_items(selected)
+            return sort_local_items(selected)
 
     for item in ranked:
         add(item)
         if len(selected) >= LOCAL_REPORT_MAX:
-            return sort_popular_items(selected)
+            return sort_local_items(selected)
 
     for item in ranked:
         add(item, enforce_publisher_cap=False)
         if len(selected) >= LOCAL_REPORT_MAX:
             break
-    return sort_popular_items(selected)
+    return sort_local_items(selected)
 
 
 def source_status(rows: dict[str, Any], errors: dict[str, str], selected: int) -> dict[str, Any]:
@@ -1228,6 +1748,7 @@ def main() -> int:
         start, end = parse_window(args.date)
     except ValueError as exc:
         parser.error(str(exc))
+    include_current_hot = args.date is None
 
     model_registry = load_json(MODEL_REGISTRY_PATH)
     project_registry = load_json(PROJECT_REGISTRY_PATH)
@@ -1237,21 +1758,49 @@ def main() -> int:
     local = local_index(model_registry)
     project_model_ids, project_dataset_ids = artifact_specs(project_registry)
     dataset_records = {str(entry["id"]): entry for entry in dataset_registry.get("datasets", [])}
-    owners = list(
+    official_owners = list(
         dict.fromkeys(str(entry["owner"]) for entry in model_registry.get("families", []))
     )
+    owners = list(official_owners)
+    if include_current_hot:
+        owners = list(
+            dict.fromkeys(
+                owners
+                + [str(value) for value in model_registry.get("local_publishers", [])]
+            )
+        )
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    snapshot_path = trending_snapshot_path()
+    previous_snapshot = load_trending_snapshot(snapshot_path) if args.date is None else {}
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
-        local_future = executor.submit(query_local_candidates)
-        dataset_future = executor.submit(query_trending_datasets)
+        local_future = executor.submit(query_local_candidates) if include_current_hot else None
+        global_future = executor.submit(query_global_models) if include_current_hot else None
+        dataset_future = executor.submit(
+            query_dataset_candidates,
+            official_owners,
+            include_current_hot,
+        )
+        project_url_future = executor.submit(query_project_urls, project_registry)
         owner_rows_list, owner_coverage, owner_errors = owner_future.result()
-        local_candidates = local_future.result()
-        trending_datasets = dataset_future.result()
+        local_candidates = local_future.result() if local_future else []
+        global_trending, global_recent, global_errors = (
+            global_future.result() if global_future else ([], [], {})
+        )
+        dataset_candidates, dataset_query_counts, dataset_query_errors = dataset_future.result()
+        project_url_rows, project_url_errors = project_url_future.result()
 
+    annotate_trending_deltas(global_trending, previous_snapshot)
+    open_candidate_rows = {
+        str(row.get("id") or ""): row
+        for row in owner_rows_list + local_candidates + global_recent + global_trending
+        if row.get("id")
+    }
+    open_candidates = list(open_candidate_rows.values())
     cached_model_rows = {
         str(row.get("id") or ""): row
-        for row in owner_rows_list + local_candidates
+        for row in open_candidates
         if row.get("id")
     }
     relevant_model_ids = list(flagship) + list(local) + project_model_ids
@@ -1264,26 +1813,27 @@ def main() -> int:
             continue
         requested_model_ids.append(model_id)
 
-    trending_dataset_rows = {
+    dataset_candidate_rows = {
         str(row.get("id") or ""): row
-        for row in trending_datasets
+        for row in dataset_candidates
         if row.get("id")
     }
     requested_dataset_ids = [
         dataset_id
         for dataset_id in dict.fromkeys(list(dataset_records) + project_dataset_ids)
-        if dataset_id not in trending_dataset_rows
+        if dataset_id not in dataset_candidate_rows
     ]
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         model_future = executor.submit(fetch_many, requested_model_ids, fetch_model)
         dataset_exact_future = executor.submit(fetch_many, requested_dataset_ids, fetch_dataset)
         exact_model_rows, exact_model_errors = model_future.result()
-        exact_dataset_rows, dataset_errors = dataset_exact_future.result()
+        exact_dataset_rows, exact_dataset_errors = dataset_exact_future.result()
 
     model_rows = {**cached_model_rows, **exact_model_rows}
-    dataset_rows = {**trending_dataset_rows, **exact_dataset_rows}
-    model_errors = {**owner_errors, **exact_model_errors}
+    dataset_rows = {**dataset_candidate_rows, **exact_dataset_rows}
+    model_errors = {**owner_errors, **global_errors, **exact_model_errors}
+    dataset_errors = {**dataset_query_errors, **exact_dataset_errors}
 
     flagship_groups: dict[str, list[dict[str, Any]]] = {role: [] for role in FLAGSHIP_ROLES}
     for model_id, record in flagship.items():
@@ -1295,44 +1845,87 @@ def main() -> int:
     local_items: list[dict[str, Any]] = []
     for model_id, record in local.items():
         row = model_rows.get(model_id)
-        event = event_in_window(row or {}, start, end)
+        event = local_signal(row or {}, start, end, include_current_hot)
         priority = bool(record.get("priority", True))
-        if row is None or not event or not is_hot_local(row):
+        selection = registered_local_selection(
+            row or {},
+            event,
+            priority,
+            include_current_hot,
+        )
+        if row is None or selection is None:
             continue
+        assert event is not None
         inherited = model_rows.get(str(record.get("canonical") or ""))
-        selection = (["priority"] if priority else []) + (["hot"] if is_hot_local(row) else [])
-        local_items.append(model_item(row, {**record, "selection": selection}, model_registry, event, inherited))
+        local_items.append(
+            model_item(
+                row,
+                {**record, "selection": selection},
+                model_registry,
+                event,
+                inherited,
+            )
+        )
 
     known_ids = set(flagship) | set(local)
     local_items.extend(
-        local_discovery_items(local_candidates, model_registry, model_rows, start, end, known_ids)
+        local_discovery_items(
+            open_candidates,
+            model_registry,
+            model_rows,
+            start,
+            end,
+            known_ids,
+            include_current_hot,
+        )
     )
     local_items = list({item["title"]: item for item in local_items}.values())
 
     dataset_items: list[dict[str, Any]] = []
     for dataset_id, record in dataset_records.items():
-        row = trending_dataset_rows.get(dataset_id) or dataset_rows.get(dataset_id)
+        row = dataset_rows.get(dataset_id)
         event = event_in_window(row or {}, start, end)
         priority = bool(record.get("priority"))
-        if row is not None and event and is_hot_dataset(row):
-            selection = (["priority"] if priority else []) + (["hot"] if is_hot_dataset(row) else [])
+        technical = bool(record.get("roles") or record.get("related_projects"))
+        hot = include_current_hot and is_hot_dataset(row or {})
+        if row is not None and event and (hot or priority or technical):
+            selection = (["priority"] if priority else []) + (["hot"] if hot else [])
+            if technical:
+                selection.append("technical-artifact")
             dataset_items.append(dataset_item(row, {**record, "selection": selection}, event))
 
-    reproducible_items = project_items(project_registry, model_rows, dataset_rows, start, end)
+    reproducible_items = project_items(
+        project_registry,
+        model_rows,
+        dataset_rows,
+        project_url_rows,
+        start,
+        end,
+    )
     known_dataset_ids = set(dataset_records)
     model_discoveries = model_discovery_items(
-        owner_rows_list,
+        open_candidates,
         known_ids | set(project_model_ids),
         model_registry,
         start,
         end,
+        allow_unregistered_hot=include_current_hot,
     )
     dataset_discoveries = new_dataset_items(
-        trending_datasets,
+        dataset_candidates,
         known_dataset_ids | set(project_dataset_ids),
+        set(official_owners),
         start,
         end,
+        allow_hot_discovery=include_current_hot,
     )
+    if not include_current_hot:
+        for rows in flagship_groups.values():
+            strip_live_popularity(rows)
+        strip_live_popularity(local_items)
+        strip_live_popularity(dataset_items)
+        strip_live_popularity(model_discoveries)
+        strip_live_popularity(dataset_discoveries)
     discoveries = sorted(
         model_discoveries + dataset_discoveries,
         key=lambda item: (item.get("date", ""), item.get("title", "")),
@@ -1344,12 +1937,13 @@ def main() -> int:
     )
 
     flagship_groups = {role: sort_items(rows) for role, rows in flagship_groups.items()}
-    local_items = select_popular_derivatives(local_items)
+    local_items = select_popular_derivatives(collapse_local_variants(local_items))
     dataset_items = sort_popular_items(dataset_items)
     flagship_groups = {
         role: enrich_items_with_cards(rows) if rows else []
         for role, rows in flagship_groups.items()
     }
+    local_items = enrich_items_with_cards(local_items) if local_items else []
     dataset_items = enrich_items_with_cards(dataset_items) if dataset_items else []
     notable_discoveries = {
         "models": enrich_items_with_cards(notable_discoveries["models"]),
@@ -1373,6 +1967,42 @@ def main() -> int:
                 dataset_errors,
                 len(dataset_items) + notable_dataset_count,
             ),
+            "github_projects": source_status(
+                project_url_rows,
+                project_url_errors,
+                sum(
+                    1
+                    for item in reproducible_items
+                    for artifact in (item.get("metadata") or {}).get("artifacts", [])
+                    if str(artifact.get("url") or "").startswith("https://github.com/")
+                ),
+            ),
+        },
+        "diagnostics": {
+            "owner_candidates": len(owner_rows_list),
+            "local_filter_candidates": len(local_candidates),
+            "global_trending_candidates": len(global_trending),
+            "global_recent_candidates": len(global_recent),
+            "open_candidate_union": len(open_candidates),
+            "local_hot_before_limit": (
+                len(
+                    [
+                        row
+                        for row in open_candidates
+                        if is_hot_local(row)
+                        and local_signal(row, start, end, include_current_hot)
+                    ]
+                )
+                if include_current_hot
+                else 0
+            ),
+            "local_selected": len(local_items),
+            "model_discoveries": len(model_discoveries),
+            "dataset_trending_candidates": dataset_query_counts.get("trending", 0),
+            "dataset_recent_candidates": dataset_query_counts.get("recent", 0),
+            "dataset_official_owner_candidates": dataset_query_counts.get("official_owner", 0),
+            "dataset_candidate_union": dataset_query_counts.get("union", 0),
+            "project_url_candidates": len(project_url_rows),
         },
         "groups": {
             "flagship": flagship_groups,
@@ -1384,6 +2014,8 @@ def main() -> int:
         "discoveries": discoveries,
     }
     emit_payload(payload, args.output)
+    if args.date is None and global_trending:
+        write_trending_snapshot_safely(snapshot_path, global_trending, end.isoformat())
 
     if args.stats:
         print(

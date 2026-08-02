@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "verified_at": "2026-07-22",
+  "version": 2,
+  "verified_at": "2026-08-02",
   "projects": [
     {
       "id": "olmo-3",
@@ -27,13 +27,15 @@
       "openness": "reproducible",
       "artifacts": [
         {"id": "swiss-ai/apertus-pretrain-swiss", "repo_type": "dataset", "role": "pretrain-data", "depends_on": []},
-        {"id": "https://github.com/swiss-ai/apertus", "repo_type": "url", "role": "training-recipe", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
+        {"id": "https://github.com/swiss-ai/pretrain-data", "repo_type": "url", "role": "data-pipeline", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
+        {"id": "https://github.com/swiss-ai/pretrain-code", "repo_type": "url", "role": "training-recipe", "depends_on": ["https://github.com/swiss-ai/pretrain-data"]},
         {"id": "swiss-ai/Apertus-70B-2509", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
         {"id": "swiss-ai/Apertus-8B-2509", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["swiss-ai/apertus-pretrain-swiss"]},
         {"id": "swiss-ai/apertus-sft-mixture", "repo_type": "dataset", "role": "sft-data", "depends_on": ["swiss-ai/Apertus-70B-2509"]},
         {"id": "swiss-ai/Apertus-70B-Instruct-2509", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["swiss-ai/Apertus-70B-2509", "swiss-ai/apertus-sft-mixture"]},
         {"id": "swiss-ai/Apertus-8B-Instruct-2509", "repo_type": "model", "role": "aligned-checkpoint", "depends_on": ["swiss-ai/Apertus-8B-2509", "swiss-ai/apertus-sft-mixture"]},
-        {"id": "https://github.com/swiss-ai/apertus-eval", "repo_type": "url", "role": "eval-harness", "depends_on": ["swiss-ai/Apertus-70B-Instruct-2509"]}
+        {"id": "https://github.com/swiss-ai/evals", "repo_type": "url", "role": "eval-harness", "depends_on": ["swiss-ai/Apertus-70B-Instruct-2509"]},
+        {"id": "https://github.com/swiss-ai/apertus-tech-report", "repo_type": "url", "role": "eval-results", "depends_on": ["https://github.com/swiss-ai/evals"]}
       ]
     },
     {
@@ -43,12 +45,12 @@
       "scope": "partial",
       "openness": "partial-artifacts",
       "artifacts": [
-        {"id": "https://huggingface.co/datasets/nvidia/nemotron-pre-training-datasets", "repo_type": "url", "role": "pretrain-data", "depends_on": []},
-        {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["https://huggingface.co/datasets/nvidia/nemotron-pre-training-datasets"]},
+        {"id": "https://huggingface.co/collections/nvidia/nemotron-pre-training-datasets", "repo_type": "url", "role": "pretrain-data", "depends_on": []},
+        {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "repo_type": "model", "role": "base-checkpoint", "depends_on": ["https://huggingface.co/collections/nvidia/nemotron-pre-training-datasets"]},
         {"id": "nvidia/Nemotron-SFT-Agentic-v2", "repo_type": "dataset", "role": "sft-data", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
         {"id": "nvidia/Nemotron-RL-Ultra-Training-Blends", "repo_type": "dataset", "role": "preference-data", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
         {"id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4", "repo_type": "model", "role": "deployment-artifact", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]},
-        {"id": "https://github.com/NVIDIA-NeMo/NeMo-Evaluator", "repo_type": "url", "role": "eval-harness", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]}
+        {"id": "https://github.com/NVIDIA-NeMo/Evaluator", "repo_type": "url", "role": "eval-harness", "depends_on": ["nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"]}
       ]
     },
     {

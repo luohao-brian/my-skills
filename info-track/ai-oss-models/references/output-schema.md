@@ -8,7 +8,23 @@
   "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
   "sources": {
     "huggingface_models": {"ok": true, "count": 0, "selected": 0, "errors": {}},
-    "huggingface_datasets": {"ok": true, "count": 0, "selected": 0, "errors": {}}
+    "huggingface_datasets": {"ok": true, "count": 0, "selected": 0, "errors": {}},
+    "github_projects": {"ok": true, "count": 0, "selected": 0, "errors": {}}
+  },
+  "diagnostics": {
+    "owner_candidates": 0,
+    "local_filter_candidates": 0,
+    "global_trending_candidates": 0,
+    "global_recent_candidates": 0,
+    "open_candidate_union": 0,
+    "local_hot_before_limit": 0,
+    "local_selected": 0,
+    "model_discoveries": 0,
+    "dataset_trending_candidates": 0,
+    "dataset_recent_candidates": 0,
+    "dataset_official_owner_candidates": 0,
+    "dataset_candidate_union": 0,
+    "project_url_candidates": 0
   },
   "groups": {
     "flagship": {
@@ -50,7 +66,7 @@
 }
 ```
 
-热门衍生/本地部署模型和数据集的 `metadata` 包含：
+当前运行的热门衍生/本地部署模型和数据集的 `metadata` 包含：
 
 ```json
 {
@@ -61,6 +77,24 @@
 }
 ```
 
+模型候选还可包含发布者和当前趋势信息：
+
+```json
+{
+  "publisher_tier": "unregistered",
+  "trend": {
+    "rank": 12,
+    "rank_delta": 5,
+    "score_delta": 8,
+    "downloads_delta": 1200,
+    "likes_delta": 4,
+    "previous_observed_at": "YYYY-MM-DD"
+  }
+}
+```
+
+`rank_delta > 0` 表示排名上升。首次观察或上次快照没有该仓库时，各增量为 `null`。`diagnostics` 只用于检查召回漏斗，不进入最终报告。
+
 热门衍生/本地部署模型还包含 `derivation` 和 `deployment`：
 
 ```json
@@ -70,12 +104,14 @@
 }
 ```
 
-热门衍生/本地部署模型和数据集的 `selection` 必须包含 `hot`；模型还可包含 `priority`、`flagship-lineage`、`trusted-publisher`、`breakout` 或 `derivative`。时间命中但不满足热门条件的条目不进入正式分组。`groups.local` 为兼容字段名，报告标题使用“热门衍生与本地部署模型”。
+只有注册表通过 `model_overrides.<repo>.variant_group` 显式声明同组时，同一发布者下的多个仓库才折叠为一个代表条目，并在 `metadata.variants` 中列出仓库 ID、链接、部署格式和热度指标。不同发布者不跨发布者折叠；仅有相同 `base_model` 不触发折叠。
+
+当前运行的热门衍生/本地部署模型 `selection` 必须包含 `hot`，还可包含 `priority`、`flagship-lineage`、`trusted-publisher`、`local-ecosystem-publisher`、`breakout` 或 `derivative`。历史运行只纳入注册表中的重点本地模型，`selection` 包含 `priority` 且不包含 `hot`，metadata 省略实时 `trendingScore`、`downloads`、`likes` 和 `trend`。正式数据集可由 `hot`、`priority` 或 `technical-artifact` 入选；`technical-artifact` 表示注册表确认其属于数据、训练、偏好、评测等开发链路。`groups.local` 为兼容字段名，报告标题使用“热门衍生与本地部署模型”。
 
 `groups.notable_discoveries` 是从发现池自动选出的成稿候选：
 
-- 模型来自已登记官方发布者，`selection` 包含 `trusted-publisher` 和 `pending-registry`。
-- 数据集满足 HF 热门条件，`selection` 包含 `hot` 和 `pending-registry`。
+- 模型来自已登记官方发布者时，`selection` 包含 `trusted-publisher` 和 `pending-registry`；当前运行中未登记 owner 的热门模型包含 `hot`、`global-discovery` 和 `pending-registry`。
+- 当前运行中未登记 owner 的数据集须满足 HF 热门条件，`selection` 包含 `hot` 和 `pending-registry`；已登记主要厂商 owner 的窗口内新数据集可包含 `trusted-publisher` 和 `pending-registry`，不强制包含 `hot`。历史运行只保留后一类已登记 owner 发现。
 - 模型与数据集合计最多 12 条，数据集最多 5 条；候选充足时至少 8 条。
 - `repo_type` 为 `model` 或 `dataset`，`metadata.pending_registry` 为 `true`；方向分类是暂定展示字段，不等于旗舰身份确认。
 
@@ -99,7 +135,8 @@
 
 - `published`：`createdAt` 位于窗口内。
 - `repository-updated`：`lastModified` 位于窗口内。
-- `artifact-updated`：可复现项目有交付件位于窗口内。
+- `trending-observed`：仅当前运行使用；仓库在观察日仍满足 HF 热门条件，但窗口内没有发布或更新时间。
+- `artifact-updated`：可复现项目有 HF 交付件发布/更新，或已登记 GitHub 仓库的 `pushed_at` 位于窗口内。
 
 顶层 `discoveries` 是全部待确认模型和热门新数据集的审计池，不直接进入最终报告；其中入选成稿的条目会以完整结构复制到 `groups.notable_discoveries`。
 

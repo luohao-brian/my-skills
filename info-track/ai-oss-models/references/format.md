@@ -30,8 +30,9 @@
 - 衍生：Merge | Finetune | Adapter | Quantized
 - 部署：GGUF | MLX | Ollama | Quantized | On-device
 - 规模：HF 结构化字段提供的参数量。
-- 热度：TrendingScore N · 下载 N · 点赞 N
-- 窗口信号：新发布 | 仓库更新
+- 热度：TrendingScore N · 下载 N · 点赞 N；有趋势快照时可补充排名和相对上次的变化。历史运行省略。
+- 窗口信号：新发布 | 仓库更新 | 当前热门
+- 变体：注册表显式声明同一 `variant_group` 后折叠出的其他仓库；没有 `metadata.variants` 时省略。
 - 时间：YYYY-MM-DD
 - 链接：[Hugging Face](https://huggingface.co/...)
 
@@ -80,12 +81,12 @@
 - 时间：YYYY-MM-DD
 - 链接：[Hugging Face](https://huggingface.co/...)
 
-### 热门新数据集
+### 技术数据与热门新数据集
 
 #### 1. 数据集名称
 
-- 状态：热门新数据集 · 待纳入注册表
-- 热度：TrendingScore N · 下载 N · 点赞 N
+- 状态：主要厂商技术数据 | 热门新数据集 · 待纳入注册表
+- 热度：TrendingScore N · 下载 N · 点赞 N；未包含 `hot` 时可省略。
 - 窗口信号：新发布 | 仓库更新
 - 用途与内容：根据 dataset card 用 1–2 句概括任务、数据内容或规模。
 - 时间：YYYY-MM-DD
@@ -95,7 +96,9 @@
 字段规则：
 
 - `窗口信号` 只写候选和 HF 页面支持的事实，不把 `lastModified` 扩写为版本发布。
-- `关注` 按候选的 `selection` 写为“HF 热门”或“HF 热门 · 重点白名单”。
+- `当前热门` 只表示观察日仍满足热门条件，不写成“本周发布”“本周更新”或“热度上升”；只有 `metadata.trend` 的非空增量才能支持趋势变化表述。
+- `关注` 按候选的 `selection` 写为“HF 热门”“HF 热门 · 重点白名单”或“重点白名单”；历史运行不写实时热度与趋势变化。
+- 正式数据集含 `technical-artifact` 时可写“重点技术资产”，不把它描述成 HF 热门；重点新发现含 `trusted-publisher` 但不含 `hot` 时写“主要厂商技术数据”。
 - 参数规模只使用 HF 结构化字段，不从模型名推断。
 - 没有明确原模型时省略“原模型”。
 - 没有结构化衍生关系或本地部署格式时，分别省略“衍生”或“部署”；不得从仓库名猜测。
@@ -105,7 +108,7 @@
 - 仓库更新时，model card 只提供项目背景，不得据此声称这些能力或交付件在本窗口新增。
 - `card.ok` 为 `false` 或片段缺少证据时省略“本期看点”“为什么关注”或“用途与内容”，不根据名称推断。
 - 最终报告不展示采集状态、原始 tags、分类过程或顶层发现池。
-- 热门衍生/本地部署模型最多 20 条，先保证 Merge、Finetune、Adapter、GGUF、MLX、On-device 和 Quantized 类型覆盖，再按重点标记、TrendingScore、点赞和下载量排序；数据集按重点标记和热度排序。
+- 热门衍生/本地部署模型最多 20 条，只折叠注册表显式声明同一 `variant_group` 的变体，再覆盖最多 8 个不同发布者，并保证 Merge、Finetune、Adapter、GGUF、MLX、On-device 和 Quantized 类型覆盖。当前运行最后按 TrendingScore、重点标记、点赞和下载量排序；历史运行按重点标记、窗口事件日期和仓库 ID 排序。数据集按主要厂商/重点技术资产和可用热度排序。
 
 全部分节为空时输出：
 

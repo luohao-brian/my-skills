@@ -20,6 +20,7 @@ metadata: {"openclaw":{"skillKey":"ai-community-pulse","emoji":"🌐","homepage"
 ```bash
 python3 {baseDir}/scripts/community_pulse.py collect \
   --hours 72 \
+  --max-seconds 720 \
   --output /absolute/path/community-pulse.json
 ```
 
@@ -38,6 +39,7 @@ python3 {baseDir}/scripts/community_pulse.py render \
 ```bash
 python3 {baseDir}/scripts/community_pulse.py run \
   --hours 72 \
+  --max-seconds 720 \
   --json-output /absolute/path/community-pulse.json \
   --report-output /absolute/path/community-pulse.md
 ```
@@ -46,6 +48,8 @@ python3 {baseDir}/scripts/community_pulse.py run \
 
 - X、Reddit、知乎、Linux.do、B站依赖 Chrome 登录态与 OpenCLI Browser Bridge。桥接不可用时继续采集公开来源，并在来源状态中记录失败原因。
 - HN、Bluesky、V2EX、Lobsters、LessWrong、Product Hunt 和 Polymarket 使用公开读取能力，不要求登录。
+- 公开 HTTP 来源先直连；连接失败、超时、空响应、403、429 或 5xx 时，如果环境提供 `OPENCLAW_PROXY_URL`，脚本自动经代理重试一次。
+- 采集器会输出来源进度并在 `--max-seconds` 预算内结束。启动后等待同一进程完成，不要因暂时没有新输出而重复运行。
 - X 只采固定账号；Reddit 只采固定 subreddit；Bluesky 只采固定 Custom Feed；V2EX 只采固定节点；不得用通用 Web 搜索代替。
 - Polymarket 只表达市场问题、当前概率和市场链接，标题加“预测市场”；概率不能写成事实。
 - 只执行只读命令。禁止发帖、评论、点赞、关注、订阅或修改账号状态。
