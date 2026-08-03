@@ -257,6 +257,107 @@ class EvaluationEvidenceTests(unittest.TestCase):
         self.assertEqual(MODULE.extract_evaluation_evidence(card), {})
 
 
+class PerformancePipelineTests(unittest.TestCase):
+    def test_non_retryable_http_error_stops_immediately(self):
+        url = "https://huggingface.co/missing/raw/main/README.md"
+        error = MODULE.urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        with mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=error) as opener:
+            with self.assertRaises(MODULE.urllib.error.HTTPError):
+                MODULE.fetch_text(url, retries=3)
+        opener.assert_called_once()
+
+    def test_formal_groups_share_one_enrichment_pool(self):
+        flagship = {role: [] for role in MODULE.FLAGSHIP_ROLES}
+        flagship["llm"] = [{"title": "Official/flagship", "metadata": {}}]
+        local = [{"title": "Community/local", "metadata": {}}]
+        datasets = [{"title": "Official/data", "repo_type": "dataset", "metadata": {}}]
+        notable = {
+            "models": [{"title": "Official/new", "metadata": {}}],
+            "datasets": [],
+        }
+
+        def enrich(items, *_):
+            return [{**item, "enriched": True} for item in items]
+
+        with mock.patch.object(
+            MODULE,
+            "enrich_items_with_cards",
+            side_effect=enrich,
+        ) as enrichment:
+            result = MODULE.enrich_formal_groups(
+                flagship,
+                local,
+                datasets,
+                notable,
+                dt.date(2026, 7, 28),
+                dt.date(2026, 8, 3),
+            )
+
+        enrichment.assert_called_once()
+        enriched_flagship, enriched_local, enriched_datasets, enriched_notable = result
+        self.assertTrue(enriched_flagship["llm"][0]["enriched"])
+        self.assertTrue(enriched_local[0]["enriched"])
+        self.assertTrue(enriched_datasets[0]["enriched"])
+        self.assertTrue(enriched_notable["models"][0]["enriched"])
+
+    def test_report_payload_removes_audit_only_and_verbose_commit_fields(self):
+        item = {
+            "title": "Official/model",
+            "url": "https://huggingface.co/Official/model",
+            "date": "2026-08-03",
+            "event": "repository-updated",
+            "category": "llm",
+            "summary": "audit-only summary",
+            "source": "Hugging Face Models",
+            "metadata": {
+                "selection": ["hot"],
+                "license": "apache-2.0",
+                "card": {
+                    "url": "https://huggingface.co/Official/model/blob/main/README.md",
+                    "ok": True,
+                    "excerpt": "Current model status.",
+                },
+                "change_evidence": {
+                    "source": "Hugging Face commit history",
+                    "ok": True,
+                    "commits": [
+                        {
+                            "id": "abc",
+                            "title": "Update README.md",
+                            "date": "2026-08-03",
+                            "url": "https://huggingface.co/Official/model/commit/abc",
+                        }
+                    ],
+                },
+            },
+        }
+        groups = {
+            "flagship": {role: [item] if role == "llm" else [] for role in MODULE.FLAGSHIP_ROLES},
+            "local": [],
+            "reproducible": [],
+            "datasets": [],
+            "notable_discoveries": {"models": [], "datasets": []},
+        }
+        report = MODULE.build_report_payload(
+            {
+                "kind": "ai-oss-models",
+                "window": {"start": "2026-07-28", "end": "2026-08-03"},
+                "groups": groups,
+                "diagnostics": {"model_discoveries": 100},
+                "discoveries": [item],
+            }
+        )
+        projected = report["groups"]["flagship"]["llm"][0]
+        self.assertNotIn("discoveries", report)
+        self.assertNotIn("diagnostics", report)
+        self.assertNotIn("summary", projected)
+        self.assertNotIn("license", projected["metadata"])
+        self.assertEqual(
+            projected["metadata"]["change_evidence"]["commits"],
+            [{"title": "Update README.md", "date": "2026-08-03"}],
+        )
+
+
 class DevelopmentArtifactTests(unittest.TestCase):
     def test_registry_validation_rejects_dangling_artifact_dependency(self):
         projects = {

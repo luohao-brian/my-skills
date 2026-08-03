@@ -9,6 +9,7 @@
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
 - 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
 - 只为最终入选的重点旗舰、本地热门、正式数据集和重点新发现读取对应 model card 或 dataset card。
+- 所有正式候选合并后共用一个 enrichment 任务池，不按报告分节串行抓取 model card 和提交历史；同一次 run 不重复采集同一正式候选。
 - 从最终入选模型的 model card 提取 Evaluation、Benchmark、Leaderboard 等评测小节和以 `Benchmark` 为表头的结果表，同时提取 Limitations / Caveats 作为评测边界。
 - 对最终入选的 HF `repository-updated` 候选读取本窗口提交历史；对可复现项目的已更新 HF/GitHub 交付件读取提交标题和链接，供成稿解释具体变化。
 
@@ -64,6 +65,7 @@ HF 热门条件：
 - 参数量：`safetensors.total` 或 `gguf.total`。
 - 论文：只读取精确 `arxiv:` tag，并构造对应 arXiv 与 HF Paper 链接。
 - 评测：只保留 model card 明确报告的设置、基准、对照项、分数和限制；model card 结果属于发布方自述，不自动视为独立复现。
+- 证据片段在采集阶段有长度上限，保留开头的设置、代表性表格和 limitations/caveats；成稿不得因片段截断而补猜后续结果。
 
 方向分类只使用上述结构化模态证据：视频输出归入视频生成，图像输出归入图像生成，音频输出归入语音生成；纯文本输出再按音频输入、视觉输入或文本输入区分语音识别、VLM 和 LLM。`any-to-any` 保留为通用多模态方向。不得用模型 ID、owner 或自然语言名称补分类。
 

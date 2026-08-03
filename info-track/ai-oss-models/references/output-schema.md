@@ -217,3 +217,19 @@
 顶层 `discoveries` 是全部待确认模型和热门新数据集的审计池，不直接进入最终报告；其中入选成稿的条目会以完整结构复制到 `groups.notable_discoveries`。
 
 最终报告遵循 [format.md](format.md)。
+
+## 紧凑成稿输入
+
+传入 `--report-output <path>` 时，采集器额外写出单行紧凑 JSON。该文件只包含：
+
+```json
+{
+  "kind": "ai-oss-models",
+  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
+  "groups": {}
+}
+```
+
+`groups` 的候选顺序和数量与完整审计 JSON 完全一致，但会删除顶层 `discoveries`、`diagnostics`、来源抓取状态，以及不参与成稿的候选摘要、许可证、开放度等字段。提交证据只保留 `ok`、提交标题和日期；model card 只保留 `ok`、状态摘要、架构摘要、评测证据与 caveats。
+
+完整 `--output` 用于审计和排查召回，`--report-output` 用于模型成稿。不得为了节省上下文从紧凑输入再次删减正式候选。

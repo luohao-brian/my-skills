@@ -85,10 +85,10 @@ NOTABLE_DATASET_MAX = 5
 NOTABLE_TRUSTED_DATASET_MAX = 3
 NOTABLE_HOT_DATASET_MIN = 2
 NOTABLE_OWNER_MAX = 2
-CARD_EXCERPT_CHARS = 1_600
-EVALUATION_EXCERPT_CHARS = 3_200
-EVALUATION_CAVEAT_CHARS = 1_000
-CARD_FETCH_WORKERS = 6
+CARD_EXCERPT_CHARS = 1_200
+EVALUATION_EXCERPT_CHARS = 2_000
+EVALUATION_CAVEAT_CHARS = 700
+CARD_FETCH_WORKERS = 8
 CHANGE_EVIDENCE_LIMIT = 5
 SNAPSHOT_VERSION = 1
 
@@ -355,6 +355,8 @@ def fetch_text(
                 return response.read().decode("utf-8", errors="replace")
         except Exception as exc:
             last_error = exc
+            if isinstance(exc, urllib.error.HTTPError) and exc.code in {400, 401, 403, 404}:
+                break
             if attempt < retries:
                 time.sleep(attempt + 1)
     raise last_error or RuntimeError(f"failed to fetch {url}")
@@ -1678,6 +1680,52 @@ def enrich_items_with_cards(
         return list(executor.map(enrich, copied))
 
 
+def enrich_formal_groups(
+    flagship_groups: dict[str, list[dict[str, Any]]],
+    local_items: list[dict[str, Any]],
+    dataset_items: list[dict[str, Any]],
+    notable_discoveries: dict[str, list[dict[str, Any]]],
+    start: dt.date,
+    end: dt.date,
+) -> tuple[
+    dict[str, list[dict[str, Any]]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    dict[str, list[dict[str, Any]]],
+]:
+    batches: list[tuple[str, str | None, list[dict[str, Any]]]] = [
+        ("flagship", role, rows) for role, rows in flagship_groups.items()
+    ]
+    batches.extend(
+        [
+            ("local", None, local_items),
+            ("datasets", None, dataset_items),
+            ("notable", "models", notable_discoveries["models"]),
+            ("notable", "datasets", notable_discoveries["datasets"]),
+        ]
+    )
+    flattened = [item for _, _, rows in batches for item in rows]
+    enriched = enrich_items_with_cards(flattened, start, end)
+
+    enriched_flagship = {role: [] for role in flagship_groups}
+    enriched_local: list[dict[str, Any]] = []
+    enriched_datasets: list[dict[str, Any]] = []
+    enriched_notable = {"models": [], "datasets": []}
+    cursor = 0
+    for group, key, rows in batches:
+        batch = enriched[cursor : cursor + len(rows)]
+        cursor += len(rows)
+        if group == "flagship" and key is not None:
+            enriched_flagship[key] = batch
+        elif group == "local":
+            enriched_local = batch
+        elif group == "datasets":
+            enriched_datasets = batch
+        elif group == "notable" and key is not None:
+            enriched_notable[key] = batch
+    return enriched_flagship, enriched_local, enriched_datasets, enriched_notable
+
+
 def huggingface_repo_from_url(value: str) -> tuple[str, str] | None:
     parsed = urllib.parse.urlparse(value)
     if (parsed.hostname or "").lower() not in {"huggingface.co", "www.huggingface.co"}:
@@ -2112,6 +2160,126 @@ def source_status(rows: dict[str, Any], errors: dict[str, str], selected: int) -
     }
 
 
+def compact_change_evidence(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not value:
+        return None
+    return {
+        "ok": bool(value.get("ok")),
+        "commits": [
+            {
+                key: commit[key]
+                for key in ("title", "date")
+                if commit.get(key) not in (None, "")
+            }
+            for commit in value.get("commits", [])
+        ],
+    }
+
+
+def compact_card(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not value:
+        return None
+    result: dict[str, Any] = {"ok": bool(value.get("ok"))}
+    for key in ("excerpt", "architecture_excerpt"):
+        if value.get(key):
+            result[key] = value[key]
+    evaluation = value.get("evaluation") or {}
+    if evaluation.get("excerpt"):
+        result["evaluation"] = {
+            key: evaluation[key]
+            for key in ("excerpt", "caveats")
+            if evaluation.get(key)
+        }
+    return result
+
+
+def report_item(item: dict[str, Any]) -> dict[str, Any]:
+    result = {
+        key: item[key]
+        for key in ("title", "url", "date", "event", "category", "repo_type")
+        if item.get(key) not in (None, "")
+    }
+    metadata = item.get("metadata") or {}
+    compact_metadata: dict[str, Any] = {}
+    if item.get("category") == "reproducible":
+        for key in ("scope", "openness"):
+            if metadata.get(key) not in (None, "", [], {}):
+                compact_metadata[key] = metadata[key]
+        artifacts = []
+        for artifact in metadata.get("artifacts", []):
+            compact_artifact = {
+                key: artifact[key]
+                for key in ("id", "role", "depends_on", "event", "date", "url")
+                if artifact.get(key) not in (None, "", [], {})
+            }
+            change_evidence = compact_change_evidence(artifact.get("change_evidence"))
+            if change_evidence:
+                compact_artifact["change_evidence"] = change_evidence
+            artifacts.append(compact_artifact)
+        compact_metadata["artifacts"] = artifacts
+    else:
+        keys = (
+            "selection",
+            "uses",
+            "roles",
+            "related_models",
+            "related_projects",
+            "size",
+            "role",
+            "canonical_model",
+            "modalities",
+            "role_evidence",
+            "deployment",
+            "architecture",
+            "architecture_classes",
+            "scale",
+            "papers",
+            "derivation",
+            "variants",
+            "trendingScore",
+            "downloads",
+            "likes",
+            "trend",
+            "pending_registry",
+        )
+        for key in keys:
+            if metadata.get(key) not in (None, "", [], {}):
+                compact_metadata[key] = metadata[key]
+        card = compact_card(metadata.get("card"))
+        if card:
+            compact_metadata["card"] = card
+        change_evidence = compact_change_evidence(metadata.get("change_evidence"))
+        if change_evidence:
+            compact_metadata["change_evidence"] = change_evidence
+    result["metadata"] = compact_metadata
+    return result
+
+
+def build_report_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    groups = payload["groups"]
+    return {
+        "kind": payload["kind"],
+        "window": payload["window"],
+        "groups": {
+            "flagship": {
+                role: [report_item(item) for item in items]
+                for role, items in groups["flagship"].items()
+            },
+            "local": [report_item(item) for item in groups["local"]],
+            "reproducible": [report_item(item) for item in groups["reproducible"]],
+            "datasets": [report_item(item) for item in groups["datasets"]],
+            "notable_discoveries": {
+                "models": [
+                    report_item(item) for item in groups["notable_discoveries"]["models"]
+                ],
+                "datasets": [
+                    report_item(item) for item in groups["notable_discoveries"]["datasets"]
+                ],
+            },
+        },
+    }
+
+
 def emit_payload(payload: dict[str, Any], output: str | None) -> None:
     text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if output:
@@ -2123,6 +2291,15 @@ def emit_payload(payload: dict[str, Any], output: str | None) -> None:
         print(text, end="")
 
 
+def emit_compact_payload(payload: dict[str, Any], output: str) -> int:
+    text = json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+    path = Path(output).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    print(path)
+    return len(text.encode("utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Collect registered and notable Hugging Face model and dataset updates in a fixed 7-day window."
@@ -2130,11 +2307,23 @@ def main() -> int:
     parser.add_argument("--date", help="Window start date, YYYY-MM-DD")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
     parser.add_argument(
+        "--report-output",
+        help="Write a compact groups-only JSON projection for report generation",
+    )
+    parser.add_argument(
         "--state-dir",
         help="Optional caller-owned directory for the current trending snapshot",
     )
     parser.add_argument("--stats", action="store_true", help="Print group counts to stderr")
     args = parser.parse_args()
+
+    if args.output and args.report_output:
+        output_path = Path(args.output).expanduser().resolve()
+        report_path = Path(args.report_output).expanduser().resolve()
+        if output_path == report_path:
+            parser.error("--output and --report-output must use different paths")
+    run_started = time.perf_counter()
+    timings: dict[str, float] = {}
 
     try:
         start, end = parse_window(args.date)
@@ -2169,6 +2358,7 @@ def main() -> int:
         else {}
     )
 
+    phase_started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=5) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
         local_future = executor.submit(query_local_candidates) if include_current_hot else None
@@ -2186,6 +2376,7 @@ def main() -> int:
         )
         dataset_candidates, dataset_query_counts, dataset_query_errors = dataset_future.result()
         project_url_rows, project_url_errors = project_url_future.result()
+    timings["candidate_queries"] = time.perf_counter() - phase_started
 
     annotate_trending_deltas(global_trending, previous_snapshot)
     open_candidate_rows = {
@@ -2220,17 +2411,20 @@ def main() -> int:
         if dataset_id not in dataset_candidate_rows
     ]
 
+    phase_started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=2) as executor:
         model_future = executor.submit(fetch_many, requested_model_ids, fetch_model)
         dataset_exact_future = executor.submit(fetch_many, requested_dataset_ids, fetch_dataset)
         exact_model_rows, exact_model_errors = model_future.result()
         exact_dataset_rows, exact_dataset_errors = dataset_exact_future.result()
+    timings["exact_fetches"] = time.perf_counter() - phase_started
 
     model_rows = {**cached_model_rows, **exact_model_rows}
     dataset_rows = {**dataset_candidate_rows, **exact_dataset_rows}
     model_errors = {**owner_errors, **global_errors, **exact_model_errors}
     dataset_errors = {**dataset_query_errors, **exact_dataset_errors}
 
+    phase_started = time.perf_counter()
     flagship_groups: dict[str, list[dict[str, Any]]] = {role: [] for role in FLAGSHIP_ROLES}
     for model_id, record in flagship.items():
         row = model_rows.get(model_id)
@@ -2342,16 +2536,22 @@ def main() -> int:
     flagship_groups = {role: sort_items(rows) for role, rows in flagship_groups.items()}
     local_items = select_popular_derivatives(collapse_local_variants(local_items))
     dataset_items = sort_popular_items(dataset_items)
-    flagship_groups = {
-        role: enrich_items_with_cards(rows, start, end) if rows else []
-        for role, rows in flagship_groups.items()
-    }
-    dataset_items = enrich_items_with_cards(dataset_items, start, end) if dataset_items else []
-    local_items = enrich_items_with_cards(local_items, start, end) if local_items else []
-    notable_discoveries = {
-        "models": enrich_items_with_cards(notable_discoveries["models"], start, end),
-        "datasets": enrich_items_with_cards(notable_discoveries["datasets"], start, end),
-    }
+    timings["selection_and_project_evidence"] = time.perf_counter() - phase_started
+    phase_started = time.perf_counter()
+    (
+        flagship_groups,
+        local_items,
+        dataset_items,
+        notable_discoveries,
+    ) = enrich_formal_groups(
+        flagship_groups,
+        local_items,
+        dataset_items,
+        notable_discoveries,
+        start,
+        end,
+    )
+    timings["formal_enrichment"] = time.perf_counter() - phase_started
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
     notable_model_count = len(notable_discoveries["models"])
     notable_dataset_count = len(notable_discoveries["datasets"])
@@ -2417,9 +2617,16 @@ def main() -> int:
         "discoveries": discoveries,
     }
     emit_payload(payload, args.output)
+    report_output_bytes = 0
+    if args.report_output:
+        report_output_bytes = emit_compact_payload(
+            build_report_payload(payload),
+            args.report_output,
+        )
     if args.date is None and global_trending and snapshot_path is not None:
         write_trending_snapshot_safely(snapshot_path, global_trending, end.isoformat())
 
+    timings["total"] = time.perf_counter() - run_started
     if args.stats:
         print(
             json.dumps(
@@ -2437,6 +2644,10 @@ def main() -> int:
                     "discoveries": len(discoveries),
                     "exact_model_queries": len(requested_model_ids),
                     "exact_dataset_queries": len(requested_dataset_ids),
+                    "report_output_bytes": report_output_bytes,
+                    "timings_seconds": {
+                        key: round(value, 3) for key, value in timings.items()
+                    },
                 },
                 ensure_ascii=False,
                 sort_keys=True,
