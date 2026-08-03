@@ -20,6 +20,11 @@ FLAG_POS_SEQUENCE = 0b0001
 FLAG_NEG_WITH_SEQUENCE = 0b0011
 SERIALIZATION_JSON = 0b0001
 COMPRESSION_GZIP = 0b0001
+BASE_URL = "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream"
+RESOURCE_ID = "volc.seedasr.sauc.duration"
+DEFAULT_SAMPLE_RATE = 24000
+DEFAULT_SEG_DURATION_MS = 200
+REQUEST_TIMEOUT_SECONDS = 180
 
 
 def api_key_value() -> str:
@@ -110,15 +115,12 @@ def parse_response(message: bytes) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Transcribe local audio with Volcengine Ark STT")
+    parser = argparse.ArgumentParser(description="Transcribe local audio with Ark Agent Plan STT")
     parser.add_argument("audio_path")
     parser.add_argument("--format")
     parser.add_argument("--codec")
-    parser.add_argument("--sample-rate", type=int, default=int(os.getenv("VOLC_STT_SAMPLE_RATE", "24000")))
-    parser.add_argument("--seg-duration-ms", type=int, default=int(os.getenv("VOLC_STT_SEG_DURATION_MS", "200")))
-    parser.add_argument("--resource-id", default=os.getenv("VOLC_STT_RESOURCE_ID", "volc.seedasr.sauc.duration"))
-    parser.add_argument("--base-url", default=os.getenv("VOLC_STT_BASE_URL", "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream"))
-    parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_STT_TIMEOUT", "180")))
+    parser.add_argument("--sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)
+    parser.add_argument("--raw", action="store_true", help="Include the final provider payload")
     args = parser.parse_args()
 
     api_key = api_key_value()
@@ -137,13 +139,13 @@ def main() -> int:
     audio_format = args.format or infer_format(audio_path)
     codec = args.codec or infer_codec(audio_format)
     headers = [
-        f"X-Api-Resource-Id: {args.resource_id}",
+        f"X-Api-Resource-Id: {RESOURCE_ID}",
         f"X-Api-Connect-Id: {uuid.uuid4()}",
         f"X-Api-Key: {api_key}",
     ]
     ws = None
     try:
-        ws = websocket.create_connection(args.base_url, header=headers, timeout=max(args.timeout, 120))
+        ws = websocket.create_connection(BASE_URL, header=headers, timeout=REQUEST_TIMEOUT_SECONDS)
         seq = 1
         ws.send_binary(full_request(seq, audio_format, codec, args.sample_rate))
         seq += 1
@@ -159,7 +161,7 @@ def main() -> int:
             ws.send_binary(audio_request(seq, chunk, is_last))
             if not is_last:
                 seq += 1
-            time.sleep(max(args.seg_duration_ms, 0) / 1000)
+            time.sleep(DEFAULT_SEG_DURATION_MS / 1000)
 
         final_text = ""
         final_payload = None
@@ -180,14 +182,17 @@ def main() -> int:
                 break
         if not final_text:
             raise RuntimeError("ASR finished without returning final text")
-        print(json.dumps({
+        result = {
             "success": True,
             "type": "transcript",
             "audio_path": str(audio_path),
             "transcript": final_text,
-            "resource_id": args.resource_id,
-            "payload": final_payload,
-        }, ensure_ascii=False, indent=2))
+            "duration_ms": (final_payload or {}).get("audio_info", {}).get("duration"),
+            "resource_id": RESOURCE_ID,
+        }
+        if args.raw:
+            result["raw"] = final_payload
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
         print(json.dumps({"success": False, "error": str(exc), "audio_path": str(audio_path)}, ensure_ascii=False), file=sys.stderr)

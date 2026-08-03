@@ -12,6 +12,15 @@ from pathlib import Path
 from typing import Any
 
 
+BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
+MODEL_ID = "doubao-seedance-2.0-fast"
+DEFAULT_DURATION_SECONDS = 5
+DEFAULT_ASPECT_RATIO = "16:9"
+DEFAULT_RESOLUTION = "720p"
+TASK_TIMEOUT_SECONDS = 300
+POLL_INTERVAL_SECONDS = 5
+
+
 def api_key_value() -> str:
     return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
 
@@ -24,17 +33,13 @@ def file_to_data_url(path: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate video with Volcengine Ark")
+    parser = argparse.ArgumentParser(description="Generate video with Ark Agent Plan")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional first-frame image path, data URL, or remote URL")
-    parser.add_argument("--model", default=os.getenv("VOLC_VIDEO_MODEL_ID", "doubao-seedance-2.0-fast"))
-    parser.add_argument("--base-url", default=os.getenv("VOLC_ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3"))
-    parser.add_argument("--duration", type=int, default=int(os.getenv("VOLC_VIDEO_DURATION", "5")))
-    parser.add_argument("--aspect-ratio", default=os.getenv("VOLC_VIDEO_ASPECT_RATIO", "16:9"))
-    parser.add_argument("--resolution", default=os.getenv("VOLC_VIDEO_RESOLUTION", "720p"))
+    parser.add_argument("--duration", type=int, choices=range(5, 13), default=DEFAULT_DURATION_SECONDS)
+    parser.add_argument("--aspect-ratio", default=DEFAULT_ASPECT_RATIO)
+    parser.add_argument("--resolution", default=DEFAULT_RESOLUTION)
     parser.add_argument("--audio", action="store_true")
-    parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_VIDEO_TIMEOUT", "300")))
-    parser.add_argument("--poll-seconds", type=float, default=float(os.getenv("VOLC_VIDEO_POLL_SECONDS", "5")))
     args = parser.parse_args()
 
     api_key = api_key_value()
@@ -44,7 +49,7 @@ def main() -> int:
 
     from volcenginesdkarkruntime import Ark
 
-    duration = max(5, min(args.duration, 12))
+    duration = args.duration
     full_prompt = " ".join([
         args.prompt.strip(),
         f"--rs {args.resolution}",
@@ -55,7 +60,7 @@ def main() -> int:
     ])
 
     try:
-        client = Ark(base_url=args.base_url, api_key=api_key)
+        client = Ark(base_url=BASE_URL, api_key=api_key)
         content: list[dict[str, Any]] = [{"type": "text", "text": full_prompt}]
         if args.image:
             image_url = args.image
@@ -64,13 +69,13 @@ def main() -> int:
             content.append({"type": "image_url", "image_url": {"url": image_url}})
 
         created = client.content_generation.tasks.create(
-            model=args.model,
+            model=MODEL_ID,
             content=content,
             extra_body={"generate_audio": bool(args.audio)},
         )
         task_id = created.id
         last_status = getattr(created, "status", "created")
-        deadline = time.time() + max(args.timeout, 60)
+        deadline = time.time() + TASK_TIMEOUT_SECONDS
         while time.time() < deadline:
             task = client.content_generation.tasks.get(task_id=task_id)
             last_status = task.status
@@ -82,7 +87,7 @@ def main() -> int:
                     "task_id": task_id,
                     "status": task.status,
                     "video_url": video_url,
-                    "model": args.model,
+                    "model": MODEL_ID,
                     "prompt": args.prompt,
                     "duration": duration,
                     "aspect_ratio": args.aspect_ratio,
@@ -92,13 +97,13 @@ def main() -> int:
                 return 0
             if task.status == "failed":
                 raise RuntimeError(f"task_id={task_id}; error={task.error}")
-            time.sleep(max(args.poll_seconds, 1))
+            time.sleep(POLL_INTERVAL_SECONDS)
         print(json.dumps({
             "success": False,
             "error": "task timed out",
             "task_id": task_id,
             "last_status": last_status,
-            "model": args.model,
+            "model": MODEL_ID,
         }, ensure_ascii=False), file=sys.stderr)
         return 1
     except Exception as exc:

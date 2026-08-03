@@ -52,7 +52,7 @@
 ```text
 viking://resources/codex-rspress-admin/public/articles/<source-path>.(md|mdx)/...
 ->
-${ARK_VIKING_RSPRESS_PUBLIC_BASE_URL}/auto/<source-path>.html
+<fixed-public-base-url>/auto/<source-path>.html
 ```
 
 从 `articles/` 后读取源文件路径，在第一个以 `.md` 或 `.mdx` 结尾的路径段停止。忽略其后的 OpenViking 生成目录和分段文件。无法提取源路径时不生成链接。

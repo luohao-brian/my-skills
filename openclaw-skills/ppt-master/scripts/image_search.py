@@ -339,7 +339,7 @@ def _validate_downloaded_quality(
     except ImportError as exc:
         raise RuntimeError(
             "Pillow is required to validate downloaded image dimensions. "
-            "Install it with: pip install Pillow"
+            "Provide it through the caller-selected Python environment"
         ) from exc
     try:
         with Image.open(path) as im:

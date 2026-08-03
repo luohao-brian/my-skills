@@ -47,7 +47,9 @@ The service also supports `initialize` and `tools/list`; `tools/list` returns `d
 - Parse `result.structuredContent` when present; otherwise parse JSON from `result.content[].text`.
 - Preserve `code`, `msg`, `trace_id`, `dataset_type`, and item count in failure reports or reproducibility notes.
 - Common `dataset_type` values include `stock_finance`, `enterprise_info`, `enterprise_risk`, and `academic_search`.
-- For finance records, preserve `security_code`, `indicator_name`, `value`, `unit`, `period`, and `caliber`.
+- For finance tables, match every indicator path to the same path under `field_meta`; preserve its value and full `caliber` object.
+- A period written in the query does not prove that every returned value uses that period. If `field_meta.caliber` says `去年年报`, `TTM`, another quarter, or another date, report that exact label.
+- When several ROE or other indicator variants are returned, do not collapse them into one number. Name the calculation variant and caliber for each value used.
 - For enterprise records, preserve company name, unified social credit code, legal representative, address, registration status, business scope, and capital fields when present.
 - For academic records, preserve title/name, URL, publication date, snippet/abstract, authors, DOI, journal, and citation count when present.
 - If the response says the query is outside the supported scope or not billed, report that directly instead of inventing a dataset answer.

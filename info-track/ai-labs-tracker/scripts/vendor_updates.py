@@ -14,8 +14,6 @@ import html
 
 import json
 
-import os
-
 import re
 
 import sys
@@ -45,8 +43,6 @@ USER_AGENT = "my-skills-info-track/1.0"
 VENDOR_PRODUCT = "AI厂商产品更新"
 
 VENDOR_BLOG = "AI厂商博客更新"
-
-MISC = "-misc"
 
 @dataclass
 class Item:
@@ -309,169 +305,15 @@ def fetch_page_meta(url: str) -> tuple[str, str]:
     description = extract_meta(page, ["og:description", "description", "twitter:description"])
     return title, description
 
-def provider_config() -> tuple[str, str, str]:
-    endpoint = os.getenv("LLM_ENDPOINT", os.getenv("AI_NEWS_ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3")).rstrip("/")
-    model = os.getenv("LLM_COMMON", os.getenv("AI_NEWS_CLASSIFY_MODEL", "deepseek-v4-flash"))
-    api_key = os.getenv("LLM_API_KEY") or os.getenv("ARK_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-    return endpoint, model, api_key
-
-def provider_json(payload: dict[str, Any], timeout: int = 160) -> dict[str, Any]:
-    endpoint, _, api_key = provider_config()
-    if not api_key:
-        raise RuntimeError("missing LLM_API_KEY")
-    req = urllib.request.Request(
-        endpoint.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-def parse_provider_json_content(content: str) -> dict[str, Any]:
-    content = (content or "").strip()
-    if content.startswith("```"):
-        content = re.sub(r"^```(?:json)?\s*", "", content, flags=re.I).strip()
-        content = re.sub(r"\s*```$", "", content).strip()
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", content, flags=re.S)
-        if not match:
-            raise
-        return json.loads(match.group(0))
-
-def rewrite_with_provider(system_prompt: str, rows: list[dict[str, Any]], batch_size: int = 20) -> dict[int, dict[str, str]]:
-    _, model, api_key = provider_config()
-    if not api_key:
-        return {}
-    rewrites: dict[int, dict[str, str]] = {}
-    for start in range(0, len(rows), batch_size):
-        batch = rows[start:start + batch_size]
-        batch_id_to_index = {int(row["id"]): start + offset for offset, row in enumerate(batch)}
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "请改写以下条目：\n" + json.dumps(batch, ensure_ascii=False)},
-            ],
-            "temperature": 0.2,
-        }
-        try:
-            data = provider_json(payload)
-            content = data["choices"][0]["message"]["content"]
-            parsed = parse_provider_json_content(content)
-        except Exception as exc:
-            print(f"REWRITE_SKIPPED batch={start} reason={type(exc).__name__}", file=sys.stderr)
-            continue
-        for row in parsed.get("items", []):
-            try:
-                local_id = int(row.get("id"))
-            except Exception:
-                continue
-            title = clean_text(str(row.get("title") or row.get("标题") or row.get("zh_title") or ""))
-            summary = clean_text(str(row.get("summary") or row.get("description") or row.get("摘要") or row.get("zh_summary") or ""))
-            target_index = batch_id_to_index.get(local_id)
-            if target_index is None and 1 <= local_id <= len(batch):
-                target_index = start + local_id - 1
-            if (title or summary) and target_index is not None:
-                rewrites[target_index] = {"title": title, "summary": summary}
-        time.sleep(0.2)
-    return rewrites
-
-def classify_with_provider(system_prompt: str, rows: list[dict[str, Any]], allowed: list[str], batch_size: int = 25) -> dict[int, str]:
-    _, model, api_key = provider_config()
-    if not api_key:
-        return {}
-    out: dict[int, str] = {}
-    for start in range(0, len(rows), batch_size):
-        batch = rows[start:start + batch_size]
-        batch_id_to_index = {int(row["id"]): start + offset for offset, row in enumerate(batch)}
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "请分类以下条目：\n" + json.dumps(batch, ensure_ascii=False)},
-            ],
-            "temperature": 0,
-        }
-        try:
-            data = provider_json(payload)
-            content = data["choices"][0]["message"]["content"]
-            parsed = parse_provider_json_content(content)
-        except Exception as exc:
-            print(f"CLASSIFY_SKIPPED batch={start} reason={type(exc).__name__}", file=sys.stderr)
-            continue
-        for row in parsed.get("items", []):
-            try:
-                local_id = int(row.get("id"))
-            except Exception:
-                continue
-            category = str(row.get("category") or "").strip()
-            if category not in allowed:
-                category = MISC
-            target_index = batch_id_to_index.get(local_id)
-            if target_index is None and 1 <= local_id <= len(batch):
-                target_index = start + local_id - 1
-            if target_index is not None:
-                out[target_index] = category
-        time.sleep(0.2)
-    return out
-
 def classify_vendor_items(items: list[Item]) -> None:
-    system = (
-        "你是AI周报条目分类器。分类只能是：AI厂商产品更新、AI厂商博客更新、-misc。"
-        "AI厂商产品更新：产品发布、功能更新、客户案例、商业合作、订阅、企业落地、搜索、Workspace、Codex/Cursor产品功能。"
-        "AI厂商博客更新：技术博客、研究、工程实践、模型研究、agent harness、科学研究、系统架构。"
-        '返回严格JSON：{"items":[{"id":1,"category":"AI厂商产品更新"}]}。不要解释。'
-    )
-    rows = [
-        {
-            "id": idx + 1,
-            "source": item.source,
-            "title": item.title[:500],
-            "description": item.description[:500],
-            "source_categories": item.metadata.get("categories", []),
-        }
-        for idx, item in enumerate(items)
-    ]
-    classified = classify_with_provider(system, rows, [VENDOR_PRODUCT, VENDOR_BLOG, MISC])
-    for idx, category in classified.items():
-        if 0 <= idx < len(items):
-            items[idx].category = category
     for item in items:
         if not item.category:
-            text = f"{item.source} {item.title} {item.description}".lower()
+            source_categories = " ".join(str(value) for value in item.metadata.get("categories", []))
+            text = f"{item.source} {item.title} {item.description} {source_categories}".lower()
             if any(key in text for key in ["research", "engineering", "研究", "技术", "model", "agent harness", "science"]):
                 item.category = VENDOR_BLOG
             else:
                 item.category = VENDOR_PRODUCT
-
-def rewrite_vendor_items(items: list[Item]) -> None:
-    system = (
-        "你是AI产品与技术周报编辑。请把厂商新闻/技术博客条目的标题和摘要改写成简洁中文。"
-        "只基于输入内容，不要添加未给出的事实。标题保留核心事件，20到45个中文字符。"
-        "摘要用1句话，45到95个中文字符，说明更新内容和意义。"
-        '返回严格JSON：{"items":[{"id":1,"title":"中文标题","summary":"中文摘要"}]}。不要解释。'
-    )
-    rows = [
-        {
-            "id": idx + 1,
-            "source": item.source,
-            "title": item.title,
-            "description": item.description,
-            "date": item.date,
-            "url": item.url,
-            "source_categories": item.metadata.get("categories", []),
-        }
-        for idx, item in enumerate(items)
-    ]
-    rewritten = rewrite_with_provider(system, rows, batch_size=20)
-    for idx, values in rewritten.items():
-        if 0 <= idx < len(items):
-            if values.get("title"):
-                items[idx].title = values["title"]
-            if values.get("summary"):
-                items[idx].description = values["summary"]
 
 def dedupe_items(items: list[Item]) -> list[Item]:
     out: list[Item] = []
@@ -524,7 +366,6 @@ def fetch_vendor_items(
         }
     selected = dedupe_items(candidates)
     classify_vendor_items(selected)
-    rewrite_vendor_items(selected)
     selected.sort(key=lambda item: (item.date, item.source, item.title), reverse=True)
     for item in selected:
         source_status[item.source]["selected"] += 1

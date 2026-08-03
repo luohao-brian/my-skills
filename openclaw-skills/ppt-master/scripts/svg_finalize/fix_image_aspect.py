@@ -46,7 +46,7 @@ try:
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
-    print("[WARN] PIL not installed. Install with: pip install Pillow")
+    print("[WARN] Pillow is unavailable in the caller-selected Python environment")
     print("       Will try to use basic method for JPEG/PNG files.")
 
 

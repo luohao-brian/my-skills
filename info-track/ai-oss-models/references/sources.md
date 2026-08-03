@@ -63,8 +63,8 @@ HF 热门条件：
 ## 当前热门与趋势快照
 
 - `trending-observed` 只在未传 `--date` 的当前运行中使用，表示仓库在观察日仍满足热门条件，不表示当日发布或更新。
-- 当前运行把全局 Trending 排名、TrendingScore、下载量和点赞量保存到本地快照；下一次运行在 `metadata.trend` 中给出排名与指标增量。
-- 快照默认位于 `${XDG_CACHE_HOME:-~/.cache}/ai-oss-models/trending-snapshot.json`；可通过 `AI_OSS_MODELS_STATE_DIR` 指向独立状态目录。快照不写入候选 JSON、报告或技能仓库。
+- 当前运行在调用方提供 `--state-dir` 或 `AI_OSS_MODELS_STATE_DIR` 时，把全局 Trending 排名、TrendingScore、下载量和点赞量保存到该目录的 `trending-snapshot.json`；下一次使用同一目录运行时，在 `metadata.trend` 中给出排名与指标增量。
+- 未提供状态目录时不读写持久状态，趋势增量为空。快照不写入候选 JSON、报告或技能仓库。
 - 指定 `--date` 的历史回测既不查询实时全局热门池，也不读写快照；候选 metadata 省略当前下载、点赞、TrendingScore 和趋势字段，防止当前社区热度影响历史召回、排序或展示。
 
 不从模型名推断分类、参数量或依赖。缺少结构化字段时使用空值或 `unknown`。

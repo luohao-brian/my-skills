@@ -1,19 +1,13 @@
 # Ark Video Generation Reference
 
-## Environment
+## API Boundary
 
-Required:
+- Environment: `ARK_AGENT_PLAN_API_KEY`
+- Endpoint: `https://ark.cn-beijing.volces.com/api/plan/v3`
+- Model: `doubao-seedance-2.0-fast`
 
-- `ARK_AGENT_PLAN_API_KEY`
-
-The script reads only `ARK_AGENT_PLAN_API_KEY` for authentication.
-
-Optional:
-
-- `VOLC_ARK_BASE_URL`: defaults to `https://ark.cn-beijing.volces.com/api/plan/v3`
-- `VOLC_VIDEO_MODEL_ID`: defaults to `doubao-seedance-2.0-fast`
-- `VOLC_VIDEO_TIMEOUT`: defaults to `300`
-- `VOLC_VIDEO_POLL_SECONDS`: defaults to `5`
+The script reads no other environment variable. Task timeout and polling are
+fixed implementation details.
 
 ## Usage
 
@@ -25,9 +19,9 @@ python3 {baseDir}/scripts/volc_video_gen.py "科技产品展示动画" --audio
 
 ## Generation Settings
 
-- `--duration`: clamped to 5-12 seconds.
+- `--duration`: accepts 5-12 seconds; other values fail before submission.
 - `--aspect-ratio`: defaults to `16:9`.
 - `--resolution`: defaults to `720p`.
 - `--audio`: requests generated audio when the model supports it.
 
-The script encodes local reference images as data URLs and passes them as `image_url` content, matching the Hermes Ark plugin pattern.
+The script encodes local reference images as data URLs and passes them as `image_url` content.

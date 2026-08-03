@@ -35,7 +35,7 @@ configure_utf8_stdio()
 try:
     from PIL import Image
 except ImportError:
-    print("Error: PIL (Pillow) is required. Run: pip install Pillow")
+    print("Error: Pillow is required in the caller-selected Python environment")
     exit(1)
 
 

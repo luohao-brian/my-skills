@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
-import os
 import re
 import subprocess
 import sys
@@ -36,12 +35,8 @@ USER_AGENT = "ai-community-pulse/1.0 (+fixed-channel collector)"
 EXCLUDED_HOSTS = {"github.com", "www.github.com"}
 DEFAULT_MAX_SECONDS = 720
 HTTP_TIMEOUT_SECONDS = 6
-PROXY_HTTP_TIMEOUT_SECONDS = 15
 OPENCLI_TIMEOUT_SECONDS = 12
 OPENCLI_WORKERS = 3
-PROXY_URL = os.environ.get("OPENCLAW_PROXY_URL", "").strip()
-PROXY_REQUIRED_HOSTS: set[str] = set()
-PROXY_REQUIRED_HOSTS_LOCK = threading.Lock()
 OPENCLI_SEMAPHORE = threading.BoundedSemaphore(2)
 
 
@@ -96,13 +91,12 @@ def remaining_timeout(deadline: float | None, default: float) -> float:
     return max(0.2, min(default, remaining))
 
 
-def read_json_url(url: str, timeout: float, proxy_url: str = "") -> Any:
+def read_json_url(url: str, timeout: float) -> Any:
     request = urllib.request.Request(
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
     )
-    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else {}
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+    opener = urllib.request.build_opener()
     with opener.open(request, timeout=timeout) as response:
         payload = response.read()
     if not payload:
@@ -111,37 +105,10 @@ def read_json_url(url: str, timeout: float, proxy_url: str = "") -> Any:
 
 
 def http_json(url: str, timeout: int = HTTP_TIMEOUT_SECONDS, deadline: float | None = None) -> Any:
-    host = urllib.parse.urlsplit(url).netloc.lower()
-    with PROXY_REQUIRED_HOSTS_LOCK:
-        proxy_required = host in PROXY_REQUIRED_HOSTS
-    if proxy_required and PROXY_URL:
-        try:
-            return read_json_url(
-                url,
-                remaining_timeout(deadline, PROXY_HTTP_TIMEOUT_SECONDS),
-                PROXY_URL,
-            )
-        except Exception as proxy_error:
-            raise RuntimeError(f"proxy request failed: {describe_error(proxy_error)}") from proxy_error
-
     try:
         return read_json_url(url, remaining_timeout(deadline, timeout))
-    except Exception as direct_error:
-        if not PROXY_URL:
-            raise RuntimeError(f"direct request failed: {describe_error(direct_error)}") from direct_error
-        with PROXY_REQUIRED_HOSTS_LOCK:
-            PROXY_REQUIRED_HOSTS.add(host)
-        try:
-            return read_json_url(
-                url,
-                remaining_timeout(deadline, PROXY_HTTP_TIMEOUT_SECONDS),
-                PROXY_URL,
-            )
-        except Exception as proxy_error:
-            raise RuntimeError(
-                f"direct request failed: {describe_error(direct_error)}; "
-                f"proxy retry failed: {describe_error(proxy_error)}"
-            ) from proxy_error
+    except Exception as exc:
+        raise RuntimeError(f"request failed: {describe_error(exc)}") from exc
 
 
 def parse_date(value: Any) -> datetime | None:
@@ -708,7 +675,7 @@ def collect_document(args: argparse.Namespace) -> dict[str, Any]:
     }
     log_progress(
         f"collecting {len(collectors)} public sources in parallel "
-        f"(deadline={args.max_seconds}s, proxy_retry={'on' if PROXY_URL else 'off'})"
+        f"(deadline={args.max_seconds}s)"
     )
     public_results: dict[str, tuple[list[dict[str, Any]], int] | BaseException] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(collectors)) as pool:

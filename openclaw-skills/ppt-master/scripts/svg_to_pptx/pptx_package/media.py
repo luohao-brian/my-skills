@@ -33,10 +33,10 @@ def get_png_renderer_info() -> tuple[str | None, str, str | None]:
         return ('cairosvg', '(full gradient/filter support)', None)
     elif PNG_RENDERER == 'svglib':
         return ('svglib', '(some gradients may be lost)',
-                'Install cairosvg for better results: pip install cairosvg')
+                'Provide cairosvg through the calling runtime for better results')
     else:
         return (None, '(not installed)',
-                'Install via: pip install cairosvg or pip install svglib reportlab')
+                'Provide cairosvg or svglib+reportlab through the calling runtime')
 
 
 def convert_svg_to_png(

@@ -18,9 +18,9 @@
 
 每个 `items[]` 包含：
 
-- `title`：原始标题或 provider 的中文改写标题。
+- `title`：来源原始标题；中文报告标题由调用方 Agent 根据来源字段生成。
 - `url`：原文直达链接。
-- `summary`：来源摘要或 provider 基于来源字段生成的中文摘要。
+- `summary`：来源摘要；中文报告摘要由调用方 Agent 根据来源字段生成。
 - `date`：`YYYY-MM-DD`；无法识别日期的条目不会进入窗口结果。
 - `source`：固定来源名。
 - `category`：`AI厂商产品更新`、`AI厂商博客更新` 或 `-misc`。

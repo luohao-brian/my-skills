@@ -825,7 +825,7 @@ def _convert_docx(input_file: Path, out_file: Path) -> str:
     try:
         import mammoth
     except ImportError:
-        print("[ERROR] mammoth not installed. Run: pip install mammoth")
+        print("[ERROR] mammoth is unavailable in the caller-selected Python environment")
         return ""
 
     media_dir, rel_media_dir = _ensure_media_dir(out_file)
@@ -997,7 +997,7 @@ def _process_html_images(html: str, base_dir: Path, media_dir: Path, rel_media_d
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        print("[ERROR] beautifulsoup4 not installed. Run: pip install beautifulsoup4")
+        print("[ERROR] beautifulsoup4 is unavailable in the caller-selected Python environment")
         return html
 
     soup = BeautifulSoup(html, "html.parser")
@@ -1022,13 +1022,13 @@ def _convert_html(input_file: Path, out_file: Path) -> str:
     try:
         from markdownify import markdownify
     except ImportError:
-        print("[ERROR] markdownify not installed. Run: pip install markdownify")
+        print("[ERROR] markdownify is unavailable in the caller-selected Python environment")
         return ""
 
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        print("[ERROR] beautifulsoup4 not installed. Run: pip install beautifulsoup4")
+        print("[ERROR] beautifulsoup4 is unavailable in the caller-selected Python environment")
         return ""
 
     media_dir, rel_media_dir = _ensure_media_dir(out_file)
@@ -1190,7 +1190,7 @@ def _convert_epub(input_file: Path, out_file: Path) -> str:
         from bs4 import BeautifulSoup
     except ImportError as e:
         print(f"[ERROR] Missing dependency: {e.name}. "
-              f"Run: pip install ebooklib markdownify beautifulsoup4")
+              f"Provide ebooklib, markdownify, and beautifulsoup4 through the calling runtime")
         return ""
 
     media_dir, rel_media_dir = _ensure_media_dir(out_file)
@@ -1261,7 +1261,7 @@ def _convert_ipynb(input_file: Path, out_file: Path) -> str:
         from nbconvert import MarkdownExporter
         from nbconvert.writers import FilesWriter
     except ImportError:
-        print("[ERROR] nbconvert not installed. Run: pip install nbconvert")
+        print("[ERROR] nbconvert is unavailable in the caller-selected Python environment")
         return ""
 
     # Pre-process cell-level markdown attachments: nbconvert leaves
@@ -1322,10 +1322,10 @@ def _check_pandoc() -> bool:
 
 def _convert_with_pandoc(input_file: Path, out_file: Path, suffix: str) -> str:
     if not _check_pandoc():
-        print(f"[ERROR] Format '{suffix}' requires pandoc. Install it:")
-        print("   macOS:   brew install pandoc")
-        print("   Ubuntu:  sudo apt install pandoc")
-        print("   Windows: https://pandoc.org/installing.html")
+        print(
+            f"[ERROR] Format '{suffix}' requires a pandoc executable "
+            "provided by the calling runtime"
+        )
         return ""
 
     input_format, _ = PANDOC_FORMATS[suffix]

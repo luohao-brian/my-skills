@@ -261,7 +261,7 @@ def _load_encoder(name: str) -> Any:
     except ImportError as exc:
         raise AuditError(
             "tiktoken is required for exact prompt counts. "
-            "Install it with: pip install 'tiktoken>=0.7.0'"
+            "Provide tiktoken>=0.7.0 through the caller-selected Python environment"
         ) from exc
 
     try:

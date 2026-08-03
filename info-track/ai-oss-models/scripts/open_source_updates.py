@@ -166,13 +166,11 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def trending_snapshot_path() -> Path:
-    override = (os.getenv("AI_OSS_MODELS_STATE_DIR") or "").strip()
-    if override:
-        return Path(override).expanduser() / "trending-snapshot.json"
-    cache_root = (os.getenv("XDG_CACHE_HOME") or "").strip()
-    base = Path(cache_root).expanduser() if cache_root else Path.home() / ".cache"
-    return base / "ai-oss-models" / "trending-snapshot.json"
+def trending_snapshot_path(state_dir: str | None) -> Path | None:
+    configured = (state_dir or os.getenv("AI_OSS_MODELS_STATE_DIR") or "").strip()
+    if not configured:
+        return None
+    return Path(configured).expanduser() / "trending-snapshot.json"
 
 
 def load_trending_snapshot(path: Path) -> dict[str, Any]:
@@ -1741,6 +1739,10 @@ def main() -> int:
     )
     parser.add_argument("--date", help="Window start date, YYYY-MM-DD")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
+    parser.add_argument(
+        "--state-dir",
+        help="Optional caller-owned directory for the current trending snapshot",
+    )
     parser.add_argument("--stats", action="store_true", help="Print group counts to stderr")
     args = parser.parse_args()
 
@@ -1770,8 +1772,12 @@ def main() -> int:
             )
         )
 
-    snapshot_path = trending_snapshot_path()
-    previous_snapshot = load_trending_snapshot(snapshot_path) if args.date is None else {}
+    snapshot_path = trending_snapshot_path(args.state_dir)
+    previous_snapshot = (
+        load_trending_snapshot(snapshot_path)
+        if args.date is None and snapshot_path is not None
+        else {}
+    )
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
@@ -2014,7 +2020,7 @@ def main() -> int:
         "discoveries": discoveries,
     }
     emit_payload(payload, args.output)
-    if args.date is None and global_trending:
+    if args.date is None and global_trending and snapshot_path is not None:
         write_trending_snapshot_safely(snapshot_path, global_trending, end.isoformat())
 
     if args.stats:

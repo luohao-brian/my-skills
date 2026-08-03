@@ -14,14 +14,6 @@ metadata: {"openclaw":{"skillKey":"ark-search","emoji":"🔎","homepage":"https:
 - Read [references/docs-index.md](references/docs-index.md) only when you need API parameters, response fields, errors, or official docs links.
 - Read `scripts/web_search.py --help` only when exact flags are needed.
 
-## Credential Boundary
-
-This skill only supports Agent Plan API key authentication:
-
-- `ARK_AGENT_PLAN_API_KEY`
-
-No AK/SK credential path is supported by this skill.
-
 ## Command
 
 ```bash
@@ -44,15 +36,15 @@ python3 {baseDir}/scripts/web_search.py "故宫博物院" --type image --count 3
 - `--query-rewrite`: enable provider query rewrite.
 - `--no-summary`: do not request `Summary` for web results.
 
-## Invocation Contract
+## Contract
 
-1. Use `--type web` for text evidence and `--type image` only for image result lists.
-2. Use `--time-range` when the caller specifies a recency window or date range.
-3. Use `--sites` or `--auth-level 1` when the caller requires specific or authoritative sources.
+1. The script reads only `ARK_AGENT_PLAN_API_KEY` and uses the fixed Search endpoint.
+2. Use `--type web` for text evidence and `--type image` only for image result lists.
+3. Use recency, site, and authority filters only when required; combined filters may legitimately return zero results.
 
 ## Result Handling
 
 1. Treat stdout as the search result list.
 2. When passing web evidence forward, keep title, site name, URL, publish time, and summary/snippet when present.
 3. When passing image results forward, keep image URL, dimensions, source page URL, title, and site name when present.
-4. Treat empty or weak results as a completed skill call with insufficient evidence, not as permission to invent missing facts.
+4. Treat empty or weak results as a successful call with insufficient evidence, not as an API failure or permission to invent facts.

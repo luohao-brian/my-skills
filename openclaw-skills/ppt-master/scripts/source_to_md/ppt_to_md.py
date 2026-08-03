@@ -12,7 +12,7 @@ and slide-internal jumps are emitted as ``[text](url)`` / ``[text](#slide-N)``,
 with a shape-level ``click_action`` fallback.
 
 Dependency:
-    pip install python-pptx
+    Requires python-pptx in the caller-selected Python environment.
 
 API stability note:
     Detecting slide-internal jumps (``ppaction://hlinksldjump``) reads

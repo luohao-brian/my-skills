@@ -21,6 +21,7 @@ python3 {baseDir}/scripts/vendor_updates.py --output vendor-candidates.json --st
 
 1. 仅使用可选的 `--date YYYY-MM-DD`、`--output` 和 `--stats`；未指定绝对日期时不传 `--date`。
 2. 候选 JSON 遵循 [references/output-schema.md](references/output-schema.md)，报告遵循 [references/template.md](references/template.md)。
+3. 采集器不调用语言模型，也不读取任何通用 LLM key、endpoint 或模型配置。使用当前 Agent 已有的语言能力，根据候选原文生成中文标题、摘要和报告。
 
 ## 时间窗口
 

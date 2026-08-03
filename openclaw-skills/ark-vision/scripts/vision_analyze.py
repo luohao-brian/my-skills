@@ -11,29 +11,24 @@ from pathlib import Path
 from typing import Any
 
 
+BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
+MODEL_ID = "doubao-seed-2.0-lite"
+MAX_OUTPUT_TOKENS = 2000
+TEMPERATURE = 0.1
+REQUEST_TIMEOUT_SECONDS = 120
+
+
 def _require_requests():
     try:
         import requests
     except ImportError:
-        print("Error: requests not installed. Run: pip install requests", file=sys.stderr)
+        print("Error: requests is unavailable in the caller-selected Python environment", file=sys.stderr)
         sys.exit(1)
     return requests
 
 
 def api_key_value() -> str:
     return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
-
-
-def endpoint(base_url: str, suffix: str) -> str:
-    base = base_url.strip().rstrip("/")
-    suffix = suffix.strip("/")
-    if base.endswith(f"/{suffix}"):
-        return base
-    if base.endswith("/chat/completions") and suffix != "chat/completions":
-        base = base[: -len("/chat/completions")]
-    if base.endswith("/responses") and suffix != "responses":
-        base = base[: -len("/responses")]
-    return f"{base}/{suffix}"
 
 
 def file_to_data_url(path_text: str) -> str:
@@ -91,7 +86,7 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
 
     image_url = normalize_image(args.image)
     payload = {
-        "model": args.model,
+        "model": MODEL_ID,
         "input": [
             {
                 "role": "user",
@@ -101,25 +96,27 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
                 ],
             }
         ],
-        "temperature": args.temperature,
-        "max_output_tokens": args.max_output_tokens,
+        "temperature": TEMPERATURE,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
     }
     response = requests.post(
-        endpoint(args.base_url, "responses"),
+        f"{BASE_URL}/responses",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
-        timeout=args.timeout,
+        timeout=REQUEST_TIMEOUT_SECONDS,
     )
     if response.status_code >= 400:
         raise RuntimeError(response_error(response))
 
     body = response.json()
     analysis = extract_responses_text(body)
+    if not analysis:
+        raise RuntimeError("Vision response contained no analysis text")
     result: dict[str, Any] = {
         "success": True,
         "type": "vision",
         "analysis": analysis,
-        "model": args.model,
+        "model": MODEL_ID,
         "image": args.image,
     }
     if args.raw:
@@ -131,11 +128,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Analyze images with Ark Agent Plan vision models")
     parser.add_argument("image", help="Local image path, remote URL, or data URL")
     parser.add_argument("question", help="Question or extraction instruction about the image")
-    parser.add_argument("--model", default=os.getenv("VOLC_VISION_MODEL_ID", "doubao-seed-2.0-lite"))
-    parser.add_argument("--base-url", default=os.getenv("VOLC_ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3"))
-    parser.add_argument("--max-output-tokens", type=int, default=int(os.getenv("VOLC_VISION_MAX_OUTPUT_TOKENS", "2000")))
-    parser.add_argument("--temperature", type=float, default=float(os.getenv("VOLC_VISION_TEMPERATURE", "0.1")))
-    parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_VISION_TIMEOUT", "120")))
     parser.add_argument("--json", action="store_true", help="Print structured JSON instead of plain analysis text")
     parser.add_argument("--raw", action="store_true", help="Include raw provider response in JSON output")
     args = parser.parse_args()
@@ -143,7 +135,7 @@ def main() -> int:
     try:
         result = analyze_image(args)
     except Exception as exc:
-        error = {"success": False, "type": "vision", "error": str(exc), "model": args.model, "image": args.image}
+        error = {"success": False, "type": "vision", "error": str(exc), "model": MODEL_ID, "image": args.image}
         print(json.dumps(error, ensure_ascii=False), file=sys.stderr)
         return 1
 

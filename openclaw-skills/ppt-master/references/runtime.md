@@ -1,40 +1,39 @@
-# OpenClaw Runtime Contract
+# Runtime Contract
 
-## Upstream baseline and overlay
+## Python capability
 
-- Repository: `https://github.com/hugohe3/ppt-master`
-- Imported core commit: `6b42a6a652f9d6e9fc0c81e634c9fdfe771eee10` (2026-07-31)
-- The OpenClaw overlay retains single-line metadata, `{baseDir}` resolution, external project roots, runtime-neutral media, and deterministic SVG/PPTX release checks.
-- The later upstream independent-identity guard is intentionally not imported because it rejects the OpenClaw metadata and runtime adapter contract. See [`upstream-source.md`](upstream-source.md).
+The calling runtime owns its Python executable, environment, dependency manager,
+browser installation, and process lifecycle. PPT Master consumes that capability;
+it does not provision or select it.
 
-## Dependencies
+- Reuse the Python invocation already selected by the caller. It may be
+  `python3`, `python`, `uv run python`, a managed virtual environment, a
+  container command, or another compatible runtime-owned launcher.
+- Do not create, activate, delete, or relocate a virtual environment; install or
+  upgrade packages; alter `PATH`; switch interpreters; or download a browser
+  unless the user explicitly requests environment setup or the calling runtime's
+  own approved dependency mechanism performs it.
+- `requirements.txt` declares Python packages for runtimes that need dependency
+  metadata. It does not prescribe an installation directory, package manager, or
+  environment layout.
+- Before a selected route runs, check only the imports and executables that route
+  needs. If one is unavailable, report the missing capability and affected stage.
+  Do not classify a missing dependency as a corrupt project asset and do not
+  mutate the caller's environment as an implicit recovery step.
+- Browser checks may reuse a browser already exposed by the runtime, installed
+  Chrome, or Playwright-managed Chromium. If none is available, report that the
+  browser-dependent check was not run.
 
-Install into an external environment, never into the skill directory:
+Command examples use `python3` as a readable placeholder. Replace it with the
+caller's existing Python invocation; the examples do not require a particular
+executable name or a persistent shell activation.
+
+## Project location
+
+Resolve the project root before initialization. Prefer the user-selected output directory; otherwise use a dedicated directory inside the current runtime workspace. Never use `{baseDir}/projects`, a relative `projects/`, or a source-repository directory.
 
 ```bash
-uv venv <external-cache>/ppt-master-venv
-uv pip install --python <external-cache>/ppt-master-venv/bin/python \
-  -r {baseDir}/requirements.txt
-<external-cache>/ppt-master-venv/bin/python -m playwright install chromium
-```
-
-The browser audit may use installed Chrome when Playwright-managed Chromium is unavailable.
-
-Resolve the Python executable once after dependency setup and reuse that exact
-executable for every PPT Master command. Do not assume an activated virtual
-environment or a modified `PATH` survives across Agent tool calls. Before
-starting work, use the resolved interpreter to import the dependencies needed
-by the selected route (including Pillow for raster images and Playwright for
-the browser audit); a failed import is an environment failure, not a corrupt
-project asset. The command examples below use `python3` as a placeholder for
-that resolved executable.
-
-## External project root
-
-Resolve an absolute project root before initialization. Prefer the user-selected output directory; otherwise use a dedicated directory inside the current runtime workspace. Never use `{baseDir}/projects`, a relative `projects/`, or a source-repository directory.
-
-```bash
-PROJECTS_ROOT="<absolute runtime-workspace directory>"
+PROJECTS_ROOT="<caller-selected directory or runtime workspace>"
 python3 {baseDir}/scripts/project_manager.py init <name> --format ppt169 --dir "$PROJECTS_ROOT"
 ```
 
@@ -42,7 +41,7 @@ Pass the resulting absolute project path to every subsequent command.
 
 ## Runtime media
 
-Read [`runtime-media.md`](runtime-media.md) before AI image or narration work. Discover the current Agent's available tools/skills and adapt to their declared schemas. The workflow may request an image or TTS capability, but must not bind itself to an Agent, provider, model, key, or one fixed parameter spelling.
+Read [`runtime-media.md`](runtime-media.md) before AI image or narration work. Discover the caller's available tools/skills and adapt to their declared schemas. The workflow may request an image or TTS capability, but must not bind itself to an Agent product, provider, model, key, or one fixed parameter spelling.
 
 ## Release gate
 

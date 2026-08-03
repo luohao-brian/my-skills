@@ -1,12 +1,15 @@
 ---
 name: ark-viking
 description: 检索和读取 OpenViking 只读知识库，并按文章返回相关度、文章标题、原文链接及相关章节正文。用于查找博客或文档、回答需要原文依据的问题，或按 Viking URI 浏览资源；不用于写入、同步或删除数据。
+homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-viking
 metadata: {"openclaw":{"skillKey":"ark-viking","emoji":"🧭","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-viking","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_OPENVIKING_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_OPENVIKING_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ---
 
 # Ark Viking
 
 通过 `{baseDir}/scripts/openviking.py` 只读访问 OpenViking。
+
+脚本只读取 `ARK_AGENT_PLAN_OPENVIKING_API_KEY`，服务地址、默认知识库范围和原文链接映射固定在实现中。
 
 ## 操作
 

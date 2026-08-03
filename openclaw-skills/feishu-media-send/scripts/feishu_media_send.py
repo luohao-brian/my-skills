@@ -52,21 +52,6 @@ def json_pointer(data: Any, pointer: str) -> Any:
     return current
 
 
-def default_config_path() -> Path:
-    if os.getenv("OPENCLAW_CONFIG"):
-        return Path(os.environ["OPENCLAW_CONFIG"]).expanduser()
-    home = Path(os.getenv("OPENCLAW_HOME") or Path.home()).expanduser()
-    candidates = [
-        home / ".openclaw" / "openclaw.json",
-        Path.home() / ".openclaw" / "openclaw.json",
-        Path("/root/.openclaw/openclaw.json"),
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return candidates[0]
-
-
 def load_openclaw_config(path: Path) -> dict[str, Any]:
     try:
         return json.loads(path.read_text())
@@ -98,12 +83,17 @@ def resolve_secret_ref(config: dict[str, Any], ref: Any) -> str:
     return str(value).strip()
 
 
-def load_credentials(config_path: Path) -> tuple[str, str]:
+def load_credentials(config_path: Path | None) -> tuple[str, str]:
     env_app_id = os.getenv("FEISHU_APP_ID", "").strip()
     env_app_secret = os.getenv("FEISHU_APP_SECRET", "").strip()
     if env_app_id and env_app_secret:
         return env_app_id, env_app_secret
 
+    if config_path is None:
+        raise FeishuError(
+            "Missing Feishu credentials. Set FEISHU_APP_ID and FEISHU_APP_SECRET, "
+            "or pass an OpenClaw config explicitly with --config."
+        )
     config = load_openclaw_config(config_path)
     channels = config.get("channels") if isinstance(config.get("channels"), dict) else {}
     channel = channels.get("feishu") or channels.get("lark") or {}
@@ -245,7 +235,10 @@ def main() -> int:
     parser.add_argument("--caption", help="Optional text message sent before the media")
     parser.add_argument("--duration-ms", type=int, help="Optional duration for mp4/opus uploads")
     parser.add_argument("--domain", choices=["feishu", "lark"], default=os.getenv("FEISHU_DOMAIN", "feishu"))
-    parser.add_argument("--config", default=str(default_config_path()))
+    parser.add_argument(
+        "--config",
+        help="Optional explicit OpenClaw config path used only as a credential adapter",
+    )
     parser.add_argument("--timeout", type=float, default=float(os.getenv("FEISHU_MEDIA_TIMEOUT", "60")))
     args = parser.parse_args()
 
@@ -255,7 +248,8 @@ def main() -> int:
         return 2
 
     try:
-        app_id, app_secret = load_credentials(Path(args.config).expanduser())
+        config_path = Path(args.config).expanduser() if args.config else None
+        app_id, app_secret = load_credentials(config_path)
         token = tenant_access_token(app_id, app_secret, args.domain, args.timeout)
         receive_id_type = infer_receive_id_type(args.to) if args.receive_id_type == "auto" else args.receive_id_type
 

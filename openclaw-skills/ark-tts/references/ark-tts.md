@@ -6,29 +6,27 @@ Required:
 
 - `ARK_AGENT_PLAN_API_KEY`
 
-The script reads only `ARK_AGENT_PLAN_API_KEY` for authentication. It checks
-the process environment first, then `.env`, then `~/.hermes/.env`.
+No other environment variable is read. The endpoint and resource id are fixed to
+the Agent Plan `seed-tts-2.0` service.
 
-Default request settings come from Hermes Ark plugin config when present:
+## Request
 
-- `~/.hermes/config.yaml` → `plugins.entries.ark.text_to_speech.base_url`
-- `~/.hermes/config.yaml` → `plugins.entries.ark.text_to_speech.resource_id`
-- `~/.hermes/config.yaml` → `plugins.entries.ark.text_to_speech.voice`
-- `~/.hermes/config.yaml` → `plugins.entries.ark.text_to_speech.output_format`
-- `~/.hermes/config.yaml` → `plugins.entries.ark.text_to_speech.timeout_seconds`
+- Endpoint: `https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional`
+- Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
+- Header `X-Api-Resource-Id`: `seed-tts-2.0`
+- Default voice: `zh_female_vv_uranus_bigtts`
+- Default format: `mp3`
+- Default sample rate: `24000`
 
-CLI flags such as `--voice`, `--resource-id`, `--base-url`, `--format`, and
-`--sample-rate` can override those request settings for a single run.
-
-The request matches the Hermes Ark TTS provider: plan TTS endpoint,
-`X-Api-Key`, `X-Api-Resource-Id`, and no `appid`.
+`--voice`, `--format`, and `--sample-rate` can override the three media settings
+for one call. Select `--voice` from [seed-tts-2.0-voices.md](seed-tts-2.0-voices.md).
 
 ## Usage
 
 ```bash
 python3 {baseDir}/scripts/volc_tts.py "欢迎使用 OpenClaw"
 python3 {baseDir}/scripts/volc_tts.py "今天心情不错" --voice zh_female_vv_uranus_bigtts --output ./speech.mp3
-python3 {baseDir}/scripts/volc_tts.py "Hello from Ark" --language en --format mp3
+python3 {baseDir}/scripts/volc_tts.py "Hello from Ark" --format mp3
 ```
 
 ## Output
@@ -45,9 +43,7 @@ The script prints JSON:
   "format": "mp3",
   "bytes": 12345,
   "speaker": "zh_female_vv_uranus_bigtts",
-  "sample_rate": 24000,
-  "resource_id": "seed-tts-2.0",
-  "subtitle_flag": "enable_subtitle"
+  "sample_rate": 24000
 }
 ```
 

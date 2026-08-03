@@ -21,7 +21,7 @@ metadata: {"openclaw":{"skillKey":"ai-community-pulse","emoji":"🌐","homepage"
 python3 {baseDir}/scripts/community_pulse.py collect \
   --hours 72 \
   --max-seconds 720 \
-  --output /absolute/path/community-pulse.json
+  --output ./outputs/community-pulse.json
 ```
 
 3. 检查 JSON 中的 `sources`。`ok: false` 的登录态来源必须如实保留；不得用泛搜索结果伪装为固定频道数据。
@@ -30,8 +30,8 @@ python3 {baseDir}/scripts/community_pulse.py collect \
 
 ```bash
 python3 {baseDir}/scripts/community_pulse.py render \
-  --input /absolute/path/community-pulse.json \
-  --output /absolute/path/community-pulse.md
+  --input ./outputs/community-pulse.json \
+  --output ./outputs/community-pulse.md
 ```
 
 也可以一步完成：
@@ -40,15 +40,15 @@ python3 {baseDir}/scripts/community_pulse.py render \
 python3 {baseDir}/scripts/community_pulse.py run \
   --hours 72 \
   --max-seconds 720 \
-  --json-output /absolute/path/community-pulse.json \
-  --report-output /absolute/path/community-pulse.md
+  --json-output ./outputs/community-pulse.json \
+  --report-output ./outputs/community-pulse.md
 ```
 
 ## 采集边界
 
 - X、Reddit、知乎、Linux.do、B站依赖 Chrome 登录态与 OpenCLI Browser Bridge。桥接不可用时继续采集公开来源，并在来源状态中记录失败原因。
 - HN、Bluesky、V2EX、Lobsters、LessWrong、Product Hunt 和 Polymarket 使用公开读取能力，不要求登录。
-- 公开 HTTP 来源先直连；连接失败、超时、空响应、403、429 或 5xx 时，如果环境提供 `OPENCLAW_PROXY_URL`，脚本自动经代理重试一次。
+- 公开 HTTP 来源使用调用方进程的标准网络配置；失败时在来源状态中记录错误，不读取 Agent 专属代理配置。
 - 采集器会输出来源进度并在 `--max-seconds` 预算内结束。启动后等待同一进程完成，不要因暂时没有新输出而重复运行。
 - X 只采固定账号；Reddit 只采固定 subreddit；Bluesky 只采固定 Custom Feed；V2EX 只采固定节点；不得用通用 Web 搜索代替。
 - Polymarket 只表达市场问题、当前概率和市场链接，标题加“预测市场”；概率不能写成事实。

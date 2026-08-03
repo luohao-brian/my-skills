@@ -19,10 +19,23 @@ SIZE_ALIASES = {
     "9:16": "1152x2048",
     "21:9": "2560x1080",
 }
+BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
+MODEL_ID = "doubao-seedream-5.0-lite"
+DEFAULT_SIZE = "2k"
+REQUEST_TIMEOUT_SECONDS = 180
 
 
 def api_key_value() -> str:
     return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+
+
+def require_requests():
+    try:
+        import requests
+    except ImportError:
+        print("Error: requests is unavailable in the caller-selected Python environment", file=sys.stderr)
+        sys.exit(1)
+    return requests
 
 
 def normalize_size(value: str) -> str:
@@ -33,14 +46,6 @@ def normalize_size(value: str) -> str:
     if size.lower() in {"2k", "3k", "4k"}:
         return size.lower()
     return size
-
-
-def endpoint(base_url: str, suffix: str) -> str:
-    base = base_url.strip().rstrip("/")
-    suffix = suffix.strip("/")
-    if base.endswith(f"/{suffix}"):
-        return base
-    return f"{base}/{suffix}"
 
 
 def file_to_data_url(path: str) -> str:
@@ -60,46 +65,46 @@ def image_ext(raw: bytes, fallback: str = "png") -> str:
     return fallback
 
 
-def output_path(out_dir: str, ext: str, filename: str | None) -> Path:
-    directory = Path(out_dir).expanduser()
+def output_path(output: str | None, ext: str) -> Path:
+    if output:
+        path = Path(output).expanduser()
+        suffix_ext = "jpg" if path.suffix.lower() in {".jpg", ".jpeg"} else path.suffix.lower().lstrip(".")
+        if suffix_ext != ext:
+            path = path.with_suffix(f".{ext}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+    directory = Path("outputs") / "images"
     directory.mkdir(parents=True, exist_ok=True)
-    if filename:
-        path = Path(filename)
-        return path if path.is_absolute() else directory / path
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     return directory / f"ark_image_{stamp}.{ext}"
 
 
-def save_b64(value: str, out_dir: str, filename: str | None) -> Path:
+def save_b64(value: str, output: str | None) -> Path:
     payload = value.split(",", 1)[1] if value.startswith("data:") and "," in value else value
     raw = base64.b64decode(payload)
-    path = output_path(out_dir, image_ext(raw), filename)
+    path = output_path(output, image_ext(raw))
     path.write_bytes(raw)
     return path
 
 
-def save_url(url: str, out_dir: str, filename: str | None, timeout: float) -> Path:
-    import requests
+def save_url(url: str, output: str | None) -> Path:
+    requests = require_requests()
 
-    response = requests.get(url, timeout=timeout)
+    response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()
     content_type = response.headers.get("content-type", "")
     fallback = "jpg" if "jpeg" in content_type else "webp" if "webp" in content_type else "png"
-    path = output_path(out_dir, image_ext(response.content, fallback), filename)
+    path = output_path(output, image_ext(response.content, fallback))
     path.write_bytes(response.content)
     return path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate images with Volcengine Ark")
+    parser = argparse.ArgumentParser(description="Generate images with Ark Agent Plan")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional local reference image path or data URL")
-    parser.add_argument("--size", default=os.getenv("VOLC_IMAGE_SIZE", "2k"))
-    parser.add_argument("--model", default=os.getenv("VOLC_IMAGE_MODEL_ID", "doubao-seedream-5.0-lite"))
-    parser.add_argument("--base-url", default=os.getenv("VOLC_ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/plan/v3"))
-    parser.add_argument("--output-dir", default=os.getenv("VOLC_IMAGE_OUTPUT_DIR", "outputs/images"))
-    parser.add_argument("--filename")
-    parser.add_argument("--timeout", type=float, default=float(os.getenv("VOLC_IMAGE_TIMEOUT", "180")))
+    parser.add_argument("--size", default=DEFAULT_SIZE)
+    parser.add_argument("--output", help="Output image path")
     args = parser.parse_args()
 
     api_key = api_key_value()
@@ -107,10 +112,10 @@ def main() -> int:
         print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    import requests
+    requests = require_requests()
 
     payload: dict[str, Any] = {
-        "model": args.model,
+        "model": MODEL_ID,
         "prompt": args.prompt,
         "size": normalize_size(args.size),
         "response_format": "b64_json",
@@ -122,10 +127,10 @@ def main() -> int:
 
     try:
         response = requests.post(
-            endpoint(args.base_url, "images/generations"),
+            f"{BASE_URL}/images/generations",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=payload,
-            timeout=max(args.timeout, 60),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         if response.status_code >= 400:
             raise RuntimeError(f"HTTP {response.status_code}: {response.text[:500]}")
@@ -133,9 +138,9 @@ def main() -> int:
         item = (body.get("data") or [{}])[0]
         remote_url = item.get("url")
         if item.get("b64_json"):
-            path = save_b64(item["b64_json"], args.output_dir, args.filename)
+            path = save_b64(item["b64_json"], args.output)
         elif remote_url:
-            path = save_url(remote_url, args.output_dir, args.filename, max(args.timeout, 60))
+            path = save_url(remote_url, args.output)
         else:
             raise RuntimeError(f"No image in response: {json.dumps(body, ensure_ascii=False)[:800]}")
         print(json.dumps({
@@ -143,7 +148,7 @@ def main() -> int:
             "type": "image",
             "local_path": str(path),
             "remote_url": remote_url,
-            "model": args.model,
+            "model": MODEL_ID,
             "prompt": args.prompt,
             "size": normalize_size(args.size),
             "used_reference_image": bool(args.image),

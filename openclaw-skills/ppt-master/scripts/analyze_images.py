@@ -30,7 +30,7 @@ configure_utf8_stdio()
 try:
     from PIL import Image, ImageOps
 except ImportError:
-    print("Error: PIL/Pillow not installed. Run: pip install Pillow")
+    print("Error: Pillow is unavailable in the caller-selected Python environment")
     sys.exit(1)
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"}

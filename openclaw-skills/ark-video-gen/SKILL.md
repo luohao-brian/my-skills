@@ -1,11 +1,11 @@
 ---
 name: ark-video-gen
-description: 使用火山引擎 Ark Seedance 视频生成接口创建文生视频或图生视频任务。适用于短视频生成、分镜草稿、图片转视频、视频任务轮询和返回生成视频 URL 的任务。
+description: 使用 Ark Agent Plan Seedance 视频生成接口创建文生视频或图生视频任务。适用于短视频生成、分镜草稿、图片转视频、视频任务轮询和返回生成视频 URL 的任务。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-video-gen
 metadata: {"openclaw":{"skillKey":"ark-video-gen","emoji":"🎬","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-video-gen","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"volcengine-python-sdk[ark]>=5.0.5,<6"}]}}
 ---
 
-# Volcengine Ark Video Generation
+# Ark Agent Plan Video Generation
 
 Use this skill to submit and poll Ark video generation tasks.
 
@@ -28,7 +28,8 @@ python3 {baseDir}/scripts/volc_video_gen.py "镜头缓慢推进，人物转身" 
 
 ## Contract
 
-1. Require `ARK_AGENT_PLAN_API_KEY`; the script does not read any other API key variable.
-2. Submit one task, poll until success, failure, or timeout.
-3. Expect stdout JSON containing `success`, `task_id`, `status`, `video_url`, `model`, and generation settings.
-4. On timeout, use the last known task status and task id from the script output.
+1. The script reads only `ARK_AGENT_PLAN_API_KEY`.
+2. Use the fixed Agent Plan endpoint and `doubao-seedance-2.0-fast` model.
+3. Submit one task, poll until success, failure, or timeout.
+4. Expect stdout JSON containing `success`, `task_id`, `status`, `video_url`, `model`, and generation settings.
+5. On timeout, use the last known task status and task id from the script output.

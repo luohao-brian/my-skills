@@ -6,19 +6,21 @@ Required:
 
 - `ARK_AGENT_PLAN_API_KEY`
 
-The script reads only `ARK_AGENT_PLAN_API_KEY` for authentication.
+The script reads only `ARK_AGENT_PLAN_API_KEY`. No optional environment variable
+is used.
 
-Optional:
+## Request
 
-- `VOLC_STT_BASE_URL`: defaults to `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream`
-- `VOLC_STT_RESOURCE_ID`: defaults to `volc.seedasr.sauc.duration`
+- Endpoint: `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream`
+- Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
+- Header `X-Api-Resource-Id`: `volc.seedasr.sauc.duration`
 
 ## Usage
 
 ```bash
 python3 {baseDir}/scripts/volc_stt.py ./meeting.wav
 python3 {baseDir}/scripts/volc_stt.py ./voice.ogg --format ogg --codec opus
-python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --seg-duration-ms 200
+python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --raw
 ```
 
 ## Audio Hints
@@ -26,7 +28,9 @@ python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --seg-duration-ms 200
 - `wav`, `pcm`, and `mp3` default to codec `raw`.
 - `ogg` and `opus` default to codec `opus`.
 - The default sample rate in the request metadata is `24000`.
-- The script sends chunked binary frames and waits for the final package.
+- Use `--sample-rate` when the input audio has another sample rate.
+- The script sends chunked binary frames at a fixed cadence and waits for the final package.
+- Default output omits the provider payload; `--raw` includes it.
 
 ## Failure Reporting
 

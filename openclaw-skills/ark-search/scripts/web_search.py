@@ -13,6 +13,7 @@ import textwrap
 from typing import Any
 
 ENDPOINT = "https://open.feedcoopapi.com/search_api/web_search"
+REQUEST_TIMEOUT_SECONDS = 30
 TIME_RANGE_SHORTCUTS = {"OneDay", "OneWeek", "OneMonth", "OneYear"}
 DATE_RANGE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$")
 
@@ -21,7 +22,7 @@ def _require_requests():
     try:
         import requests
     except ImportError:
-        print("Error: requests not installed. Run: pip install requests", file=sys.stderr)
+        print("Error: requests is unavailable in the caller-selected Python environment", file=sys.stderr)
         sys.exit(1)
     return requests
 
@@ -97,13 +98,13 @@ def build_body(
     return body
 
 
-def do_search(body: dict[str, Any], api_key: str, timeout: float) -> dict[str, Any]:
+def do_search(body: dict[str, Any], api_key: str) -> dict[str, Any]:
     requests = _require_requests()
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
-    response = requests.post(ENDPOINT, headers=headers, json=body, timeout=timeout)
+    response = requests.post(ENDPOINT, headers=headers, json=body, timeout=REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
 
@@ -125,6 +126,10 @@ def format_output(data: dict[str, Any], search_type: str) -> str:
             summary = item.get("Summary") or item.get("Snippet", "")
             if summary:
                 lines.append(f"    {summary[:300]}")
+            content = item.get("Content")
+            if content:
+                rendered_content = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+                lines.append(f"    正文: {rendered_content[:2000]}")
             lines.append("")
 
     elif search_type == "image":
@@ -134,6 +139,12 @@ def format_output(data: dict[str, Any], search_type: str) -> str:
             if image.get("Url"):
                 lines.append(f"    {image['Url']}")
             lines.append(f"    {image.get('Width', '?')}x{image.get('Height', '?')} ({image.get('Shape', '')})")
+            site_name = item.get("SiteName") or item.get("SourceSiteName")
+            if site_name:
+                lines.append(f"    来源: {site_name}")
+            source_url = item.get("SourceUrl") or item.get("SourcePageUrl") or item.get("Url")
+            if source_url:
+                lines.append(f"    来源页: {source_url}")
             lines.append("")
 
     return "\n".join(lines)
@@ -164,7 +175,6 @@ def main() -> int:
     parser.add_argument("--need-url", action="store_true", help="Web-only. Require original URLs for citation-ready results.")
     parser.add_argument("--query-rewrite", action="store_true", help="Ask the provider to rewrite the query when recall matters more than latency.")
     parser.add_argument("--no-summary", action="store_true", help="Web-only. Skip requesting Summary; useful when snippets are enough.")
-    parser.add_argument("--timeout", type=float, default=30, help="HTTP timeout in seconds.")
     args = parser.parse_args()
 
     count = args.count
@@ -203,7 +213,7 @@ def main() -> int:
             query_rewrite=args.query_rewrite,
             need_summary=not args.no_summary,
         )
-        data = do_search(body, api_key=api_key, timeout=args.timeout)
+        data = do_search(body, api_key=api_key)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

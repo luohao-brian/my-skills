@@ -6,7 +6,7 @@ profile may explicitly omit an artifact without erasing its facts.
 **Hard rule**: Read each fact from its owning artifact. Do not merge multiple channels into a second source of truth.
 
 **Quick Generate projection**: Quick omits confirmation, Design Spec, and lock.
-Its current main agent reads source/analysis facts, keeps routine decisions in
+Its active execution context reads source/analysis facts, keeps routine decisions in
 active context, and prepares images/icons/formulas plus required manifests
 before SVG authoring. Those artifacts retain their factual/provenance roles.
 Quick writes the same final SVG quality provenance and package postflight as

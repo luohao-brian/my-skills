@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify OpenClaw runtime-path and media boundaries for ppt-master."""
+"""Verify portable runtime-path and media boundaries for ppt-master."""
 
 from __future__ import annotations
 

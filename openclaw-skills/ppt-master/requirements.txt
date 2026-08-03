@@ -4,9 +4,9 @@
 # Most tools use only the Python standard library. Below are optional dependencies.
 # 大部分工具仅使用 Python 标准库，以下为可选依赖。
 #
-# Install into a uv-managed virtual environment / 安装到 uv 管理的虚拟环境：
-#   uv venv <external-venv>
-#   uv pip install --python <external-venv>/bin/python -r requirements.txt
+# The calling runtime chooses how and where these packages are provided.
+# This file does not require uv, venv, pip, or a fixed interpreter path.
+# 依赖由调用方运行时按自身机制提供；本文件不要求 uv、venv、pip 或固定解释器路径。
 
 # ─────────────────────────────────────────────────────────────
 # SVG to PPTX tool / SVG 转 PPTX 工具 ({baseDir}/scripts/svg_to_pptx.py)
@@ -59,9 +59,7 @@ openpyxl>=3.1.0
 # 备用路径 —— 仅在需要处理以下小众格式时才用到
 # (.doc .odt .rtf .tex/.latex .rst .org .typ)。
 # 如果只处理上述四种原生格式，无需安装。
-#   macOS:   brew install pandoc
-#   Ubuntu:  sudo apt install pandoc
-#   Windows: https://pandoc.org/installing.html
+#   Provide a pandoc executable through the calling runtime when those formats are needed.
 
 # ─────────────────────────────────────────────────────────────
 # Image processing tools / 图片处理工具

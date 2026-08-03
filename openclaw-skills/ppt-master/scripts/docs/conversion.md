@@ -95,11 +95,7 @@ Prefer MinerU or another OCR/layout tool when:
 - Multi-column layout parsing is poor
 - Encoding is garbled
 
-Dependency:
-
-```bash
-pip install PyMuPDF
-```
+Required capability: `PyMuPDF` in the caller-selected Python environment.
 
 ## `source_to_md/doc_to_md.py`
 
@@ -124,17 +120,10 @@ python3 {baseDir}/scripts/source_to_md/doc_to_md.py notes.epub
 python3 {baseDir}/scripts/source_to_md/doc_to_md.py paper.tex -o paper.md  # uses pandoc
 ```
 
-Dependencies:
-
-```bash
-# Native path — always required
-pip install mammoth markdownify ebooklib nbconvert beautifulsoup4
-
-# Fallback path — only for .doc/.odt/.rtf/.tex/.rst/.org/.typ
-# macOS:   brew install pandoc
-# Ubuntu:  sudo apt install pandoc
-# Windows: https://pandoc.org/installing.html
-```
+Required native-path capabilities: `mammoth`, `markdownify`, `ebooklib`,
+`nbconvert`, and `beautifulsoup4` in the caller-selected Python environment.
+Fallback formats (`.doc`, `.odt`, `.rtf`, `.tex`, `.rst`, `.org`, `.typ`) also
+require a `pandoc` executable supplied by the calling runtime.
 
 All paths produce the same output convention: `<input>.md` plus a sibling `<input>_files/` directory containing extracted images with relative references.
 On success, a sibling `<input>.conversion_profile.json` is also written.
@@ -167,11 +156,7 @@ Behavior:
 - exports formula cells as cached values; it does not recalculate formulas
 - writes `<input>.conversion_profile.json` after successful conversion
 
-Dependency:
-
-```bash
-pip install openpyxl
-```
+Required capability: `openpyxl` in the caller-selected Python environment.
 
 CSV/TSV files are already plain-text table sources and do not require this converter.
 
@@ -203,11 +188,7 @@ Behavior:
 - appends speaker notes when present
 - writes `<input>.conversion_profile.json` after successful conversion
 
-Dependency:
-
-```bash
-pip install python-pptx
-```
+Required capability: `python-pptx` in the caller-selected Python environment.
 
 Legacy `.ppt` is not parsed directly. Resave it as `.pptx` or export it to PDF first.
 

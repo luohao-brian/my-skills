@@ -12,7 +12,7 @@ Conditional Executor authority for image status handling, placement, crop behavi
 
 Handle images by status; enum and lifecycle: [`svg-image-embedding.md`](svg-image-embedding.md).
 
-**Mode boundary**: Default keeps Strategist → Executor with no downstream acquisition/reselection. Quick substitutes the main agent's prepared transient roster for §VIII/lock below; the same boundary starts at SVG authoring.
+**Mode boundary**: Default keeps Strategist → Executor with no downstream acquisition/reselection. Quick substitutes the active execution context's prepared transient roster for §VIII/lock below; the same boundary starts at SVG authoring.
 
 | Status | Source | Handling |
 |--------|--------|----------|

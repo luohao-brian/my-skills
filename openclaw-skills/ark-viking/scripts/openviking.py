@@ -21,10 +21,10 @@ RSPRESS_ARTICLES_PREFIX = "viking://resources/codex-rspress-admin/public/article
 
 
 class Client:
-    def __init__(self, base_url: str, api_key: str) -> None:
+    def __init__(self, api_key: str) -> None:
         if not api_key:
             raise RuntimeError("ARK_AGENT_PLAN_OPENVIKING_API_KEY is required")
-        self.base_url = base_url.rstrip("/")
+        self.base_url = DEFAULT_URL
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {api_key}",
@@ -313,11 +313,6 @@ def retrieve_articles(
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Read and retrieve OpenViking knowledge")
-    root.add_argument("--base-url", default=os.environ.get("ARK_AGENT_PLAN_OPENVIKING_BASE_URL", DEFAULT_URL))
-    root.add_argument(
-        "--public-base-url",
-        default=os.environ.get("ARK_VIKING_RSPRESS_PUBLIC_BASE_URL", DEFAULT_RSPRESS_PUBLIC_BASE_URL),
-    )
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("doctor")
     for name in ("ls", "stat", "read"):
@@ -338,17 +333,17 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = parser().parse_args()
-    client = Client(args.base_url, os.environ.get("ARK_AGENT_PLAN_OPENVIKING_API_KEY", ""))
+    client = Client(os.environ.get("ARK_AGENT_PLAN_OPENVIKING_API_KEY", ""))
     if args.command == "doctor":
         output = {"health": client.health(), "status": client.status()}
     elif args.command == "ls":
-        output = enrich_rspress_metadata(client.ls(args.uri), args.public_base_url)
+        output = enrich_rspress_metadata(client.ls(args.uri), DEFAULT_RSPRESS_PUBLIC_BASE_URL)
     elif args.command == "stat":
-        output = enrich_rspress_metadata(client.stat(args.uri), args.public_base_url)
+        output = enrich_rspress_metadata(client.stat(args.uri), DEFAULT_RSPRESS_PUBLIC_BASE_URL)
     elif args.command == "read":
         output = client.read(args.uri)
     elif args.command == "find":
-        output = enrich_rspress_metadata(client.find(args.query, args.target_uri, args.limit), args.public_base_url)
+        output = enrich_rspress_metadata(client.find(args.query, args.target_uri, args.limit), DEFAULT_RSPRESS_PUBLIC_BASE_URL)
     else:
         if args.limit < 1 or args.sections_per_article < 1 or args.max_chars < 1:
             raise RuntimeError("retrieve limits must be positive integers")
@@ -359,7 +354,7 @@ def main() -> int:
             args.limit,
             args.sections_per_article,
             args.max_chars,
-            args.public_base_url,
+            DEFAULT_RSPRESS_PUBLIC_BASE_URL,
         )
     print(json.dumps(output, ensure_ascii=False, indent=2))
     return 0

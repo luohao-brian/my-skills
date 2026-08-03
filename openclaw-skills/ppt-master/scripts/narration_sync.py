@@ -1319,7 +1319,7 @@ def _require_numpy() -> Any:
     except ImportError as exc:
         raise RuntimeError(
             "Exported-video subtitle calibration requires numpy. "
-            "Install it with: python3 -m pip install numpy"
+            "Provide it through the caller-selected Python environment"
         ) from exc
     return np
 

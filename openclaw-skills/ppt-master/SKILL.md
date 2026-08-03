@@ -10,7 +10,7 @@ PPT Master 是路由式演示文稿工作流。SVG 生成路线以完整页面 S
 
 ## 必读顺序
 
-1. 始终读取 [`references/openclaw-runtime.md`](references/openclaw-runtime.md)，确定外部项目目录、依赖、媒体能力和发布门禁。
+1. 始终读取 [`references/runtime.md`](references/runtime.md)，确定项目目录、运行时能力、媒体能力和发布门禁。
 2. 读取 [`workflows/routing.md`](workflows/routing.md)，只选择一个顶层路线。
 3. 按路由读取对应 authority：
    - 新建或重构演示：[`workflows/generate-pptx.md`](workflows/generate-pptx.md)
@@ -19,10 +19,11 @@ PPT Master 是路由式演示文稿工作流。SVG 生成路线以完整页面 S
    - 原生增强 PPTX：[`workflows/native-enhance-pptx.md`](workflows/native-enhance-pptx.md)
 4. 只读取所选路线明确触发的 profile、stage、governance 和 reference，不预加载其他路线。
 
-## OpenClaw 执行边界
+## 运行时执行边界
 
 - 使用 `{baseDir}` 解析本 skill 内脚本、模板和 reference；禁止假设 cwd 中存在 `skills/ppt-master`，也不要拼接安装目录绝对路径。
 - 初始化时必须向 `project_manager.py init` 传 `--dir <absolute-projects-root>`。项目、预览、备份和导出写入用户指定目录；未指定时写入当前运行时 workspace 下的独立目录。禁止写入 `{baseDir}` 或本源码仓库。
+- Python 解释器、虚拟环境、依赖管理和浏览器由调用方运行时负责。复用调用方已经选择的能力；不得自行创建或固定 venv、切换解释器、安装依赖、修改 `PATH` 或下载浏览器，除非用户明确要求环境配置。先读 [`references/runtime.md`](references/runtime.md)。
 - AI 配图与旁白通过当前 Agent 已有的工具或 skill 执行；先发现并读取真实接口，再把 PPT Master 的语义请求映射过去。PPT Master 不绑定 Agent、provider、模型、密钥或运行时配置。先读 [`references/runtime-media.md`](references/runtime-media.md)。
 - SVG 页面由当前主执行者逐页手工创作；不得用脚本批量生成页面，也不得把页面创作委派给另一个执行者。
 - `svg_output/` 是 SVG 路线完整的可见页面设计源。模板和 design spec 只能约束页面，不能补充 SVG 中缺失的可见内容。

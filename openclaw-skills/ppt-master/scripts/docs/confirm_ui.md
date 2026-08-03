@@ -97,11 +97,7 @@ python3 {baseDir}/scripts/confirm_ui/server.py <project_path> --shutdown    # St
 - Idle auto-shutdown after 900 s by default; `/api/shutdown` exits gracefully and releases the lock.
 - `/api/recommendations` and `/api/confirm` strip legacy `template_reuse_scope` and `template_adherence` fields. Those exporter values are never user-facing controls; an active template instead exposes the editable natural-language `template_application` field in Stage 2.
 
-Dependency:
-
-```bash
-pip install flask
-```
+Required capability: `flask` in the caller-selected Python environment.
 
 ## Field shapes
 

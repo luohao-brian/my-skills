@@ -28,7 +28,7 @@ Default Generate uses Strategist-owned `design_spec.md §VIII` plus its lock pro
 
 **Required per non-skipped row**: `Acquire Via` and `Status`. `Reference` is required for every `web` / `slice` row and every newly authored `ai` row. An existing `ai` row whose `Reference` is omitted or blank may continue only through the declared inference in [`image-generator.md`](./image-generator.md) §8; no other path may infer it.
 
-**Quick Generate ownership**: explicit user assets, URLs, and path instructions win. Otherwise the main agent chooses required `user` / `ai` / `web` / `slice` / `formula` rows and AI path `auto`, without interaction.
+**Quick Generate ownership**: explicit user assets, URLs, and path instructions win. Otherwise the active execution context chooses required `user` / `ai` / `web` / `slice` / `formula` rows and AI path `auto`, without interaction.
 
 ---
 
@@ -116,7 +116,7 @@ Executor reads the manifest per slide and renders inline credits when needed —
 
 ## 8. Intent Ownership
 
-The `Reference` field is **intent**, not a query. Strategist owns it by default; Quick's main agent owns it in the transient roster. The receiving role translates without reopening it.
+The `Reference` field is **intent**, not a query. Strategist owns it by default; Quick's active execution context owns it in the transient roster. The receiving role translates without reopening it.
 
 | ✅ Intent | ❌ Pre-processed |
 |---|---|
@@ -136,7 +136,7 @@ SVG authoring consumes the resource roster plus:
 
 **Default Generate boundary**: Executor does NOT invoke runtime image generation / `image_search.py` / `slice_images.py`; missing material returns to Strategist-owned preparation.
 
-**Quick Generate boundary**: the main agent finishes acquisition before SVG authoring, then neither acquires nor reselects while drawing.
+**Quick Generate boundary**: the active execution context finishes acquisition before SVG authoring, then neither acquires nor reselects while drawing.
 
 ---
 

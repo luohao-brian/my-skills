@@ -15,7 +15,7 @@ Neutral geometry and review rules for every image or rendered-formula placement.
 | Default Strategist | Resource choice, semantic role, crop boundary, and preferred image/content or image/shape relationship |
 | Image_Generator | Composition inside each generated bitmap for its planned container |
 | Default Executor | Final SVG regions and geometry; may adapt the preferred relationship while preserving binding resource, content, and crop constraints |
-| Quick Generate main agent | The planning and realization decisions above in one active context |
+| Quick Generate active context | The planning and realization decisions above in one active context |
 
 This specification and [`image-layout-patterns.md`](./image-layout-patterns.md) are the always-read geometry and composition vocabulary; [`svg-image-embedding.md`](./svg-image-embedding.md) owns embedding. Default and Quick SVG authoring also load [`svg-effects.md`](./svg-effects.md) and [`native-shape-authoring.md`](./native-shape-authoring.md) before realization, so apply their contracts directly when a selected construction needs effects, preset geometry, or Boolean geometry. Other routes follow their own documented load triggers.
 

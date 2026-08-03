@@ -19,6 +19,4 @@
 
 `retrieve` 先在默认范围检索候选文章，再以每篇文章的资源根目录作为 `target_uri` 检索相关章节。整个流程只调用上表中的只读接口。
 
-可通过 `ARK_AGENT_PLAN_OPENVIKING_BASE_URL` 覆盖服务地址，但不要把 API Key 写入配置文件、参数或输出。
-
-Rspress 原文链接的站点根地址读取 `ARK_VIKING_RSPRESS_PUBLIC_BASE_URL`，默认值为 `http://8.140.22.158`。它不是凭证，可按部署域名覆盖。
+服务地址和 Rspress 原文链接根地址固定在脚本中。脚本只读取 `ARK_AGENT_PLAN_OPENVIKING_API_KEY`，不要把 Key 写入参数、文件或输出。

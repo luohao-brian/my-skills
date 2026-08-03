@@ -18,7 +18,7 @@ Page count alone never activates or blocks this profile.
 
 | Concern | Quick Generate contract |
 |---|---|
-| Interaction | The current main agent decides content, design, resources, and implementation without Strategist, Confirm UI, or approval stops |
+| Interaction | The active execution context decides content, design, resources, and implementation without Strategist, Confirm UI, or approval stops |
 | Inputs | Any supported Generate input; convert/import sources and run bounded factual research when the input requires them |
 | Resources | Prepare every project-local image, icon, formula, and required provenance/manifest artifact before the referencing SVG is authored |
 | Planning artifacts | Do not create `design_spec.md`, `spec_lock.md`, confirmation payloads, or a second persisted strategy |
@@ -157,7 +157,7 @@ depend on a lock or generated font asset. Before authoring, run `python3
 for generated title/body text, and give mixed CJK annotation/code stacks an
 explicit installed EA face rather than a generic tail.
 
-**Generation pacing**: the current main agent hand-writes the SVG roster in
+**Generation pacing**: the active execution context hand-writes the SVG roster in
 order. Use P01 as the visual anchor and continue directly through the remaining
 pages without a first-page checker or confirmation stop. When a motif was
 resolved, reuse it selectively and vary scale, crop, density, position, or

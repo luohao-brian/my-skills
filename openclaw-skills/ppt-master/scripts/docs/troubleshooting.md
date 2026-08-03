@@ -74,11 +74,8 @@ Use `--narration-audio-dir audio` only when you intentionally want lower-level, 
 ## Dependency Checklist
 
 Do not maintain a package list in this document. The component
-`requirements.txt` is the dependency source of truth; install it into a
-uv-managed virtual environment:
-
-```bash
-uv venv <external-venv>
-uv pip install --python <external-venv>/bin/python \
-  -r {baseDir}/requirements.txt
-```
+`requirements.txt` is the dependency source of truth. Use the Python
+environment and dependency mechanism already owned by the calling runtime.
+PPT Master must not create or select a virtual environment, install packages,
+or change interpreters as part of a presentation task. If a dependency is
+missing, report its name and the blocked command or stage.

@@ -9,11 +9,8 @@ python3 {baseDir}/scripts/prompt_audit.py            # text summary
 python3 {baseDir}/scripts/prompt_audit.py --json     # stable JSON report
 ```
 
-Requires `tiktoken` (not part of `requirements.txt` — end users never need it):
-
-```bash
-pip install 'tiktoken>=0.7.0'
-```
+Requires `tiktoken>=0.7.0` in the maintainer-selected Python environment (not
+part of `requirements.txt`; presentation users do not need it).
 
 Exit code `1` on any deterministic error; advisory duplicate/schema candidates stay warnings. With `--json`, setup failures also use a stable `AUDIT_SETUP_ERROR` JSON envelope instead of a traceback or plain-text error.
 

@@ -28,7 +28,7 @@ def _require_requests():
     try:
         import requests
     except ImportError:
-        print("Error: requests not installed. Run: pip install requests", file=sys.stderr)
+        print("Error: requests is unavailable in the caller-selected Python environment", file=sys.stderr)
         sys.exit(1)
     return requests
 

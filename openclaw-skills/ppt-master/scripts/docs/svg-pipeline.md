@@ -679,11 +679,7 @@ Behavior:
 - The animation writer does not emit paragraph/text-range builds (`p:bldP`), custom freeform motion paths, native Chart/SmartArt build sequences, or media playback commands for grouped SVG content. Direct-PPTX routes preserve source object animation and perform structural package validation only; they do not author effects
 - The full registry, OOXML rules, and compatibility boundary are documented in [`pptx-animations.md`](./pptx-animations.md)
 
-Dependency:
-
-```bash
-pip install python-pptx
-```
+Required capability: `python-pptx` in the caller-selected Python environment.
 
 ## `total_md_split.py`
 

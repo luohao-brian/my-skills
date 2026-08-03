@@ -15,7 +15,7 @@ Examples:
 
 Dependencies:
     ffmpeg
-    python3 -m pip install stable-ts
+    Requires stable-ts in the caller-selected Python environment.
 """
 
 from __future__ import annotations
@@ -214,7 +214,7 @@ def _require_stable_whisper() -> Any:
     except ImportError as exc:
         raise RuntimeError(
             "Final-video subtitle alignment requires stable-ts. "
-            "Install it with: python3 -m pip install stable-ts"
+            "Provide it through the caller-selected Python environment"
         ) from exc
     return stable_whisper
 

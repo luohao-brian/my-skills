@@ -16,11 +16,8 @@ Use Ark Agent Plan image-understanding models to inspect images and return text 
 
 ## Credential Boundary
 
-This skill only supports Agent Plan API key authentication:
-
-- `ARK_AGENT_PLAN_API_KEY`
-
-Run `scripts/vision_analyze.py` for every image-understanding request. The script calls Ark Agent Plan Responses API directly with `input_image` plus `input_text`.
+The script reads only `ARK_AGENT_PLAN_API_KEY`. It uses the fixed Agent Plan
+Responses endpoint and `doubao-seed-2.0-lite` model.
 
 ## Command
 
@@ -34,13 +31,11 @@ python3 {baseDir}/scripts/vision_analyze.py ./receipt.jpg "识别商家、日期
 
 - `image`: local image path, remote URL, or data URL.
 - `question`: question or extraction instruction for the image.
-- `--model`: defaults to `doubao-seed-2.0-lite`.
 - `--json`: print structured JSON instead of plain analysis text.
 - `--raw`: include the raw provider response in JSON output.
-- `--timeout N`: defaults to `120`.
 
 ## Result Handling
 
 1. Treat stdout as the image-analysis result.
 2. Treat non-zero exit or stderr JSON as a failed skill call.
-3. After a failed call, surface the script error to the calling context. Retry only when the user request requires another attempt, another image, or another model.
+3. After a failed call, surface the script error. Retry only when the user request requires another attempt or another image.
