@@ -33,6 +33,7 @@ python3 {baseDir}/scripts/open_source_updates.py --output oss-candidates.json --
 2. 候选 JSON 遵循 [references/output-schema.md](references/output-schema.md)，最终报告遵循 [references/format.md](references/format.md)。
 3. 报告必须覆盖 `groups` 中的全部候选；只从 `groups.notable_discoveries` 生成“本周重点新发现”，不直接展开顶层 `discoveries`。
 4. 只有调用方明确提供 `--state-dir` 或 `AI_OSS_MODELS_STATE_DIR` 时才读写趋势快照；目录由调用方负责选择和管理。
+5. 模型方向、规模、架构与论文只使用候选中的结构化字段，方向不按模型名推断；评测必须同时保留 model card 的测试条件和限制；解释“仓库更新”时只使用本窗口 `change_evidence`，把 model/dataset card 限定为当前状态背景。
 
 ## 时间窗口
 

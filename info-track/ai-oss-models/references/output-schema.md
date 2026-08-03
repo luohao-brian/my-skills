@@ -129,7 +129,83 @@
 }
 ```
 
-`card.excerpt` 只用于概括能力、用途和交付件，不代表该内容在本窗口发生变更。`ok` 为 `false` 时不根据仓库名补写能力。
+模型的结构化技术字段还包含：
+
+```json
+{
+  "metadata": {
+    "architecture": "moe | diffusion | unknown",
+    "architecture_classes": ["ExampleForConditionalGeneration"],
+    "scale": {"parameters": 304180418494, "source": "safetensors.total", "inherited": false},
+    "papers": [
+      {
+        "id": "2606.19348",
+        "arxiv_url": "https://arxiv.org/abs/2606.19348",
+        "hf_paper_url": "https://huggingface.co/papers/2606.19348"
+      }
+    ]
+  }
+}
+```
+
+`architecture_classes` 直接来自 config；`papers` 只来自精确 `arxiv:` tag。数据集也可包含同结构的 `papers`。`card` 在找到明确的 Architecture / Model Architecture / Architecture Overview 小节时还包含 `architecture_excerpt`。
+
+模型方向的通用证据包含：
+
+```json
+{
+  "metadata": {
+    "modalities": {"input": ["image", "text"], "output": ["audio", "video"]},
+    "role_evidence": {
+      "pipeline_tag": "image-text-to-audio-video",
+      "task_signals": [
+        {"source": "pipeline_tag", "value": "image-text-to-audio-video"}
+      ]
+    }
+  }
+}
+```
+
+方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。无法得到完整输入和输出时保留空数组并使用“待确认”。
+
+模型卡存在 Evaluation、Benchmark、Leaderboard 等明确小节，或存在以 `Benchmark` 为表头的结果表时，`card` 还包含：
+
+```json
+{
+  "evaluation": {
+    "source": "model-card",
+    "excerpt": "评测设置、对照项、代表性结果和表格的紧凑证据",
+    "caveats": "Limitations / Caveats 小节中的评测边界"
+  }
+}
+```
+
+`evaluation.excerpt` 保留表格单元格和必要上下文，供成稿提炼，不直接长段复制。`caveats` 为可选字段；出现小样本、内部基准、未完整评测、仅验证单一量化版本等说明时必须随结果一起处理。`source: model-card` 表示发布者仓库自述，不等于独立评测。
+
+`card.excerpt` 只用于概括当前能力、用途和交付件，不代表该内容在本窗口发生变更。`ok` 为 `false` 时不根据仓库名补写能力。
+
+`repository-updated` 候选还可包含提交证据：
+
+```json
+{
+  "metadata": {
+    "change_evidence": {
+      "source": "Hugging Face commit history",
+      "ok": true,
+      "commits": [
+        {
+          "id": "commit sha",
+          "title": "Update README.md",
+          "date": "YYYY-MM-DD",
+          "url": "https://huggingface.co/.../commit/..."
+        }
+      ]
+    }
+  }
+}
+```
+
+可复现项目的每个 `metadata.artifacts[]` 可包含相同的 `change_evidence`；GitHub 子目录证据额外包含 `path`，且提交已经按该路径过滤。`ok: false` 或空提交列表表示只能确认仓库时间戳，不能说明具体变化。
 
 `event` 使用：
 

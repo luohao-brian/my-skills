@@ -7,8 +7,10 @@
 - 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
-- 查询可复现项目注册表中已登记 GitHub 仓库的 `pushed_at`，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接按所属仓库更新信号处理。
+- 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
 - 只为最终入选的重点旗舰、本地热门、正式数据集和重点新发现读取对应 model card 或 dataset card。
+- 从最终入选模型的 model card 提取 Evaluation、Benchmark、Leaderboard 等评测小节和以 `Benchmark` 为表头的结果表，同时提取 Limitations / Caveats 作为评测边界。
+- 对最终入选的 HF `repository-updated` 候选读取本窗口提交历史；对可复现项目的已更新 HF/GitHub 交付件读取提交标题和链接，供成稿解释具体变化。
 
 全局池、衍生过滤池和 owner 池先按仓库 ID 合并，再进行分类与去重。不能假设 HF 的 `finetune` 等过滤器会返回所有带对应 `base_model` 关系的仓库。
 
@@ -52,13 +54,18 @@ HF 热门条件：
 ## HF 字段
 
 - 事件：`createdAt`、`lastModified`。
-- 模态：`pipeline_tag`。
+- 模态：优先解析 `pipeline_tag`，再合并可解析为完整输入/输出的任务 tags；标准固定任务使用已知 I/O，组合任务按 `<输入模态>-to-<输出模态>` 泛化解析。
 - 能力：精确 tags 和模型注册表覆盖项。
 - 部署：精确 tags、量化配置和模型注册表。
 - 依赖：`cardData.base_model`、`base_model_relation` 和 `base_model:*` tags。
 - 衍生关系：只接受 HF 结构化 `adapter`、`finetune`、`merge` 和 `quantized` 关系。
 - 架构：只在 config 含明确 expert 字段或精确 tags 支持时标记 MoE，在精确 `diffusers` tag 支持时标记 Diffusion；普通 config 的存在不足以证明 Dense，其余情况使用 `unknown`。
+- 架构类：读取 `config.architectures`；model card 存在明确 Architecture 小节时保留短证据片段。
 - 参数量：`safetensors.total` 或 `gguf.total`。
+- 论文：只读取精确 `arxiv:` tag，并构造对应 arXiv 与 HF Paper 链接。
+- 评测：只保留 model card 明确报告的设置、基准、对照项、分数和限制；model card 结果属于发布方自述，不自动视为独立复现。
+
+方向分类只使用上述结构化模态证据：视频输出归入视频生成，图像输出归入图像生成，音频输出归入语音生成；纯文本输出再按音频输入、视觉输入或文本输入区分语音识别、VLM 和 LLM。`any-to-any` 保留为通用多模态方向。不得用模型 ID、owner 或自然语言名称补分类。
 
 ## 当前热门与趋势快照
 

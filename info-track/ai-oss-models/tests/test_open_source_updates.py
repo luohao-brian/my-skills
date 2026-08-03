@@ -158,6 +158,104 @@ class ArchitectureFacetTests(unittest.TestCase):
         row = model_row("community/model", config={"num_experts": 256})
         self.assertEqual(MODULE.architecture_facet(row), "moe")
 
+    def test_architecture_classes_are_preserved_without_inference(self):
+        row = model_row(
+            "community/model",
+            config={"architectures": ["ExampleForConditionalGeneration"]},
+        )
+        self.assertEqual(
+            MODULE.architecture_classes(row),
+            ["ExampleForConditionalGeneration"],
+        )
+
+    def test_composed_pipeline_is_parsed_without_registry_entry(self):
+        pipeline = "image-text-to-audio-video"
+        self.assertNotIn(pipeline, MODULE.PIPELINE_MODALITIES)
+        row = model_row("community/video", pipeline_tag=pipeline)
+        evidence = MODULE.modality_evidence(row)
+        self.assertEqual(MODULE.model_role(row), "video-generation")
+        self.assertEqual(evidence["input"], ["image", "text"])
+        self.assertEqual(evidence["output"], ["audio", "video"])
+        self.assertEqual(
+            evidence["signals"],
+            [{"source": "pipeline_tag", "value": pipeline}],
+        )
+        metadata = MODULE.model_metadata(
+            row,
+            {"track": "discovery", "role": "video-generation"},
+            {"families": [], "model_overrides": {}, "local_publishers": []},
+        )
+        self.assertEqual(metadata["modalities"], {"input": ["image", "text"], "output": ["audio", "video"]})
+        self.assertEqual(metadata["role_evidence"]["task_signals"], evidence["signals"])
+
+    def test_task_tags_can_fill_missing_pipeline_signal(self):
+        row = model_row(
+            "community/video",
+            pipeline_tag="",
+            tags=["multimodal", "text-to-audio-video"],
+        )
+        self.assertEqual(MODULE.model_role(row), "video-generation")
+
+    def test_standard_modality_directions_keep_expected_roles(self):
+        cases = {
+            "text-generation": "llm",
+            "image-to-text": "vlm",
+            "audio-text-to-text": "audio-stt",
+            "text-to-image": "image-generation",
+            "text-to-speech": "audio-tts",
+        }
+        for pipeline, expected in cases.items():
+            with self.subTest(pipeline=pipeline):
+                self.assertEqual(
+                    MODULE.model_role(model_row("community/model", pipeline_tag=pipeline)),
+                    expected,
+                )
+
+    def test_unstructured_label_remains_unknown(self):
+        row = model_row("community/model", pipeline_tag="experimental-omni-model")
+        self.assertEqual(MODULE.model_role(row), "unknown")
+        self.assertEqual(MODULE.modality_evidence(row)["signals"], [])
+
+    def test_arxiv_tags_produce_primary_and_hf_paper_links(self):
+        row = model_row("community/model", tags=["arxiv:2606.19348"])
+        self.assertEqual(
+            MODULE.paper_links(row),
+            [
+                {
+                    "id": "2606.19348",
+                    "arxiv_url": "https://arxiv.org/abs/2606.19348",
+                    "hf_paper_url": "https://huggingface.co/papers/2606.19348",
+                }
+            ],
+        )
+
+    def test_architecture_section_is_extracted_from_card(self):
+        card = """# Model\n\nIntro text that is long enough to be selected as a normal paragraph for context.\n\n## Model Architecture\n\nThe model combines an encoder and a transformer backbone for unified generation.\n\n## Usage\n\nInstall the package and run it.\n"""
+        excerpt = MODULE.extract_architecture_excerpt(card)
+        self.assertIn("encoder and a transformer backbone", excerpt)
+        self.assertNotIn("Install the package", excerpt)
+
+
+class EvaluationEvidenceTests(unittest.TestCase):
+    def test_benchmark_table_without_evaluation_heading_is_extracted(self):
+        card = """# Model\n\n## Introduction\n\nThe release improves agentic performance on the benchmarks below.\n\n| Benchmark | New | Preview |\n| --- | ---: | ---: |\n| Terminal Bench | 82.7 | 61.8 |\n| Tool Use | 70.3 | 49.7 |\n\nNotes:\n1. The harness is not yet released.\n\n## Usage\n\nRun the model.\n"""
+        evidence = MODULE.extract_evaluation_evidence(card)
+        self.assertEqual(evidence["source"], "model-card")
+        self.assertIn("Terminal Bench | 82.7 | 61.8", evidence["excerpt"])
+        self.assertIn("harness is not yet released", evidence["excerpt"])
+        self.assertNotIn("Run the model", evidence["excerpt"])
+
+    def test_evaluation_section_keeps_conditions_and_limitations(self):
+        card = """# Model\n\n## Evaluation — full results\n\nAll at Q4_K_M in thinking mode on one GPU.\n\n| Test | Result |\n| --- | ---: |\n| HumanEval | 94.5 |\n| SWE-bench subset | 7/15 |\n\n## Limitations\n\nThe subset is small and only Q4_K_M was evaluated.\n"""
+        evidence = MODULE.extract_evaluation_evidence(card)
+        self.assertIn("Q4_K_M in thinking mode", evidence["excerpt"])
+        self.assertIn("HumanEval | 94.5", evidence["excerpt"])
+        self.assertIn("subset is small", evidence["caveats"])
+
+    def test_card_without_evaluation_does_not_invent_evidence(self):
+        card = """# Model\n\n## Usage\n\nThis paragraph only explains how to run inference locally.\n"""
+        self.assertEqual(MODULE.extract_evaluation_evidence(card), {})
+
 
 class DevelopmentArtifactTests(unittest.TestCase):
     def test_registry_validation_rejects_dangling_artifact_dependency(self):
@@ -190,6 +288,12 @@ class DevelopmentArtifactTests(unittest.TestCase):
             MODULE.github_repo_api_url("https://github.com/Official/training/tree/main/recipes"),
             "https://api.github.com/repos/Official/training",
         )
+        self.assertEqual(
+            MODULE.github_artifact_spec(
+                "https://github.com/Official/training/tree/main/recipes/eval"
+            )["path"],
+            "recipes/eval",
+        )
 
     def test_registered_github_recipe_update_enters_reproducible_project(self):
         url = "https://github.com/Official/training/tree/main/recipes"
@@ -218,6 +322,18 @@ class DevelopmentArtifactTests(unittest.TestCase):
                 "createdAt": "2026-01-01T00:00:00Z",
                 "lastModified": "2026-07-30T00:00:00Z",
                 "url": "https://github.com/Official/training",
+                "change_evidence": {
+                    "source": "GitHub commit history",
+                    "ok": True,
+                    "commits": [
+                        {
+                            "id": "abc",
+                            "title": "Update training config",
+                            "date": "2026-07-30",
+                            "url": "https://github.com/Official/training/commit/abc",
+                        }
+                    ],
+                },
             }
         }
         items = MODULE.project_items(
@@ -230,6 +346,65 @@ class DevelopmentArtifactTests(unittest.TestCase):
         )
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["metadata"]["artifacts"][0]["role"], "training-recipe")
+        self.assertEqual(
+            items[0]["metadata"]["artifacts"][0]["change_evidence"]["commits"][0]["title"],
+            "Update training config",
+        )
+
+    def test_github_subdirectory_requires_path_specific_commit(self):
+        root = "https://github.com/Official/training"
+        subdirectory = root + "/tree/main/src/eval"
+        registry = {
+            "projects": [
+                {
+                    "artifacts": [
+                        {"id": root, "repo_type": "url"},
+                        {"id": subdirectory, "repo_type": "url"},
+                    ]
+                }
+            ]
+        }
+        requested_urls = []
+
+        def response(url, **kwargs):
+            requested_urls.append(url)
+            if "path=src%2Feval" in url:
+                return "[]"
+            return """[{"sha":"abc","html_url":"https://github.com/Official/training/commit/abc","commit":{"message":"Update dependency","committer":{"date":"2026-07-30T00:00:00Z"}}}]"""
+
+        with mock.patch.object(MODULE, "fetch_text", side_effect=response):
+            rows, errors = MODULE.query_project_urls(
+                registry,
+                dt.date(2026, 7, 27),
+                dt.date(2026, 8, 2),
+            )
+        self.assertEqual(errors, {})
+        self.assertIn(root, rows)
+        self.assertNotIn(subdirectory, rows)
+        self.assertTrue(any("path=src%2Feval" in url for url in requested_urls))
+
+    def test_hf_change_evidence_is_limited_to_window(self):
+        payload = [
+            {
+                "id": "new",
+                "title": "Update README.md",
+                "date": "2026-08-02T00:00:00Z",
+            },
+            {
+                "id": "old",
+                "title": "Old change",
+                "date": "2026-07-01T00:00:00Z",
+            },
+        ]
+        with mock.patch.object(MODULE, "hf_api", return_value=payload):
+            evidence = MODULE.fetch_hf_change_evidence(
+                "Official/model",
+                "model",
+                dt.date(2026, 7, 27),
+                dt.date(2026, 8, 2),
+            )
+        self.assertTrue(evidence["ok"])
+        self.assertEqual([entry["id"] for entry in evidence["commits"]], ["new"])
 
     def test_official_owner_dataset_can_be_discovered_without_heat_threshold(self):
         row = model_row(
@@ -382,7 +557,7 @@ class HistoricalMainTests(unittest.TestCase):
             mock.patch.object(MODULE, "query_dataset_candidates", dataset_query),
             mock.patch.object(MODULE, "query_project_urls", return_value=({}, {})),
             mock.patch.object(MODULE, "fetch_many", return_value=({}, {})),
-            mock.patch.object(MODULE, "enrich_items_with_cards", side_effect=lambda items: items),
+            mock.patch.object(MODULE, "enrich_items_with_cards", side_effect=lambda items, *args: items),
             mock.patch.object(MODULE, "emit_payload", side_effect=capture_payload),
             mock.patch("sys.argv", ["open_source_updates.py", "--date", "2026-07-27"]),
         ):

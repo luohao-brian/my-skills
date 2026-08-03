@@ -86,7 +86,10 @@ NOTABLE_TRUSTED_DATASET_MAX = 3
 NOTABLE_HOT_DATASET_MIN = 2
 NOTABLE_OWNER_MAX = 2
 CARD_EXCERPT_CHARS = 1_600
-CARD_FETCH_WORKERS = 12
+EVALUATION_EXCERPT_CHARS = 3_200
+EVALUATION_CAVEAT_CHARS = 1_000
+CARD_FETCH_WORKERS = 6
+CHANGE_EVIDENCE_LIMIT = 5
 SNAPSHOT_VERSION = 1
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
@@ -111,6 +114,7 @@ PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "sentence-similarity": {"input": ["text"], "output": ["text"]},
     "robotics": {"input": ["robotics"], "output": ["robotics"]},
 }
+MODALITY_TOKENS = {"text", "image", "video", "audio", "speech", "robotics"}
 
 CAPABILITY_TAGS = {
     "reasoning": "reasoning",
@@ -453,6 +457,55 @@ def lower_tags(row: dict[str, Any]) -> set[str]:
     return {str(tag).lower() for tag in row.get("tags", [])}
 
 
+def modality_tokens(value: str) -> list[str]:
+    aliases = {"speech": "audio"}
+    return list(
+        dict.fromkeys(
+            aliases.get(token, token)
+            for token in value.lower().split("-")
+            if token in MODALITY_TOKENS
+        )
+    )
+
+
+def pipeline_modalities(value: str) -> dict[str, list[str]]:
+    normalized = value.strip().lower()
+    known = PIPELINE_MODALITIES.get(normalized)
+    if known:
+        return {"input": list(known["input"]), "output": list(known["output"])}
+    if normalized.count("-to-") != 1 or ":" in normalized or "/" in normalized:
+        return {"input": [], "output": []}
+    raw_input, raw_output = normalized.split("-to-", 1)
+    inputs = modality_tokens(raw_input)
+    outputs = modality_tokens(raw_output)
+    if not inputs or not outputs:
+        return {"input": [], "output": []}
+    return {"input": inputs, "output": outputs}
+
+
+def modality_evidence(row: dict[str, Any]) -> dict[str, Any]:
+    pipeline_tag = str(row.get("pipeline_tag") or "").lower()
+    candidates: list[tuple[str, str]] = []
+    if pipeline_tag:
+        candidates.append(("pipeline_tag", pipeline_tag))
+    candidates.extend(("tag", tag) for tag in sorted(lower_tags(row)) if tag != pipeline_tag)
+    inputs: list[str] = []
+    outputs: list[str] = []
+    signals: list[dict[str, str]] = []
+    for source, value in candidates:
+        modalities = pipeline_modalities(value)
+        if not modalities["input"] and not modalities["output"]:
+            continue
+        inputs.extend(modalities["input"])
+        outputs.extend(modalities["output"])
+        signals.append({"source": source, "value": value})
+    return {
+        "input": sorted(set(inputs)),
+        "output": sorted(set(outputs)),
+        "signals": signals,
+    }
+
+
 def base_model_links(row: dict[str, Any]) -> list[tuple[str, str]]:
     card = row.get("cardData") or {}
     relation = str(card.get("base_model_relation") or "")
@@ -526,6 +579,32 @@ def architecture_facet(row: dict[str, Any]) -> str:
     return "unknown"
 
 
+def architecture_classes(row: dict[str, Any]) -> list[str]:
+    values = (row.get("config") or {}).get("architectures") or []
+    if isinstance(values, str):
+        values = [values]
+    return [str(value) for value in values if value]
+
+
+def paper_links(row: dict[str, Any]) -> list[dict[str, str]]:
+    paper_ids: list[str] = []
+    for raw_tag in row.get("tags", []):
+        tag = str(raw_tag)
+        if not tag.lower().startswith("arxiv:"):
+            continue
+        paper_id = tag.split(":", 1)[1].strip()
+        if paper_id and paper_id not in paper_ids:
+            paper_ids.append(paper_id)
+    return [
+        {
+            "id": paper_id,
+            "arxiv_url": f"https://arxiv.org/abs/{urllib.parse.quote(paper_id, safe='./-')}",
+            "hf_paper_url": f"https://huggingface.co/papers/{urllib.parse.quote(paper_id, safe='./-')}",
+        }
+        for paper_id in paper_ids
+    ]
+
+
 def scale_facet(row: dict[str, Any], inherited: dict[str, Any] | None = None) -> dict[str, Any]:
     for candidate, inherited_flag in [(row, False), (inherited or {}, True)]:
         gguf = candidate.get("gguf") or {}
@@ -547,7 +626,7 @@ def capability_facets(row: dict[str, Any], override: dict[str, Any] | None = Non
         mapped = CAPABILITY_TAGS.get(tag)
         if mapped:
             values.add(mapped)
-    pipeline = str(row.get("pipeline_tag") or "")
+    pipeline = str(row.get("pipeline_tag") or "").lower()
     if pipeline in CAPABILITY_TAGS:
         values.add(CAPABILITY_TAGS[pipeline])
     values.update(str(value) for value in (override or {}).get("capabilities", []))
@@ -604,17 +683,27 @@ def model_metadata(
     canonical = record.get("canonical")
     if record.get("track") == "flagship":
         canonical = canonical or model_id
+    modality_signals = modality_evidence(row)
     return {
         "track": record.get("track"),
         "role": record.get("role"),
         "family": family_id or None,
         "canonical_model": canonical,
-        "modalities": PIPELINE_MODALITIES.get(str(row.get("pipeline_tag") or ""), {"input": [], "output": []}),
+        "modalities": {
+            "input": modality_signals["input"],
+            "output": modality_signals["output"],
+        },
+        "role_evidence": {
+            "pipeline_tag": row.get("pipeline_tag") or "",
+            "task_signals": modality_signals["signals"],
+        },
         "capabilities": capability_facets(row, override),
         "deployment": deployment,
         "stage": stage_facets(row),
         "architecture": architecture_facet(row),
+        "architecture_classes": architecture_classes(row),
         "scale": scale_facet(row, inherited),
+        "papers": paper_links(row),
         "license": (row.get("cardData") or {}).get("license") or "unknown",
         "openness": {
             "level": family.get("openness", "unknown"),
@@ -828,23 +917,30 @@ def model_role(row: dict[str, Any], default: str = "unknown") -> str:
     capabilities = set(capability_facets(row))
     if "ocr" in capabilities:
         return "ocr"
-    if pipeline in {"image-text-to-text", "image-to-text", "video-text-to-text", "any-to-any"}:
-        return "vlm"
-    if pipeline in {"text-to-image", "image-to-image"}:
-        return "image-generation"
-    if pipeline in {"text-to-video", "image-to-video", "video-to-video"}:
-        return "video-generation"
-    if pipeline in {"automatic-speech-recognition", "audio-text-to-text"}:
-        return "audio-stt"
-    if pipeline in {"text-to-speech", "text-to-audio"}:
-        return "audio-tts"
     if pipeline == "translation":
         return "translation"
     if pipeline == "sentence-similarity":
         return "embedding"
     if pipeline == "robotics":
         return "robotics"
-    if pipeline == "text-generation":
+    if pipeline == "any-to-any":
+        return "vlm"
+    modalities = modality_evidence(row)
+    inputs = set(modalities["input"])
+    outputs = set(modalities["output"])
+    if "video" in outputs:
+        return "video-generation"
+    if "image" in outputs:
+        return "image-generation"
+    if "audio" in outputs:
+        return "audio-tts"
+    if "robotics" in outputs or "robotics" in inputs:
+        return "robotics"
+    if outputs == {"text"} and "audio" in inputs:
+        return "audio-stt"
+    if outputs == {"text"} and inputs & {"image", "video"}:
+        return "vlm"
+    if outputs == {"text"} and "text" in inputs:
         return "llm"
     return default
 
@@ -1149,6 +1245,7 @@ def dataset_item(row: dict[str, Any], record: dict[str, Any], event: tuple[str, 
             "related_models": record.get("related_models", []),
             "related_projects": record.get("related_projects", []),
             "size": dataset_size(row),
+            "papers": paper_links(row),
             "downloads": row.get("downloads") or 0,
             "likes": row.get("likes") or 0,
             "trendingScore": row.get("trendingScore") or 0,
@@ -1349,6 +1446,7 @@ def extract_card_excerpt(text: str) -> str:
     current: list[str] = []
     for raw_line in text.splitlines():
         line = html.unescape(raw_line).strip()
+        line = re.sub(r"\\([\\`*_{}\[\]()#+.!-])", r"\1", line)
         if not line or line.startswith(("#", "|", "[!", "<")):
             if current:
                 paragraph = " ".join(current)
@@ -1375,6 +1473,121 @@ def extract_card_excerpt(text: str) -> str:
     return excerpt
 
 
+def normalize_heading(value: str) -> str:
+    value = value.replace("\\-", "-").strip().lower()
+    value = re.sub(r"[*_`]+", "", value)
+    return re.sub(r"\s+", " ", value).strip(" :")
+
+
+def compact_markdown_evidence(text: str, limit: int) -> str:
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    output: list[str] = []
+    for raw_line in text.splitlines():
+        line = html.unescape(raw_line).strip()
+        line = re.sub(r"\\([\\`*_{}\[\]()#+.!-])", r"\1", line)
+        line = re.sub(r"^#{1,6}\s+", "", line)
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", line)
+        line = re.sub(r"\s+", " ", line).strip()
+        if not line or re.fullmatch(r"\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?", line):
+            continue
+        if line.startswith("|") and line.endswith("|"):
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            line = " | ".join(cell for cell in cells if cell)
+        if line and (not output or output[-1] != line):
+            output.append(line)
+    excerpt = "\n".join(output).strip()
+    if len(excerpt) > limit:
+        excerpt = excerpt[:limit].rsplit(" ", 1)[0].rstrip() + "…"
+    return excerpt
+
+
+def markdown_section(text: str, heading_match: Callable[[str], bool]) -> str:
+    lines = text.splitlines()
+    for index, raw_line in enumerate(lines):
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", raw_line.strip())
+        if not match or not heading_match(normalize_heading(match.group(2))):
+            continue
+        level = len(match.group(1))
+        section: list[str] = []
+        for candidate in lines[index + 1 :]:
+            next_heading = re.match(r"^(#{1,6})\s+", candidate.strip())
+            if next_heading and len(next_heading.group(1)) <= level:
+                break
+            section.append(candidate)
+        return "\n".join(section)
+    return ""
+
+
+def extract_architecture_excerpt(text: str) -> str:
+    lines = text.splitlines()
+    for target_heading in ["architecture overview", "model architecture", "architecture"]:
+        for index, raw_line in enumerate(lines):
+            match = re.match(r"^(#{2,4})\s+(.+?)\s*$", raw_line.strip())
+            if not match or normalize_heading(match.group(2)) != target_heading:
+                continue
+            level = len(match.group(1))
+            section: list[str] = []
+            for candidate in lines[index + 1 :]:
+                next_heading = re.match(r"^(#{1,6})\s+", candidate.strip())
+                if next_heading and len(next_heading.group(1)) <= level:
+                    break
+                section.append(candidate)
+            excerpt = extract_card_excerpt("\n".join(section))
+            if excerpt:
+                return excerpt
+    return ""
+
+
+def is_evaluation_heading(value: str) -> bool:
+    return bool(
+        re.search(r"\b(?:evaluation|eval results?|benchmarks?|benchmark results?|leaderboard)\b", value)
+    )
+
+
+def extract_benchmark_table_context(text: str) -> str:
+    lines = text.splitlines()
+    for index, raw_line in enumerate(lines):
+        line = raw_line.strip().lower()
+        if not line.startswith("|") or not re.search(r"\bbenchmark\b", line):
+            continue
+        start = max(0, index - 3)
+        end = index
+        while end < len(lines) and (not lines[end].strip() or lines[end].lstrip().startswith("|")):
+            end += 1
+        while end < len(lines) and not re.match(r"^#{1,6}\s+", lines[end].strip()):
+            end += 1
+        return "\n".join(lines[start:end])
+    return ""
+
+
+def extract_evaluation_evidence(text: str) -> dict[str, str]:
+    section = markdown_section(text, is_evaluation_heading)
+    if not section:
+        section = extract_benchmark_table_context(text)
+    excerpt = compact_markdown_evidence(section, EVALUATION_EXCERPT_CHARS) if section else ""
+    caveat_section = markdown_section(
+        text,
+        lambda value: bool(re.search(r"\b(?:limitations?|caveats?)\b", value)),
+    )
+    caveats = (
+        compact_markdown_evidence(caveat_section, EVALUATION_CAVEAT_CHARS)
+        if caveat_section
+        else ""
+    )
+    result: dict[str, str] = {}
+    if excerpt:
+        result["source"] = "model-card"
+        result["excerpt"] = excerpt
+    if caveats:
+        result["caveats"] = caveats
+    return result
+
+
 def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
     prefix = "datasets/" if repo_type == "dataset" else ""
     quoted_id = urllib.parse.quote(repo_id, safe="/")
@@ -1383,11 +1596,18 @@ def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
     for base in hf_api_bases():
         raw_url = f"{base}/{prefix}{quoted_id}/raw/main/README.md"
         try:
-            excerpt = extract_card_excerpt(
-                fetch_text(raw_url, timeout=15, retries=0, accept="text/markdown,text/plain")
-            )
+            text = fetch_text(raw_url, timeout=15, retries=2, accept="text/markdown,text/plain")
+            excerpt = extract_card_excerpt(text)
             if excerpt:
-                return {"url": card_url, "excerpt": excerpt, "ok": True}
+                result = {"url": card_url, "excerpt": excerpt, "ok": True}
+                architecture_excerpt = extract_architecture_excerpt(text)
+                if architecture_excerpt:
+                    result["architecture_excerpt"] = architecture_excerpt
+                if repo_type == "model":
+                    evaluation = extract_evaluation_evidence(text)
+                    if evaluation.get("excerpt"):
+                        result["evaluation"] = evaluation
+                return result
         except Exception as exc:
             last_error = exc
     return {
@@ -1398,12 +1618,60 @@ def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
     }
 
 
-def enrich_items_with_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def fetch_hf_change_evidence(
+    repo_id: str,
+    repo_type: str,
+    start: dt.date,
+    end: dt.date,
+) -> dict[str, Any]:
+    api_type = "datasets" if repo_type == "dataset" else "models"
+    quoted_id = urllib.parse.quote(repo_id, safe="/")
+    try:
+        payload = hf_api(f"/api/{api_type}/{quoted_id}/commits/main", retries=2)
+        if not isinstance(payload, list):
+            raise TypeError("unexpected Hugging Face commit response")
+    except Exception as exc:
+        return {
+            "source": "Hugging Face commit history",
+            "ok": False,
+            "commits": [],
+            "error": type(exc).__name__,
+        }
+    prefix = "datasets/" if repo_type == "dataset" else ""
+    commits: list[dict[str, str]] = []
+    for row in payload:
+        date = iso_date(row.get("date"))
+        commit_id = str(row.get("id") or "")
+        if not date or not start <= date <= end or not commit_id:
+            continue
+        title = str(row.get("title") or row.get("message") or "").strip().splitlines()[0]
+        commits.append(
+            {
+                "id": commit_id,
+                "title": title or "未提供提交说明",
+                "date": date.isoformat(),
+                "url": f"https://huggingface.co/{prefix}{repo_id}/commit/{commit_id}",
+            }
+        )
+        if len(commits) >= CHANGE_EVIDENCE_LIMIT:
+            break
+    return {"source": "Hugging Face commit history", "ok": True, "commits": commits}
+
+
+def enrich_items_with_cards(
+    items: list[dict[str, Any]],
+    start: dt.date | None = None,
+    end: dt.date | None = None,
+) -> list[dict[str, Any]]:
     copied = [{**item, "metadata": dict(item.get("metadata") or {})} for item in items]
 
     def enrich(item: dict[str, Any]) -> dict[str, Any]:
         repo_type = str(item.get("repo_type") or "model")
         item["metadata"]["card"] = fetch_card(str(item.get("title") or ""), repo_type)
+        if item.get("event") == "repository-updated" and start and end:
+            item["metadata"]["change_evidence"] = fetch_hf_change_evidence(
+                str(item.get("title") or ""), repo_type, start, end
+            )
         return item
 
     with ThreadPoolExecutor(max_workers=min(CARD_FETCH_WORKERS, len(copied) or 1)) as executor:
@@ -1433,56 +1701,140 @@ def github_repo_api_url(value: str) -> str | None:
     return f"https://api.github.com/repos/{parts[0]}/{repo}"
 
 
+def github_artifact_spec(value: str) -> dict[str, str] | None:
+    api_url = github_repo_api_url(value)
+    if not api_url:
+        return None
+    parsed = urllib.parse.urlparse(value)
+    parts = [part for part in parsed.path.split("/") if part]
+    owner = parts[0]
+    repo = parts[1].removesuffix(".git")
+    branch = ""
+    path = ""
+    if len(parts) >= 4 and parts[2] == "tree":
+        branch = parts[3]
+        path = "/".join(parts[4:])
+    return {
+        "api_url": api_url,
+        "web_url": f"https://github.com/{owner}/{repo}",
+        "branch": branch,
+        "path": path,
+    }
+
+
 def query_project_urls(
     registry: dict[str, Any],
+    start: dt.date,
+    end: dt.date,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
-    by_api: dict[str, list[str]] = {}
+    specs: dict[str, dict[str, str]] = {}
     for project in registry.get("projects", []):
         for artifact in project.get("artifacts", []):
             if artifact.get("repo_type") != "url":
                 continue
             artifact_url = str(artifact.get("id") or "")
-            api_url = github_repo_api_url(artifact_url)
-            if api_url:
-                by_api.setdefault(api_url, []).append(artifact_url)
+            spec = github_artifact_spec(artifact_url)
+            if spec:
+                specs[artifact_url] = spec
 
-    def fetch(api_url: str) -> tuple[str, dict[str, Any] | None, str | None]:
+    def fetch(entry: tuple[str, dict[str, str]]) -> tuple[str, dict[str, Any] | None, str | None]:
+        artifact_url, spec = entry
+        params = {
+            "since": f"{start.isoformat()}T00:00:00Z",
+            "until": f"{end.isoformat()}T23:59:59Z",
+            "per_page": str(CHANGE_EVIDENCE_LIMIT),
+        }
+        if spec["branch"]:
+            params["sha"] = spec["branch"]
+        if spec["path"]:
+            params["path"] = spec["path"]
+        commits_url = spec["api_url"] + "/commits?" + urllib.parse.urlencode(params)
         try:
-            payload = json.loads(fetch_text(api_url, retries=0))
+            payload = json.loads(fetch_text(commits_url, retries=0))
+            if not isinstance(payload, list):
+                raise TypeError("unexpected GitHub commits response")
         except Exception as exc:
-            parts = [part for part in urllib.parse.urlparse(api_url).path.split("/") if part]
-            web_url = f"https://github.com/{parts[1]}/{parts[2]}" if len(parts) >= 3 else ""
+            if spec["path"]:
+                return artifact_url, None, type(exc).__name__
             try:
                 feed_text = fetch_text(
-                    web_url + "/commits.atom",
+                    spec["web_url"] + "/commits.atom",
                     retries=0,
                     accept="application/atom+xml,application/xml",
                 )
                 feed = ET.fromstring(feed_text)
-                updated = feed.findtext("{http://www.w3.org/2005/Atom}entry/{http://www.w3.org/2005/Atom}updated")
-                if not updated:
+                namespace = "{http://www.w3.org/2005/Atom}"
+                entry_node = feed.find(namespace + "entry")
+                updated = entry_node.findtext(namespace + "updated") if entry_node is not None else ""
+                date = iso_date(updated)
+                if not updated or not date or not start <= date <= end:
                     raise ValueError("missing Atom updated timestamp")
-                payload = {"created_at": "", "pushed_at": updated, "html_url": web_url}
+                title = entry_node.findtext(namespace + "title") if entry_node is not None else ""
+                link_node = entry_node.find(namespace + "link") if entry_node is not None else None
+                link = link_node.get("href", "") if link_node is not None else ""
+                change_evidence = {
+                    "source": "GitHub Atom commit history",
+                    "ok": True,
+                    "commits": [
+                        {
+                            "id": link.rstrip("/").split("/")[-1],
+                            "title": re.sub(r"\s+", " ", str(title or "")).strip()
+                            or "未提供提交说明",
+                            "date": date.isoformat(),
+                            "url": link,
+                        }
+                    ],
+                }
+                return artifact_url, {
+                    "id": artifact_url,
+                    "createdAt": "",
+                    "lastModified": updated,
+                    "url": spec["web_url"],
+                    "change_evidence": change_evidence,
+                }, None
             except Exception:
-                return api_url, None, type(exc).__name__
-        return api_url, payload if isinstance(payload, dict) else None, None
+                return artifact_url, None, type(exc).__name__
+        commits: list[dict[str, str]] = []
+        for row in payload:
+            commit = row.get("commit") or {}
+            committer = commit.get("committer") or {}
+            author = commit.get("author") or {}
+            date = iso_date(committer.get("date") or author.get("date"))
+            if not date or not start <= date <= end:
+                continue
+            message = str(commit.get("message") or "").strip()
+            commits.append(
+                {
+                    "id": str(row.get("sha") or ""),
+                    "title": message.splitlines()[0] if message else "未提供提交说明",
+                    "date": date.isoformat(),
+                    "url": str(row.get("html_url") or spec["web_url"]),
+                }
+            )
+        if not commits:
+            return artifact_url, None, None
+        change_evidence = {
+            "source": "GitHub commit history",
+            "ok": True,
+            "path": spec["path"] or None,
+            "commits": commits,
+        }
+        return artifact_url, {
+            "id": artifact_url,
+            "createdAt": "",
+            "lastModified": commits[0]["date"],
+            "url": spec["web_url"],
+            "change_evidence": change_evidence,
+        }, None
 
     rows: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=min(8, len(by_api) or 1)) as executor:
-        for api_url, payload, error in executor.map(fetch, by_api):
-            artifact_urls = by_api[api_url]
-            if error or payload is None:
-                for artifact_url in artifact_urls:
-                    errors[artifact_url] = error or "UnexpectedResponse"
-                continue
-            for artifact_url in artifact_urls:
-                rows[artifact_url] = {
-                    "id": artifact_url,
-                    "createdAt": payload.get("created_at") or "",
-                    "lastModified": payload.get("pushed_at") or payload.get("updated_at") or "",
-                    "url": payload.get("html_url") or artifact_url,
-                }
+    with ThreadPoolExecutor(max_workers=min(8, len(specs) or 1)) as executor:
+        for artifact_url, payload, error in executor.map(fetch, specs.items()):
+            if error:
+                errors[artifact_url] = error
+            elif payload is not None:
+                rows[artifact_url] = payload
     return rows, errors
 
 
@@ -1561,6 +1913,11 @@ def project_items(
                     "event": event[0],
                     "date": event[1],
                     "url": artifact_url,
+                    **(
+                        {"change_evidence": row["change_evidence"]}
+                        if row.get("change_evidence")
+                        else {}
+                    ),
                 }
             )
         if not changed:
@@ -1586,6 +1943,39 @@ def project_items(
             }
         )
     return sorted(items, key=lambda item: (item["date"], item["title"]), reverse=True)
+
+
+def enrich_project_change_evidence(
+    items: list[dict[str, Any]],
+    start: dt.date,
+    end: dt.date,
+) -> list[dict[str, Any]]:
+    copied: list[dict[str, Any]] = []
+    for item in items:
+        metadata = dict(item.get("metadata") or {})
+        metadata["artifacts"] = [dict(artifact) for artifact in metadata.get("artifacts", [])]
+        copied.append({**item, "metadata": metadata})
+
+    targets = [
+        artifact
+        for item in copied
+        for artifact in item["metadata"].get("artifacts", [])
+        if artifact.get("event") == "repository-updated"
+        and artifact.get("repo_type") in {"model", "dataset"}
+        and not artifact.get("change_evidence")
+    ]
+
+    def enrich(artifact: dict[str, Any]) -> None:
+        artifact["change_evidence"] = fetch_hf_change_evidence(
+            str(artifact.get("id") or ""),
+            str(artifact.get("repo_type") or "model"),
+            start,
+            end,
+        )
+
+    with ThreadPoolExecutor(max_workers=min(CARD_FETCH_WORKERS, len(targets) or 1)) as executor:
+        list(executor.map(enrich, targets))
+    return copied
 
 
 def sort_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1788,7 +2178,7 @@ def main() -> int:
             official_owners,
             include_current_hot,
         )
-        project_url_future = executor.submit(query_project_urls, project_registry)
+        project_url_future = executor.submit(query_project_urls, project_registry, start, end)
         owner_rows_list, owner_coverage, owner_errors = owner_future.result()
         local_candidates = local_future.result() if local_future else []
         global_trending, global_recent, global_errors = (
@@ -1908,6 +2298,7 @@ def main() -> int:
         start,
         end,
     )
+    reproducible_items = enrich_project_change_evidence(reproducible_items, start, end)
     known_dataset_ids = set(dataset_records)
     model_discoveries = model_discovery_items(
         open_candidates,
@@ -1941,19 +2332,25 @@ def main() -> int:
         model_discoveries,
         dataset_discoveries,
     )
+    notable_model_ids = {
+        str(item.get("title") or "") for item in notable_discoveries["models"]
+    }
+    local_items = [
+        item for item in local_items if str(item.get("title") or "") not in notable_model_ids
+    ]
 
     flagship_groups = {role: sort_items(rows) for role, rows in flagship_groups.items()}
     local_items = select_popular_derivatives(collapse_local_variants(local_items))
     dataset_items = sort_popular_items(dataset_items)
     flagship_groups = {
-        role: enrich_items_with_cards(rows) if rows else []
+        role: enrich_items_with_cards(rows, start, end) if rows else []
         for role, rows in flagship_groups.items()
     }
-    local_items = enrich_items_with_cards(local_items) if local_items else []
-    dataset_items = enrich_items_with_cards(dataset_items) if dataset_items else []
+    dataset_items = enrich_items_with_cards(dataset_items, start, end) if dataset_items else []
+    local_items = enrich_items_with_cards(local_items, start, end) if local_items else []
     notable_discoveries = {
-        "models": enrich_items_with_cards(notable_discoveries["models"]),
-        "datasets": enrich_items_with_cards(notable_discoveries["datasets"]),
+        "models": enrich_items_with_cards(notable_discoveries["models"], start, end),
+        "datasets": enrich_items_with_cards(notable_discoveries["datasets"], start, end),
     }
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
     notable_model_count = len(notable_discoveries["models"])
