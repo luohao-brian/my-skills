@@ -8,6 +8,8 @@ import html
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -47,6 +49,7 @@ FLAGSHIP_ROLES = [
     "vlm",
     "image-generation",
     "video-generation",
+    "audio-generation",
     "audio-tts",
     "audio-stt",
     "ocr",
@@ -55,6 +58,18 @@ FLAGSHIP_ROLES = [
     "robotics",
 ]
 DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetune", "adapter"]
+MODALITY_QUERY_FILTERS = {
+    "image-generation": ["text-to-image", "image-to-image"],
+    "video-generation": [
+        "text-to-video",
+        "image-to-video",
+        "image-text-to-video",
+        "video-to-video",
+    ],
+    "audio-tts": ["text-to-speech"],
+    "audio-stt": ["automatic-speech-recognition"],
+}
+MODALITY_FOCUS_ROLES = tuple(MODALITY_QUERY_FILTERS)
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
 DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
 LOCAL_QUERY_LIMIT = 200
@@ -72,6 +87,10 @@ LOCAL_BREAKOUT_LIKES = 100
 DISCOVERY_HOT_TRENDING = 15
 DISCOVERY_HOT_DOWNLOADS = 2_000
 DISCOVERY_HOT_LIKES = 20
+MODALITY_HOT_TRENDING = 4
+MODALITY_HOT_DOWNLOADS = 500
+MODALITY_HOT_LIKES = 10
+MODALITY_QUERY_LIMIT = 200
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
 DATASET_HOT_LIKES = 20
@@ -90,7 +109,7 @@ EVALUATION_EXCERPT_CHARS = 2_000
 EVALUATION_CAVEAT_CHARS = 700
 CARD_FETCH_WORKERS = 8
 CHANGE_EVIDENCE_LIMIT = 5
-SNAPSHOT_VERSION = 1
+SNAPSHOT_VERSION = 2
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "text-generation": {"input": ["text"], "output": ["text"]},
@@ -182,53 +201,173 @@ def load_trending_snapshot(path: Path) -> dict[str, Any]:
         payload = load_json(path)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return {}
-    if payload.get("version") != SNAPSHOT_VERSION:
+    if payload.get("version") not in {1, SNAPSHOT_VERSION}:
         return {}
     models = payload.get("models")
     return payload if isinstance(models, dict) else {}
 
 
+def trending_scopes(
+    rows_or_scopes: list[dict[str, Any]] | dict[str, list[dict[str, Any]]],
+) -> dict[str, list[dict[str, Any]]]:
+    if isinstance(rows_or_scopes, list):
+        return {"global": rows_or_scopes}
+    return rows_or_scopes
+
+
+def previous_scope_ranks(old: dict[str, Any]) -> dict[str, int]:
+    ranks = old.get("ranks")
+    if isinstance(ranks, dict):
+        return {
+            str(scope): int(rank)
+            for scope, rank in ranks.items()
+            if isinstance(rank, int)
+        }
+    rank = old.get("rank")
+    return {"global": int(rank)} if isinstance(rank, int) else {}
+
+
+def snapshot_is_mature(previous_observed_at: str, current_observed_at: str) -> bool:
+    previous_date = iso_date(previous_observed_at)
+    current_date = iso_date(current_observed_at)
+    return bool(previous_date and current_date and previous_date < current_date)
+
+
 def annotate_trending_deltas(
-    rows: list[dict[str, Any]],
+    rows_or_scopes: list[dict[str, Any]] | dict[str, list[dict[str, Any]]],
     previous: dict[str, Any],
+    current_observed_at: str | None = None,
 ) -> None:
     previous_models = previous.get("models") or {}
     previous_observed_at = previous.get("observed_at") or ""
-    for rank, row in enumerate(rows, start=1):
-        model_id = str(row.get("id") or "")
-        old = previous_models.get(model_id) if isinstance(previous_models, dict) else None
+    current_observed_at = current_observed_at or dt.date.today().isoformat()
+    use_previous = snapshot_is_mature(previous_observed_at, current_observed_at)
+    scopes = trending_scopes(rows_or_scopes)
+    current_by_id: dict[str, dict[str, Any]] = {}
+    for scope, rows in scopes.items():
+        for rank, row in enumerate(rows, start=1):
+            model_id = str(row.get("id") or "")
+            if not model_id:
+                continue
+            current = current_by_id.setdefault(model_id, {"row": row, "ranks": {}, "instances": []})
+            current["ranks"][scope] = rank
+            current["instances"].append(row)
+
+    for model_id, current in current_by_id.items():
+        row = current["row"]
+        ranks = current["ranks"]
+        old = previous_models.get(model_id) if use_previous and isinstance(previous_models, dict) else None
         old = old if isinstance(old, dict) else {}
-        old_rank = old.get("rank")
-        row["_trend"] = {
-            "rank": rank,
-            "rank_delta": int(old_rank) - rank if isinstance(old_rank, int) else None,
-            "score_delta": float(row.get("trendingScore") or 0)
-            - float(old.get("trendingScore") or 0)
+        old_ranks = previous_scope_ranks(old)
+        rankings = {
+            scope: {
+                "rank": rank,
+                "rank_delta": old_ranks.get(scope) - rank if scope in old_ranks else None,
+            }
+            for scope, rank in ranks.items()
+        }
+        preferred_scope = "global" if "global" in ranks else min(ranks, key=ranks.get)
+        signals = [
+            "hf-global-trending" if scope == "global" else "hf-task-trending"
+            for scope in ranks
+        ]
+        if any(
+            isinstance(value.get("rank_delta"), int) and value["rank_delta"] > 0
+            for value in rankings.values()
+        ):
+            signals.append("hf-rank-rising")
+        score_delta = (
+            float(row.get("trendingScore") or 0) - float(old.get("trendingScore") or 0)
             if old
-            else None,
-            "downloads_delta": int(row.get("downloads") or 0) - int(old.get("downloads") or 0)
+            else None
+        )
+        downloads_delta = (
+            int(row.get("downloads") or 0) - int(old.get("downloads") or 0)
             if old
-            else None,
-            "likes_delta": int(row.get("likes") or 0) - int(old.get("likes") or 0)
+            else None
+        )
+        likes_delta = (
+            int(row.get("likes") or 0) - int(old.get("likes") or 0)
             if old
-            else None,
+            else None
+        )
+        if any(value is not None and value > 0 for value in (score_delta, downloads_delta, likes_delta)):
+            signals.append("hf-engagement-growing")
+        trend = {
+            "rank_scope": preferred_scope,
+            "rank": ranks[preferred_scope],
+            "rank_delta": rankings[preferred_scope]["rank_delta"],
+            "rankings": rankings,
+            "score_delta": score_delta,
+            "downloads_delta": downloads_delta,
+            "likes_delta": likes_delta,
+            "signals": list(dict.fromkeys(signals)),
+            "previous_observed_at": previous_observed_at or None,
+        }
+        for scoped_row in current["instances"]:
+            scoped_row["_trend"] = trend
+
+
+def annotate_github_deltas(
+    metrics: dict[str, dict[str, Any]],
+    previous: dict[str, Any],
+    current_observed_at: str | None = None,
+) -> None:
+    previous_github = previous.get("github") or {}
+    previous_observed_at = previous.get("observed_at") or ""
+    current_observed_at = current_observed_at or dt.date.today().isoformat()
+    use_previous = snapshot_is_mature(previous_observed_at, current_observed_at)
+    for repo_url, current in metrics.items():
+        old = previous_github.get(repo_url) if use_previous and isinstance(previous_github, dict) else None
+        old = old if isinstance(old, dict) else {}
+        stars_delta = int(current.get("stars") or 0) - int(old.get("stars") or 0) if old else None
+        forks_delta = int(current.get("forks") or 0) - int(old.get("forks") or 0) if old else None
+        signals: list[str] = []
+        if stars_delta is not None and stars_delta > 0:
+            signals.append("github-stars-growing")
+        if forks_delta is not None and forks_delta > 0:
+            signals.append("github-forks-growing")
+        current["trend"] = {
+            "stars_delta": stars_delta,
+            "forks_delta": forks_delta,
+            "signals": signals,
             "previous_observed_at": previous_observed_at or None,
         }
 
 
-def write_trending_snapshot(path: Path, rows: list[dict[str, Any]], observed_at: str) -> None:
+def write_trending_snapshot(
+    path: Path,
+    rows_or_scopes: list[dict[str, Any]] | dict[str, list[dict[str, Any]]],
+    observed_at: str,
+    github_metrics: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    scopes = trending_scopes(rows_or_scopes)
+    models: dict[str, dict[str, Any]] = {}
+    for scope, rows in scopes.items():
+        for rank, row in enumerate(rows, start=1):
+            model_id = str(row.get("id") or "")
+            if not model_id:
+                continue
+            model = models.setdefault(
+                model_id,
+                {
+                    "ranks": {},
+                    "trendingScore": row.get("trendingScore") or 0,
+                    "downloads": row.get("downloads") or 0,
+                    "likes": row.get("likes") or 0,
+                },
+            )
+            model["ranks"][scope] = rank
     payload = {
         "version": SNAPSHOT_VERSION,
         "observed_at": observed_at,
-        "models": {
-            str(row.get("id")): {
-                "rank": rank,
-                "trendingScore": row.get("trendingScore") or 0,
-                "downloads": row.get("downloads") or 0,
-                "likes": row.get("likes") or 0,
+        "models": models,
+        "github": {
+            repo_url: {
+                "stars": row.get("stars") or 0,
+                "forks": row.get("forks") or 0,
             }
-            for rank, row in enumerate(rows, start=1)
-            if row.get("id")
+            for repo_url, row in (github_metrics or {}).items()
         },
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -248,11 +387,12 @@ def write_trending_snapshot(path: Path, rows: list[dict[str, Any]], observed_at:
 
 def write_trending_snapshot_safely(
     path: Path,
-    rows: list[dict[str, Any]],
+    rows_or_scopes: list[dict[str, Any]] | dict[str, list[dict[str, Any]]],
     observed_at: str,
+    github_metrics: dict[str, dict[str, Any]] | None = None,
 ) -> bool:
     try:
-        write_trending_snapshot(path, rows, observed_at)
+        write_trending_snapshot(path, rows_or_scopes, observed_at, github_metrics)
     except OSError as exc:
         print(
             f"HF_TREND_SNAPSHOT_SKIPPED reason={type(exc).__name__}",
@@ -346,10 +486,6 @@ def fetch_text(
             token = huggingface_token()
             if token and is_huggingface_host(url):
                 headers["Authorization"] = f"Bearer {token}"
-            github_token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
-            if github_token and (urllib.parse.urlparse(url).hostname or "").lower() == "api.github.com":
-                headers["Authorization"] = f"Bearer {github_token}"
-                headers["X-GitHub-Api-Version"] = "2022-11-28"
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read().decode("utf-8", errors="replace")
@@ -528,13 +664,14 @@ def base_model_links(row: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 def derivation_facets(row: dict[str, Any]) -> list[str]:
-    return sorted(
-        {
-            relation
-            for _, relation in base_model_links(row)
-            if relation in DERIVATIVE_RELATIONS
-        }
-    )
+    values = {
+        relation
+        for _, relation in base_model_links(row)
+        if relation in DERIVATIVE_RELATIONS
+    }
+    if lower_tags(row) & {"adapter", "lora"}:
+        values.add("adapter")
+    return sorted(values)
 
 
 def deployment_facets(row: dict[str, Any]) -> list[str]:
@@ -732,6 +869,7 @@ ROLE_LABELS = {
     "vlm": "旗舰 VLM / 多模态模型",
     "image-generation": "图像生成模型",
     "video-generation": "视频生成模型",
+    "audio-generation": "音频生成模型",
     "audio-tts": "语音合成模型",
     "audio-stt": "语音识别模型",
     "ocr": "OCR 模型",
@@ -825,6 +963,71 @@ def query_local_candidates() -> list[dict[str, Any]]:
     return list(rows.values())
 
 
+def query_modality_candidates() -> tuple[
+    list[dict[str, Any]],
+    dict[str, int],
+    dict[str, str],
+    dict[str, list[dict[str, Any]]],
+]:
+    """Query generative-media and speech task pools that are sparse globally."""
+    rows: dict[str, dict[str, Any]] = {}
+    role_ids = {role: set() for role in MODALITY_QUERY_FILTERS}
+    trending_by_pipeline: dict[str, dict[str, dict[str, Any]]] = {
+        pipeline: {}
+        for pipelines in MODALITY_QUERY_FILTERS.values()
+        for pipeline in pipelines
+    }
+    errors: dict[str, str] = {}
+
+    def query(
+        role: str,
+        pipeline: str,
+        sort: str,
+    ) -> tuple[str, str, str, list[dict[str, Any]], str | None]:
+        params = [
+            ("filter", pipeline),
+            ("sort", sort),
+            ("direction", "-1"),
+            ("limit", str(MODALITY_QUERY_LIMIT)),
+        ]
+        try:
+            result = hf_api(expanded_model_query(params), retries=0)
+        except Exception as exc:
+            return role, pipeline, sort, [], type(exc).__name__
+        return role, pipeline, sort, result if isinstance(result, list) else [], None
+
+    queries = [
+        (role, pipeline, sort)
+        for role, pipelines in MODALITY_QUERY_FILTERS.items()
+        for pipeline in pipelines
+        for sort in ("trendingScore", "lastModified")
+    ]
+    with ThreadPoolExecutor(max_workers=min(12, len(queries))) as executor:
+        results = executor.map(lambda values: query(*values), queries)
+        for role, pipeline, sort, result, error in results:
+            if error:
+                errors[f"modality:{role}:{pipeline}:{sort}"] = error
+                continue
+            for row in result:
+                model_id = str(row.get("id") or "")
+                if not model_id:
+                    continue
+                rows.setdefault(model_id, row)
+                role_ids[role].add(model_id)
+                if sort == "trendingScore":
+                    trending_by_pipeline[pipeline].setdefault(model_id, row)
+    counts = {role: len(model_ids) for role, model_ids in role_ids.items()}
+    return (
+        list(rows.values()),
+        counts,
+        errors,
+        {
+            f"task:{pipeline}": list(pipeline_rows.values())
+            for pipeline, pipeline_rows in trending_by_pipeline.items()
+        },
+    )
+
+
 def query_global_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
     errors: dict[str, str] = {}
 
@@ -864,6 +1067,10 @@ def popularity_values(row: dict[str, Any]) -> tuple[float, int, int]:
 
 def is_hot_local(row: dict[str, Any]) -> bool:
     trending, downloads, likes = popularity_values(row)
+    if model_role(row) in MODALITY_FOCUS_ROLES:
+        return trending >= MODALITY_HOT_TRENDING and (
+            downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES
+        )
     return trending >= LOCAL_HOT_TRENDING and (
         downloads >= LOCAL_HOT_DOWNLOADS or likes >= LOCAL_HOT_LIKES
     )
@@ -880,6 +1087,10 @@ def is_breakout_local(row: dict[str, Any]) -> bool:
 
 def is_hot_discovery(row: dict[str, Any]) -> bool:
     trending, downloads, likes = popularity_values(row)
+    if model_role(row) in MODALITY_FOCUS_ROLES:
+        return trending >= MODALITY_HOT_TRENDING and (
+            downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES
+        )
     return trending >= DISCOVERY_HOT_TRENDING and (
         downloads >= DISCOVERY_HOT_DOWNLOADS or likes >= DISCOVERY_HOT_LIKES
     )
@@ -934,14 +1145,16 @@ def model_role(row: dict[str, Any], default: str = "unknown") -> str:
         return "video-generation"
     if "image" in outputs:
         return "image-generation"
-    if "audio" in outputs:
+    if pipeline == "text-to-speech" or "tts" in capabilities:
         return "audio-tts"
+    if "audio" in outputs:
+        return "audio-generation"
     if "robotics" in outputs or "robotics" in inputs:
         return "robotics"
-    if outputs == {"text"} and "audio" in inputs:
-        return "audio-stt"
     if outputs == {"text"} and inputs & {"image", "video"}:
         return "vlm"
+    if outputs == {"text"} and "audio" in inputs:
+        return "audio-stt"
     if outputs == {"text"} and "text" in inputs:
         return "llm"
     return default
@@ -1022,10 +1235,13 @@ def local_discovery_items(
             selection.append("breakout")
         if derivative:
             selection.append("derivative")
+        role = base_record.get("role") or model_role(row, default="llm")
+        if role in MODALITY_FOCUS_ROLES:
+            selection.append("modality-radar")
         record = {
             "id": model_id,
             "track": "local",
-            "role": base_record.get("role") or model_role(row, default="llm"),
+            "role": role,
             "family": base_record.get("family"),
             "canonical": canonical,
             "selection": selection,
@@ -1110,15 +1326,18 @@ def model_discovery_items(
             or set(derivation_facets(row)) & DERIVATIVE_RELATIONS
         ):
             continue
+        role = model_role(row)
         selection = ["pending-registry"]
         if registered_owner:
             selection.append("trusted-publisher")
         else:
             selection.extend(["hot", "global-discovery"])
+        if role in MODALITY_FOCUS_ROLES:
+            selection.append("modality-radar")
         record = {
             "id": model_id,
             "track": "discovery",
-            "role": model_role(row),
+            "role": role,
             "family": owner_families.get(owner),
             "selection": selection,
             "pending_registry": True,
@@ -1300,15 +1519,47 @@ def strip_live_popularity(items: Iterable[dict[str, Any]]) -> None:
             metadata.pop(key, None)
 
 
+def native_trend_sort_key(metadata: dict[str, Any]) -> tuple[Any, ...]:
+    trend = metadata.get("trend") or {}
+    signals = set(trend.get("signals") or [])
+    rankings = trend.get("rankings") or {}
+    global_ranking = rankings.get("global") or {}
+    global_rank = (
+        int(global_ranking["rank"])
+        if isinstance(global_ranking, dict) and isinstance(global_ranking.get("rank"), int)
+        else 1_000_000
+    )
+    task_ranks = [
+        int(value["rank"])
+        for scope, value in rankings.items()
+        if str(scope).startswith("task:")
+        if isinstance(value, dict) and isinstance(value.get("rank"), int)
+    ]
+    best_task_rank = min(task_ranks) if task_ranks else 1_000_000
+
+    def rank_tier(rank: int) -> int:
+        return 3 if rank <= 10 else 2 if rank <= 50 else 1 if rank <= 200 else 0
+
+    return (
+        "hf-rank-rising" in signals,
+        "hf-engagement-growing" in signals,
+        rank_tier(global_rank),
+        rank_tier(best_task_rank),
+        -global_rank,
+        -best_task_rank,
+    )
+
+
 def notable_model_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
     metadata = item.get("metadata") or {}
     selection = metadata.get("selection") or []
     return (
+        *native_trend_sort_key(metadata),
         "trusted-publisher" in selection,
-        item.get("event") == "published",
         int(metadata.get("trendingScore") or 0),
         int(metadata.get("likes") or 0),
         int(metadata.get("downloads") or 0),
+        item.get("event") == "published",
         item.get("date", ""),
         item.get("title", ""),
     )
@@ -1345,13 +1596,6 @@ def select_diverse_models(items: list[dict[str, Any]], limit: int) -> list[dict[
         owner_counts[owner] = owner_counts.get(owner, 0) + 1
         direction_counts[direction] = direction_counts.get(direction, 0) + 1
         return True
-
-    for item in ranked:
-        direction = str(item.get("category") or "unknown")
-        if direction_counts.get(direction, 0) == 0:
-            add(item)
-        if len(selected) >= limit:
-            return selected
 
     for item in ranked:
         direction = str(item.get("category") or "unknown")
@@ -1764,10 +2008,74 @@ def github_artifact_spec(value: str) -> dict[str, str] | None:
         path = "/".join(parts[4:])
     return {
         "api_url": api_url,
+        "api_path": f"repos/{owner}/{repo}",
         "web_url": f"https://github.com/{owner}/{repo}",
         "branch": branch,
         "path": path,
     }
+
+
+def gh_available() -> bool:
+    return shutil.which("gh") is not None
+
+
+def gh_api(endpoint: str, params: dict[str, str] | None = None) -> Any:
+    command = ["gh", "api", "--method", "GET", endpoint]
+    for key, value in (params or {}).items():
+        command.extend(["-f", f"{key}={value}"])
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("authenticated gh api request failed")
+    return json.loads(completed.stdout)
+
+
+def query_github_metrics(
+    registry: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    specs: dict[str, dict[str, str]] = {}
+    for project in registry.get("projects", []):
+        for artifact in project.get("artifacts", []):
+            if artifact.get("repo_type") != "url":
+                continue
+            spec = github_artifact_spec(str(artifact.get("id") or ""))
+            if spec:
+                specs[spec["web_url"]] = spec
+
+    def fetch(
+        entry: tuple[str, dict[str, str]],
+    ) -> tuple[str, dict[str, Any] | None, str | None]:
+        web_url, spec = entry
+        try:
+            if not gh_available():
+                raise FileNotFoundError("gh is required for GitHub metrics")
+            payload = gh_api(spec["api_path"])
+            if not isinstance(payload, dict):
+                raise TypeError("unexpected GitHub repository response")
+            return web_url, {
+                "url": web_url,
+                "stars": int(payload.get("stargazers_count") or 0),
+                "forks": int(payload.get("forks_count") or 0),
+                "open_issues": int(payload.get("open_issues_count") or 0),
+                "pushed_at": str(payload.get("pushed_at") or ""),
+            }, None
+        except Exception as exc:
+            return web_url, None, type(exc).__name__
+
+    metrics: dict[str, dict[str, Any]] = {}
+    errors: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=min(8, len(specs) or 1)) as executor:
+        for web_url, payload, error in executor.map(fetch, specs.items()):
+            if error:
+                errors[f"github-metrics:{web_url}"] = error
+            elif payload is not None:
+                metrics[web_url] = payload
+    return metrics, errors
 
 
 def query_project_urls(
@@ -1796,13 +2104,14 @@ def query_project_urls(
             params["sha"] = spec["branch"]
         if spec["path"]:
             params["path"] = spec["path"]
-        commits_url = spec["api_url"] + "/commits?" + urllib.parse.urlencode(params)
         try:
-            payload = json.loads(fetch_text(commits_url, retries=0))
+            if not gh_available():
+                raise FileNotFoundError("gh is required for path-filtered GitHub commits")
+            payload = gh_api(spec["api_path"] + "/commits", params)
             if not isinstance(payload, list):
                 raise TypeError("unexpected GitHub commits response")
         except Exception as exc:
-            if spec["path"]:
+            if spec["path"] or gh_available():
                 return artifact_url, None, type(exc).__name__
             try:
                 feed_text = fetch_text(
@@ -1923,7 +2232,9 @@ def project_items(
     url_rows: dict[str, dict[str, Any]],
     start: dt.date,
     end: dt.date,
+    github_metrics: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
+    github_metrics = github_metrics or {}
     items: list[dict[str, Any]] = []
     for project in registry.get("projects", []):
         changed: list[dict[str, Any]] = []
@@ -1952,6 +2263,8 @@ def project_items(
                 if repo_type == "url" and not resolved
                 else f"https://huggingface.co/{prefix}{repo_id}"
             )
+            github_spec = github_artifact_spec(artifact_id) if repo_type == "url" else None
+            github = github_metrics.get(github_spec["web_url"], {}) if github_spec else {}
             changed.append(
                 {
                     "id": repo_id,
@@ -1966,6 +2279,7 @@ def project_items(
                         if row.get("change_evidence")
                         else {}
                     ),
+                    **({"github": github} if github else {}),
                 }
             )
         if not changed:
@@ -1990,7 +2304,26 @@ def project_items(
                 },
             }
         )
-    return sorted(items, key=lambda item: (item["date"], item["title"]), reverse=True)
+    def project_signal_key(item: dict[str, Any]) -> tuple[Any, ...]:
+        github_rows = [
+            artifact.get("github") or {}
+            for artifact in (item.get("metadata") or {}).get("artifacts", [])
+            if artifact.get("github")
+        ]
+        github_signals = {
+            signal
+            for github in github_rows
+            for signal in (github.get("trend") or {}).get("signals", [])
+        }
+        return (
+            bool(github_signals & {"github-stars-growing", "github-forks-growing"}),
+            max((int(github.get("stars") or 0) for github in github_rows), default=0),
+            max((int(github.get("forks") or 0) for github in github_rows), default=0),
+            item["date"],
+            item["title"],
+        )
+
+    return sorted(items, key=project_signal_key, reverse=True)
 
 
 def enrich_project_change_evidence(
@@ -2054,18 +2387,52 @@ def sort_popular_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def sort_local_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(
-        items,
-        key=lambda item: (
-            int((item.get("metadata") or {}).get("trendingScore") or 0),
-            "priority" in ((item.get("metadata") or {}).get("selection") or []),
-            int((item.get("metadata") or {}).get("likes") or 0),
-            int((item.get("metadata") or {}).get("downloads") or 0),
+    def key(item: dict[str, Any]) -> tuple[Any, ...]:
+        metadata = item.get("metadata") or {}
+        signals = set((metadata.get("trend") or {}).get("signals") or [])
+        return (
+            "hf-rank-rising" in signals,
+            "hf-engagement-growing" in signals,
+            int(metadata.get("trendingScore") or 0),
+            "priority" in (metadata.get("selection") or []),
+            int(metadata.get("likes") or 0),
+            int(metadata.get("downloads") or 0),
             item.get("date", ""),
             item.get("title", ""),
-        ),
+        )
+
+    return sorted(
+        items,
+        key=key,
         reverse=True,
     )
+
+
+def github_snapshot_metrics(
+    registry: dict[str, Any],
+    current: dict[str, dict[str, Any]],
+    previous: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    registered_urls = {
+        spec["web_url"]
+        for project in registry.get("projects", [])
+        for artifact in project.get("artifacts", [])
+        if artifact.get("repo_type") == "url"
+        for spec in [github_artifact_spec(str(artifact.get("id") or ""))]
+        if spec
+    }
+    previous_github = previous.get("github") or {}
+    return {
+        repo_url: current.get(repo_url)
+        or (
+            previous_github.get(repo_url)
+            if isinstance(previous_github, dict)
+            else None
+        )
+        for repo_url in registered_urls
+        if current.get(repo_url)
+        or (isinstance(previous_github, dict) and previous_github.get(repo_url))
+    }
 
 
 def local_variant_key(item: dict[str, Any]) -> str:
@@ -2209,7 +2576,7 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
         for artifact in metadata.get("artifacts", []):
             compact_artifact = {
                 key: artifact[key]
-                for key in ("id", "role", "depends_on", "event", "date", "url")
+                for key in ("id", "role", "depends_on", "event", "date", "url", "github")
                 if artifact.get(key) not in (None, "", [], {})
             }
             change_evidence = compact_change_evidence(artifact.get("change_evidence"))
@@ -2330,6 +2697,7 @@ def main() -> int:
     except ValueError as exc:
         parser.error(str(exc))
     include_current_hot = args.date is None
+    observed_at = dt.datetime.now(dt.timezone.utc).isoformat()
 
     model_registry = load_json(MODEL_REGISTRY_PATH)
     project_registry = load_json(PROJECT_REGISTRY_PATH)
@@ -2359,9 +2727,10 @@ def main() -> int:
     )
 
     phase_started = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=7) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
         local_future = executor.submit(query_local_candidates) if include_current_hot else None
+        modality_future = executor.submit(query_modality_candidates) if include_current_hot else None
         global_future = executor.submit(query_global_models) if include_current_hot else None
         dataset_future = executor.submit(
             query_dataset_candidates,
@@ -2369,21 +2738,49 @@ def main() -> int:
             include_current_hot,
         )
         project_url_future = executor.submit(query_project_urls, project_registry, start, end)
+        github_metrics_future = (
+            executor.submit(query_github_metrics, project_registry) if include_current_hot else None
+        )
         owner_rows_list, owner_coverage, owner_errors = owner_future.result()
         local_candidates = local_future.result() if local_future else []
+        modality_candidates, modality_query_counts, modality_errors, modality_trending_scopes = (
+            modality_future.result()
+            if modality_future
+            else ([], {role: 0 for role in MODALITY_FOCUS_ROLES}, {}, {})
+        )
         global_trending, global_recent, global_errors = (
             global_future.result() if global_future else ([], [], {})
         )
         dataset_candidates, dataset_query_counts, dataset_query_errors = dataset_future.result()
         project_url_rows, project_url_errors = project_url_future.result()
+        github_metrics, github_metric_errors = (
+            github_metrics_future.result() if github_metrics_future else ({}, {})
+        )
     timings["candidate_queries"] = time.perf_counter() - phase_started
 
-    annotate_trending_deltas(global_trending, previous_snapshot)
+    model_trending_scopes = {"global": global_trending, **modality_trending_scopes}
+    annotate_trending_deltas(model_trending_scopes, previous_snapshot, observed_at)
+    annotate_github_deltas(github_metrics, previous_snapshot, observed_at)
+    trend_by_model_id = {
+        str(row.get("id") or ""): row.get("_trend") or {}
+        for rows in model_trending_scopes.values()
+        for row in rows
+        if row.get("id") and row.get("_trend")
+    }
     open_candidate_rows = {
         str(row.get("id") or ""): row
-        for row in owner_rows_list + local_candidates + global_recent + global_trending
+        for row in (
+            owner_rows_list
+            + local_candidates
+            + modality_candidates
+            + global_recent
+            + global_trending
+        )
         if row.get("id")
     }
+    for model_id, row in open_candidate_rows.items():
+        if model_id in trend_by_model_id:
+            row["_trend"] = trend_by_model_id[model_id]
     open_candidates = list(open_candidate_rows.values())
     cached_model_rows = {
         str(row.get("id") or ""): row
@@ -2421,8 +2818,14 @@ def main() -> int:
 
     model_rows = {**cached_model_rows, **exact_model_rows}
     dataset_rows = {**dataset_candidate_rows, **exact_dataset_rows}
-    model_errors = {**owner_errors, **global_errors, **exact_model_errors}
+    model_errors = {
+        **owner_errors,
+        **modality_errors,
+        **global_errors,
+        **exact_model_errors,
+    }
     dataset_errors = {**dataset_query_errors, **exact_dataset_errors}
+    github_errors = {**project_url_errors, **github_metric_errors}
 
     phase_started = time.perf_counter()
     flagship_groups: dict[str, list[dict[str, Any]]] = {role: [] for role in FLAGSHIP_ROLES}
@@ -2491,6 +2894,7 @@ def main() -> int:
         project_url_rows,
         start,
         end,
+        github_metrics,
     )
     reproducible_items = enrich_project_change_evidence(reproducible_items, start, end)
     known_dataset_ids = set(dataset_records)
@@ -2571,8 +2975,8 @@ def main() -> int:
                 len(dataset_items) + notable_dataset_count,
             ),
             "github_projects": source_status(
-                project_url_rows,
-                project_url_errors,
+                {**project_url_rows, **github_metrics},
+                github_errors,
                 sum(
                     1
                     for item in reproducible_items
@@ -2584,6 +2988,8 @@ def main() -> int:
         "diagnostics": {
             "owner_candidates": len(owner_rows_list),
             "local_filter_candidates": len(local_candidates),
+            "modality_query_candidates": len(modality_candidates),
+            "modality_query_by_role": modality_query_counts,
             "global_trending_candidates": len(global_trending),
             "global_recent_candidates": len(global_recent),
             "open_candidate_union": len(open_candidates),
@@ -2606,6 +3012,7 @@ def main() -> int:
             "dataset_official_owner_candidates": dataset_query_counts.get("official_owner", 0),
             "dataset_candidate_union": dataset_query_counts.get("union", 0),
             "project_url_candidates": len(project_url_rows),
+            "github_metric_repositories": len(github_metrics),
         },
         "groups": {
             "flagship": flagship_groups,
@@ -2624,7 +3031,17 @@ def main() -> int:
             args.report_output,
         )
     if args.date is None and global_trending and snapshot_path is not None:
-        write_trending_snapshot_safely(snapshot_path, global_trending, end.isoformat())
+        snapshot_github = github_snapshot_metrics(
+            project_registry,
+            github_metrics,
+            previous_snapshot,
+        )
+        write_trending_snapshot_safely(
+            snapshot_path,
+            model_trending_scopes,
+            observed_at,
+            snapshot_github,
+        )
 
     timings["total"] = time.perf_counter() - run_started
     if args.stats:

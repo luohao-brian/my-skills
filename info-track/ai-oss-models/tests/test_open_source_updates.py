@@ -203,6 +203,8 @@ class ArchitectureFacetTests(unittest.TestCase):
             "audio-text-to-text": "audio-stt",
             "text-to-image": "image-generation",
             "text-to-speech": "audio-tts",
+            "text-to-audio": "audio-generation",
+            "audio-to-audio": "audio-generation",
         }
         for pipeline, expected in cases.items():
             with self.subTest(pipeline=pipeline):
@@ -211,10 +213,214 @@ class ArchitectureFacetTests(unittest.TestCase):
                     expected,
                 )
 
+    def test_visual_audio_input_is_not_misclassified_as_asr(self):
+        row = model_row(
+            "community/multimodal",
+            pipeline_tag="image-text-to-text",
+            tags=["audio", "image-text-to-text"],
+        )
+        self.assertEqual(MODULE.model_role(row), "vlm")
+
     def test_unstructured_label_remains_unknown(self):
         row = model_row("community/model", pipeline_tag="experimental-omni-model")
         self.assertEqual(MODULE.model_role(row), "unknown")
         self.assertEqual(MODULE.modality_evidence(row)["signals"], [])
+
+    def test_voice_conversion_is_not_mislabeled_as_tts(self):
+        row = model_row("community/voice-conversion", pipeline_tag="audio-to-audio")
+        self.assertEqual(MODULE.model_role(row), "audio-generation")
+
+    def test_lora_tag_is_normalized_to_adapter_derivation(self):
+        row = model_row("community/image-lora", tags=["lora", "text-to-image"])
+        self.assertEqual(MODULE.derivation_facets(row), ["adapter"])
+
+
+class ModalityRadarTests(unittest.TestCase):
+    def test_sparse_modality_hot_threshold_does_not_lower_llm_threshold(self):
+        image = model_row(
+            "community/image",
+            pipeline_tag="text-to-image",
+            trendingScore=5,
+            downloads=600,
+            likes=11,
+        )
+        llm = model_row(
+            "community/llm",
+            pipeline_tag="text-generation",
+            trendingScore=5,
+            downloads=600,
+            likes=11,
+        )
+        self.assertTrue(MODULE.is_hot_discovery(image))
+        self.assertFalse(MODULE.is_hot_discovery(llm))
+
+    def test_modality_queries_cover_trending_and_recent_per_pipeline(self):
+        def fake_hf_api(path, retries=1):
+            parsed = MODULE.urllib.parse.parse_qs(MODULE.urllib.parse.urlparse(path).query)
+            pipeline = parsed["filter"][0]
+            return [model_row(f"community/{pipeline}", pipeline_tag=pipeline)]
+
+        with mock.patch.object(MODULE, "hf_api", side_effect=fake_hf_api) as api:
+            rows, counts, errors, scopes = MODULE.query_modality_candidates()
+
+        expected_pipelines = {
+            pipeline
+            for pipelines in MODULE.MODALITY_QUERY_FILTERS.values()
+            for pipeline in pipelines
+        }
+        self.assertEqual(api.call_count, len(expected_pipelines) * 2)
+        self.assertEqual({row["pipeline_tag"] for row in rows}, expected_pipelines)
+        self.assertEqual(errors, {})
+        self.assertTrue(all(count > 0 for count in counts.values()))
+        self.assertEqual(
+            set(scopes),
+            {f"task:{pipeline}" for pipeline in expected_pipelines},
+        )
+        self.assertTrue(all(scope_rows for scope_rows in scopes.values()))
+
+    def test_notable_selection_does_not_reserve_focus_modalities(self):
+        def item(model_id, category, score):
+            return {
+                "title": model_id,
+                "category": category,
+                "event": "repository-updated",
+                "date": "2026-08-02",
+                "metadata": {
+                    "selection": ["hot"],
+                    "trendingScore": score,
+                    "downloads": score * 100,
+                    "likes": score,
+                },
+            }
+
+        items = [item("llm-owner/model", "llm", 1000), item("vlm-owner/model", "vlm", 900)]
+        items.extend(
+            [
+                item("image-owner/model", "image-generation", 5),
+                item("video-owner/model", "video-generation", 5),
+                item("tts-owner/model", "audio-tts", 5),
+            ]
+        )
+        selected = MODULE.select_diverse_models(items, 2)
+        categories = {entry["category"] for entry in selected}
+        self.assertEqual(categories, {"llm", "vlm"})
+
+    def test_notable_selection_does_not_reserve_each_direction(self):
+        def item(model_id, category, score):
+            return {
+                "title": model_id,
+                "category": category,
+                "event": "repository-updated",
+                "date": "2026-08-02",
+                "metadata": {
+                    "selection": ["hot"],
+                    "trendingScore": score,
+                    "downloads": score * 100,
+                    "likes": score,
+                },
+            }
+
+        strong = [
+            item(f"owner-{index}/model", "llm", 100 - index)
+            for index in range(3)
+        ]
+        weak = item("tts-owner/model", "audio-tts", 1)
+        selected = MODULE.select_diverse_models(strong + [weak], 3)
+        self.assertEqual(
+            [entry["title"] for entry in selected],
+            [entry["title"] for entry in strong],
+        )
+
+    def test_rising_native_rank_precedes_larger_static_metrics(self):
+        rising = {
+            "title": "community/rising",
+            "category": "audio-tts",
+            "event": "repository-updated",
+            "date": "2026-08-02",
+            "metadata": {
+                "selection": ["hot"],
+                "trendingScore": 10,
+                "downloads": 500,
+                "likes": 10,
+                "trend": {
+                    "signals": ["hf-task-trending", "hf-rank-rising"],
+                    "rankings": {"task:text-to-speech": {"rank": 8, "rank_delta": 10}},
+                },
+            },
+        }
+        static = {
+            "title": "community/static",
+            "category": "llm",
+            "event": "repository-updated",
+            "date": "2026-08-02",
+            "metadata": {
+                "selection": ["hot"],
+                "trendingScore": 100,
+                "downloads": 100_000,
+                "likes": 1_000,
+                "trend": {
+                    "signals": ["hf-global-trending"],
+                    "rankings": {"global": {"rank": 2, "rank_delta": 0}},
+                },
+            },
+        }
+        ranked = sorted([static, rising], key=MODULE.notable_model_sort_key, reverse=True)
+        self.assertEqual(ranked[0]["title"], "community/rising")
+
+    def test_native_task_rank_precedes_publisher_status(self):
+        task_leader = {
+            "title": "community/task-leader",
+            "category": "audio-tts",
+            "metadata": {
+                "selection": ["hot"],
+                "trendingScore": 20,
+                "trend": {
+                    "signals": ["hf-global-trending", "hf-task-trending"],
+                    "rankings": {
+                        "global": {"rank": 100},
+                        "task:text-to-speech": {"rank": 1},
+                    },
+                },
+            },
+        }
+        trusted_lagging = {
+            "title": "official/lagging",
+            "category": "llm",
+            "metadata": {
+                "selection": ["trusted-publisher"],
+                "trendingScore": 100,
+                "trend": {
+                    "signals": ["hf-global-trending"],
+                    "rankings": {"global": {"rank": 196}},
+                },
+            },
+        }
+        ranked = sorted(
+            [trusted_lagging, task_leader],
+            key=MODULE.notable_model_sort_key,
+            reverse=True,
+        )
+        self.assertEqual(ranked[0]["title"], "community/task-leader")
+
+    def test_popularity_precedes_recency_for_unregistered_models(self):
+        def item(model_id, score, event):
+            return {
+                "title": model_id,
+                "category": "audio-tts",
+                "event": event,
+                "date": "2026-08-02",
+                "metadata": {
+                    "selection": ["hot"],
+                    "trendingScore": score,
+                    "downloads": 100,
+                    "likes": score,
+                },
+            }
+
+        older_hot = item("community/hot", 100, "repository-updated")
+        new_cold = item("community/new", 5, "published")
+        ranked = sorted([new_cold, older_hot], key=MODULE.notable_model_sort_key, reverse=True)
+        self.assertEqual(ranked[0]["title"], "community/hot")
 
     def test_arxiv_tags_produce_primary_and_hf_paper_links(self):
         row = model_row("community/model", tags=["arxiv:2606.19348"])
@@ -359,6 +565,24 @@ class PerformancePipelineTests(unittest.TestCase):
 
 
 class DevelopmentArtifactTests(unittest.TestCase):
+    def test_gh_api_uses_authenticated_cli_get_request(self):
+        completed = mock.Mock(returncode=0, stdout='{"ok": true}')
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed) as run:
+            payload = MODULE.gh_api("repos/Official/training", {"per_page": "5"})
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "gh",
+                "api",
+                "--method",
+                "GET",
+                "repos/Official/training",
+                "-f",
+                "per_page=5",
+            ],
+        )
+
     def test_registry_validation_rejects_dangling_artifact_dependency(self):
         projects = {
             "projects": [
@@ -452,6 +676,34 @@ class DevelopmentArtifactTests(unittest.TestCase):
             "Update training config",
         )
 
+    def test_registered_github_metrics_are_collected(self):
+        registry = {
+            "projects": [
+                {
+                    "artifacts": [
+                        {
+                            "id": "https://github.com/Official/training/tree/main/recipes",
+                            "repo_type": "url",
+                        }
+                    ]
+                }
+            ]
+        }
+        response = {
+            "stargazers_count": 120,
+            "forks_count": 18,
+            "open_issues_count": 7,
+            "pushed_at": "2026-08-02T00:00:00Z",
+        }
+        with (
+            mock.patch.object(MODULE, "gh_available", return_value=True),
+            mock.patch.object(MODULE, "gh_api", return_value=response),
+        ):
+            metrics, errors = MODULE.query_github_metrics(registry)
+        self.assertEqual(errors, {})
+        self.assertEqual(metrics["https://github.com/Official/training"]["stars"], 120)
+        self.assertEqual(metrics["https://github.com/Official/training"]["forks"], 18)
+
     def test_github_subdirectory_requires_path_specific_commit(self):
         root = "https://github.com/Official/training"
         subdirectory = root + "/tree/main/src/eval"
@@ -465,15 +717,25 @@ class DevelopmentArtifactTests(unittest.TestCase):
                 }
             ]
         }
-        requested_urls = []
+        requested_calls = []
 
-        def response(url, **kwargs):
-            requested_urls.append(url)
-            if "path=src%2Feval" in url:
-                return "[]"
-            return """[{"sha":"abc","html_url":"https://github.com/Official/training/commit/abc","commit":{"message":"Update dependency","committer":{"date":"2026-07-30T00:00:00Z"}}}]"""
+        def response(endpoint, params=None):
+            requested_calls.append((endpoint, params))
+            if (params or {}).get("path") == "src/eval":
+                return []
+            return [{
+                "sha": "abc",
+                "html_url": "https://github.com/Official/training/commit/abc",
+                "commit": {
+                    "message": "Update dependency",
+                    "committer": {"date": "2026-07-30T00:00:00Z"},
+                },
+            }]
 
-        with mock.patch.object(MODULE, "fetch_text", side_effect=response):
+        with (
+            mock.patch.object(MODULE, "gh_available", return_value=True),
+            mock.patch.object(MODULE, "gh_api", side_effect=response),
+        ):
             rows, errors = MODULE.query_project_urls(
                 registry,
                 dt.date(2026, 7, 27),
@@ -482,7 +744,9 @@ class DevelopmentArtifactTests(unittest.TestCase):
         self.assertEqual(errors, {})
         self.assertIn(root, rows)
         self.assertNotIn(subdirectory, rows)
-        self.assertTrue(any("path=src%2Feval" in url for url in requested_urls))
+        self.assertTrue(
+            any((params or {}).get("path") == "src/eval" for _, params in requested_calls)
+        )
 
     def test_hf_change_evidence_is_limited_to_window(self):
         payload = [
@@ -598,12 +862,106 @@ class TrendSnapshotTests(unittest.TestCase):
 
     def test_snapshot_round_trip(self):
         rows = [model_row("community/model")]
+        github = {"https://github.com/community/model": {"stars": 10, "forks": 2}}
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state" / "trending-snapshot.json"
-            MODULE.write_trending_snapshot(path, rows, "2026-08-02")
+            MODULE.write_trending_snapshot(path, rows, "2026-08-02", github)
             snapshot = MODULE.load_trending_snapshot(path)
         self.assertEqual(snapshot["observed_at"], "2026-08-02")
-        self.assertEqual(snapshot["models"]["community/model"]["rank"], 1)
+        self.assertEqual(snapshot["models"]["community/model"]["ranks"]["global"], 1)
+        self.assertEqual(snapshot["github"]["https://github.com/community/model"]["stars"], 10)
+
+    def test_failed_github_metric_keeps_previous_snapshot_value(self):
+        registry = {
+            "projects": [
+                {
+                    "artifacts": [
+                        {
+                            "id": "https://github.com/community/model",
+                            "repo_type": "url",
+                        }
+                    ]
+                }
+            ]
+        }
+        previous = {
+            "github": {
+                "https://github.com/community/model": {"stars": 10, "forks": 2}
+            }
+        }
+        carried = MODULE.github_snapshot_metrics(registry, {}, previous)
+        self.assertEqual(
+            carried["https://github.com/community/model"],
+            {"stars": 10, "forks": 2},
+        )
+
+    def test_task_rank_and_github_growth_are_annotated(self):
+        previous = {
+            "version": MODULE.SNAPSHOT_VERSION,
+            "observed_at": "2026-08-01",
+            "models": {
+                "community/model": {
+                    "ranks": {"global": 20, "task:text-to-speech": 10},
+                    "trendingScore": 10,
+                    "downloads": 4_000,
+                    "likes": 25,
+                }
+            },
+            "github": {
+                "https://github.com/community/model": {"stars": 100, "forks": 10}
+            },
+        }
+        row = model_row("community/model", trendingScore=20, downloads=5_000, likes=30)
+        MODULE.annotate_trending_deltas(
+            {"global": [row], "task:text-to-speech": [row]},
+            previous,
+        )
+        self.assertEqual(row["_trend"]["rankings"]["global"]["rank_delta"], 19)
+        self.assertEqual(row["_trend"]["rankings"]["task:text-to-speech"]["rank_delta"], 9)
+        self.assertIn("hf-rank-rising", row["_trend"]["signals"])
+
+        github = {"https://github.com/community/model": {"stars": 130, "forks": 14}}
+        MODULE.annotate_github_deltas(github, previous)
+        self.assertEqual(github["https://github.com/community/model"]["trend"]["stars_delta"], 30)
+        self.assertIn(
+            "github-forks-growing",
+            github["https://github.com/community/model"]["trend"]["signals"],
+        )
+
+    def test_same_day_rerun_does_not_emit_growth_signals(self):
+        previous = {
+            "version": MODULE.SNAPSHOT_VERSION,
+            "observed_at": "2026-08-06T01:00:00+00:00",
+            "models": {
+                "community/model": {
+                    "ranks": {"global": 10},
+                    "trendingScore": 10,
+                    "downloads": 4_000,
+                    "likes": 25,
+                }
+            },
+            "github": {
+                "https://github.com/community/model": {"stars": 100, "forks": 10}
+            },
+        }
+        row = model_row("community/model", trendingScore=20, downloads=5_000, likes=30)
+        MODULE.annotate_trending_deltas(
+            {"global": [row]},
+            previous,
+            "2026-08-06T08:00:00+00:00",
+        )
+        self.assertIsNone(row["_trend"]["rank_delta"])
+        self.assertNotIn("hf-rank-rising", row["_trend"]["signals"])
+        self.assertNotIn("hf-engagement-growing", row["_trend"]["signals"])
+
+        github = {"https://github.com/community/model": {"stars": 130, "forks": 14}}
+        MODULE.annotate_github_deltas(
+            github,
+            previous,
+            "2026-08-06T08:00:00+00:00",
+        )
+        self.assertIsNone(github["https://github.com/community/model"]["trend"]["stars_delta"])
+        self.assertEqual(github["https://github.com/community/model"]["trend"]["signals"], [])
 
     def test_snapshot_write_failure_is_non_fatal(self):
         rows = [model_row("community/model")]

@@ -4,10 +4,12 @@
 
 - 精确查询模型、数据集和可复现项目注册表中的 Hugging Face 仓库。
 - 当前运行查询 HF 全局 Trending Top 500 和最近更新 Top 1000，召回未登记 owner 的热门社区模型和未被过滤器覆盖的完整权重仓库；历史运行不查询这两个实时池。
+- 当前运行额外按结构化任务查询图像生成、视频生成和 TTS 的 Trending 与最近更新池，并保留 HF 官方任务内排名；这是模态级召回漏斗，不依赖模型名或发布者。历史运行不查询这些实时池。
 - 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
-- 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
+- 使用已认证的 `gh api` 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
+- 当前运行通过 `gh api` 读取已登记 GitHub 工程的 star/fork，并在提供状态目录时计算增量；不从模型卡任意发现或猜测 GitHub 仓库。star/fork 只表达工程关注和采用信号，不证明模型质量或本窗口技术变化。
 - 只为最终入选的重点旗舰、本地热门、正式数据集和重点新发现读取对应 model card 或 dataset card。
 - 所有正式候选合并后共用一个 enrichment 任务池，不按报告分节串行抓取 model card 和提交历史；同一次 run 不重复采集同一正式候选。
 - 从最终入选模型的 model card 提取 Evaluation、Benchmark、Leaderboard 等评测小节和以 `Benchmark` 为表头的结果表，同时提取 Limitations / Caveats 作为评测边界。
@@ -26,7 +28,7 @@
 ## 入选条件
 
 - 旗舰模型：精确 ID 位于白名单，且本窗口内发布或更新。
-- 热门衍生与本地部署：当前运行要求具有本地部署格式或 HF `base_model` 衍生关系并满足 HF 热门条件，也可用 `trending-observed` 纳入窗口外更新但仍处于热门池的模型。指定历史日期时不使用实时热榜、下载、点赞或 TrendingScore，只纳入注册表中标记为重点且在窗口内发布或更新的本地模型；不自动发现未登记的历史衍生模型。
+- 热门衍生与本地部署：当前运行要求具有本地部署格式或 HF `base_model` 衍生关系并满足 HF 热门条件，也可用 `trending-observed` 纳入窗口外更新但仍处于热门池的模型；HF `lora` 标签统一视为 `adapter` 衍生关系。指定历史日期时不使用实时热榜、下载、点赞或 TrendingScore，只纳入注册表中标记为重点且在窗口内发布或更新的本地模型；不自动发现未登记的历史衍生模型。
 - 可复现项目：项目位于白名单，且本窗口内有已登记交付件发布或更新。
 - 数据集：精确 ID 位于技术数据注册表且本窗口内发布或更新时，重点、关联可复现项目或明确技术角色可以作为入选理由，不要求同时进入 HF 热榜；未登记 owner 的发现仍需满足热门条件。
 - 重点新发现：已登记官方 owner 的窗口内新模型或数据集可进入发现池；未登记 owner 的热门模型和数据集只在当前运行中从全局候选池发现，历史运行不使用这类实时热门信号。
@@ -35,22 +37,24 @@ HF 热门条件：
 
 - 热门衍生与本地部署：`trendingScore >= 4`，且 `downloads >= 2000` 或 `likes >= 20`。
 - 未登记 owner 的模型发现：`trendingScore >= 15`，且 `downloads >= 2000` 或 `likes >= 20`。
+- 图像生成、视频生成、TTS 和 ASR 模态雷达：候选必须有结构化任务证据，且 `trendingScore >= 4`，并满足 `downloads >= 500` 或 `likes >= 10`；较低阈值只作用于这些稀疏任务池，不降低 LLM/VLM 等通用发现阈值。
 - 数据集：`trendingScore >= 15`，且 `downloads >= 1000` 或 `likes >= 20`。
 
 独立爆款条件：本地模型 `trendingScore >= 50`、`downloads >= 100000` 且 `likes >= 100`。已知本地部署生态发布者位于 [model-registry.json](model-registry.json)，只用于补充 owner 定向查询，不为其预留报告名额。发布者分层为 `registered-owner`、`local-ecosystem-publisher` 和 `unregistered`；分层用于召回、排序和审计，不把本地部署生态发布者升级为官方旗舰 owner。
 
 当前运行的正式分组按重点标记和热度排序，不按更新时间生成流水账。历史运行不使用实时热度，按重点标记、窗口事件日期和仓库 ID 稳定排序。
 
-热门衍生与本地部署模型最多 20 条。只有 [model-registry.json](model-registry.json) 的 `model_overrides.<repo>.variant_group` 显式声明同组时，才把同一发布者下的仓库折叠为一个代表条目及 `variants`；`base_model` 相同不足以证明社区模型的训练、合并或用途相同。先覆盖最多 8 个不同发布者，再保证 `merge`、`finetune`、`adapter`、`gguf`、`mlx`、`on-device` 和 `quantized` 类型覆盖；默认同一发布者最多 3 条，候选不足时放宽，最后按 TrendingScore、重点标记、点赞和下载量排序。发布者覆盖对官方、已知社区和新发布者使用同一规则，不给具体名单预留名额。
+热门衍生与本地部署模型最多 20 条。只有 [model-registry.json](model-registry.json) 的 `model_overrides.<repo>.variant_group` 显式声明同组时，才把同一发布者下的仓库折叠为一个代表条目及 `variants`；`base_model` 相同不足以证明社区模型的训练、合并或用途相同。先覆盖最多 8 个不同发布者，再保证 `merge`、`finetune`、`adapter`、`gguf`、`mlx`、`on-device` 和 `quantized` 类型覆盖；默认同一发布者最多 3 条，候选不足时放宽。排序先看可用的 HF 排名/互动增量证据，再用 TrendingScore、重点标记、点赞和下载量作稳定次序。发布者覆盖对官方、已知社区和新发布者使用同一规则，不给具体名单预留名额。
 
 ## 重点新发现排序
 
-- 模型优先级依次考虑：已登记官方发布者、新发布、TrendingScore、点赞、下载量和日期。达到热门阈值的未登记 owner 候选必须标记 `global-discovery` 和 `pending-registry`。
-- 先选择不同方向的最高优先级模型，再补足候选；同一发布者默认最多 2 条，同一方向默认最多 3 条，候选不足时放宽。
+- 模型优先级依次考虑：HF 官方排名上升、HF 互动指标增长、官方全局排名档位、任务内排名档位、已登记官方发布者、TrendingScore、点赞、下载量、新发布和日期。全局榜用于跨方向排序，任务榜用于同层补强与稀疏方向召回，不把不同任务的名次数值换算成统一分数；首次快照没有增量时不虚构增长。
+- 不为图像生成、视频生成、TTS 或 ASR 无条件预留名额；候选先满足各自召回条件，再与其他方向一起按官方排名与可核验增量选取。
+- 不先按方向均分候选；同一发布者默认最多 2 条，同一方向默认最多 3 条，候选不足时放宽，两个上限只用于防止单一来源刷屏。
 - 热门新数据集按 TrendingScore、新发布、日期、点赞和下载量排序，最多 5 条。
 - 已登记主要厂商 owner 的新技术数据集可以在未达到热榜阈值时进入发现池，并优先于未登记 owner 的同热度候选；仍须标记 `pending-registry`。
 - 模型与数据集合计最多 12 条；候选充足时至少 8 条。
-- 方向覆盖包括 LLM、VLM、图像、视频、语音、OCR、翻译、Embedding 和 Robotics；结构化字段不足时标为“待确认”。方向只用于展示与去重，不确认旗舰身份。
+- 方向覆盖包括 LLM、VLM、图像、视频、TTS、其他音频生成、语音识别、OCR、翻译、Embedding 和 Robotics；结构化字段不足时标为“待确认”。方向只用于展示与去重，不确认旗舰身份。
 
 ## HF 字段
 
@@ -67,12 +71,13 @@ HF 热门条件：
 - 评测：只保留 model card 明确报告的设置、基准、对照项、分数和限制；model card 结果属于发布方自述，不自动视为独立复现。
 - 证据片段在采集阶段有长度上限，保留开头的设置、代表性表格和 limitations/caveats；成稿不得因片段截断而补猜后续结果。
 
-方向分类只使用上述结构化模态证据：视频输出归入视频生成，图像输出归入图像生成，音频输出归入语音生成；纯文本输出再按音频输入、视觉输入或文本输入区分语音识别、VLM 和 LLM。`any-to-any` 保留为通用多模态方向。不得用模型 ID、owner 或自然语言名称补分类。
+方向分类只使用上述结构化模态证据：视频输出归入视频生成，图像输出归入图像生成；只有 `text-to-speech` 或等价结构化 TTS 能力归入语音合成，其他音频输出归入音频生成；纯文本输出先识别视觉输入，再识别音频输入和文本输入，避免同时带视觉与音频标签的多模态模型误归 ASR。`any-to-any` 保留为通用多模态方向。不得用模型 ID、owner 或自然语言名称补分类。
 
 ## 当前热门与趋势快照
 
 - `trending-observed` 只在未传 `--date` 的当前运行中使用，表示仓库在观察日仍满足热门条件，不表示当日发布或更新。
-- 当前运行在调用方提供 `--state-dir` 或 `AI_OSS_MODELS_STATE_DIR` 时，把全局 Trending 排名、TrendingScore、下载量和点赞量保存到该目录的 `trending-snapshot.json`；下一次使用同一目录运行时，在 `metadata.trend` 中给出排名与指标增量。
+- 当前运行在调用方提供 `--state-dir` 或 `AI_OSS_MODELS_STATE_DIR` 时，把 HF 全局与任务内 Trending 排名、TrendingScore、下载量、点赞量，以及已登记 GitHub 工程的 star/fork 保存到该目录的 `trending-snapshot.json`；下一次使用同一目录运行时，在模型 `metadata.trend` 和项目交付件 `github.trend` 中给出对应增量。
+- 同一 UTC 自然日内重复运行会刷新快照，但不产生排名或互动增长信号，避免把分钟级榜单抖动解释成趋势；至少跨日的连续快照才计算增量。
 - 未提供状态目录时不读写持久状态，趋势增量为空。快照不写入候选 JSON、报告或技能仓库。
 - 指定 `--date` 的历史回测既不查询实时全局热门池，也不读写快照；候选 metadata 省略当前下载、点赞、TrendingScore 和趋势字段，防止当前社区热度影响历史召回、排序或展示。
 

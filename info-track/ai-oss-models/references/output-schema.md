@@ -14,6 +14,8 @@
   "diagnostics": {
     "owner_candidates": 0,
     "local_filter_candidates": 0,
+    "modality_query_candidates": 0,
+    "modality_query_by_role": {"image-generation": 0, "video-generation": 0, "audio-tts": 0},
     "global_trending_candidates": 0,
     "global_recent_candidates": 0,
     "open_candidate_union": 0,
@@ -24,7 +26,8 @@
     "dataset_recent_candidates": 0,
     "dataset_official_owner_candidates": 0,
     "dataset_candidate_union": 0,
-    "project_url_candidates": 0
+    "project_url_candidates": 0,
+    "github_metric_repositories": 0
   },
   "groups": {
     "flagship": {
@@ -32,6 +35,7 @@
       "vlm": [],
       "image-generation": [],
       "video-generation": [],
+      "audio-generation": [],
       "audio-tts": [],
       "audio-stt": [],
       "ocr": [],
@@ -83,17 +87,23 @@
 {
   "publisher_tier": "unregistered",
   "trend": {
+    "rank_scope": "task:text-to-speech",
     "rank": 12,
     "rank_delta": 5,
+    "rankings": {
+      "global": {"rank": 120, "rank_delta": 8},
+      "task:text-to-speech": {"rank": 12, "rank_delta": 5}
+    },
     "score_delta": 8,
     "downloads_delta": 1200,
     "likes_delta": 4,
+    "signals": ["hf-task-trending", "hf-rank-rising", "hf-engagement-growing"],
     "previous_observed_at": "YYYY-MM-DD"
   }
 }
 ```
 
-`rank_delta > 0` 表示排名上升。首次观察或上次快照没有该仓库时，各增量为 `null`。`diagnostics` 只用于检查召回漏斗，不进入最终报告。
+`rank_delta > 0` 表示 `rank_scope` 对应的官方榜单排名上升；`rankings` 分别保留全局或 `task:<pipeline_tag>` 榜单。首次观察、上次快照没有该仓库，或两次运行仍在同一 UTC 自然日时，各增量为 `null`。`signals` 是可核验的来源标签，不是综合分或质量结论。`diagnostics` 只用于检查召回漏斗，不进入最终报告。
 
 热门衍生/本地部署模型还包含 `derivation` 和 `deployment`：
 
@@ -166,7 +176,7 @@
 }
 ```
 
-方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。无法得到完整输入和输出时保留空数组并使用“待确认”。
+方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。`text-to-speech` 归入 TTS，其他音频输出归入音频生成，避免把 voice conversion 或音乐生成误写成 TTS。无法得到完整输入和输出时保留空数组并使用“待确认”。
 
 模型卡存在 Evaluation、Benchmark、Leaderboard 等明确小节，或存在以 `Benchmark` 为表头的结果表时，`card` 还包含：
 
@@ -206,6 +216,28 @@
 ```
 
 可复现项目的每个 `metadata.artifacts[]` 可包含相同的 `change_evidence`；GitHub 子目录证据额外包含 `path`，且提交已经按该路径过滤。`ok: false` 或空提交列表表示只能确认仓库时间戳，不能说明具体变化。
+
+已登记 GitHub 交付件还可包含：
+
+```json
+{
+  "github": {
+    "url": "https://github.com/owner/repo",
+    "stars": 1200,
+    "forks": 80,
+    "open_issues": 12,
+    "pushed_at": "ISO-8601",
+    "trend": {
+      "stars_delta": 50,
+      "forks_delta": 4,
+      "signals": ["github-stars-growing", "github-forks-growing"],
+      "previous_observed_at": "YYYY-MM-DD"
+    }
+  }
+}
+```
+
+GitHub 指标只来自 [reproducible-projects.json](reproducible-projects.json) 已登记仓库。它们表达工程关注与采用，不代替提交证据，也不证明模型质量。
 
 `event` 使用：
 
