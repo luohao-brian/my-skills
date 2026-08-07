@@ -24,5 +24,6 @@ python3 {baseDir}/scripts/volc_stt.py ./audio.wav
 
 1. The script reads only `ARK_AGENT_PLAN_API_KEY` and uses the fixed Agent Plan endpoint and `volc.seedasr.sauc.duration` resource.
 2. Accept local audio files only. Do not invent remote downloads inside the skill.
-3. Expect concise stdout JSON containing `success`, `transcript`, `audio_path`, and `duration_ms`; use `--raw` only when exact provider fields are needed.
-4. Treat an empty transcript as a failed skill call.
+3. Require the provider-supported 16 kHz input contract, derive duration from the input format, and send approximately 100-200 ms per audio package while receiving responses concurrently.
+4. Expect concise stdout JSON containing `success`, `transcript`, `audio_path`, and `duration_ms`; use `--raw` only when exact provider fields are needed.
+5. Treat an empty transcript as a failed skill call.

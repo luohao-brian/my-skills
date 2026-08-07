@@ -13,15 +13,20 @@ from typing import Any
 
 SIZE_ALIASES = {
     "1:1": "2048x2048",
-    "3:4": "1536x2048",
-    "4:3": "2048x1536",
-    "16:9": "2048x1152",
-    "9:16": "1152x2048",
-    "21:9": "2560x1080",
+    "3:4": "1728x2304",
+    "4:3": "2304x1728",
+    "3:2": "2496x1664",
+    "2:3": "1664x2496",
+    "16:9": "2848x1600",
+    "9:16": "1600x2848",
+    "21:9": "3136x1344",
 }
+# Official image generation request contract:
+# https://www.volcengine.com/docs/82379/1541523?lang=zh
+# Agent Plan exposes the same resource under the fixed /api/plan/v3 base.
 BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
 MODEL_ID = "doubao-seedream-5.0-lite"
-DEFAULT_SIZE = "2k"
+DEFAULT_SIZE = "2K"
 REQUEST_TIMEOUT_SECONDS = 180
 
 
@@ -44,7 +49,7 @@ def normalize_size(value: str) -> str:
     if alias:
         return alias
     if size.lower() in {"2k", "3k", "4k"}:
-        return size.lower()
+        return size.upper()
     return size
 
 

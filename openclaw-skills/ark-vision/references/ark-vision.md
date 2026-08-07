@@ -5,9 +5,11 @@
 - Environment: `ARK_AGENT_PLAN_API_KEY`
 - Endpoint: `https://ark.cn-beijing.volces.com/api/plan/v3/responses`
 - Model: `doubao-seed-2.0-lite`
+- Official Responses API quick start: https://www.volcengine.com/docs/82379/1795150?lang=zh
+- Official response object: https://www.volcengine.com/docs/82379/1783703?lang=zh
 
 The script reads no other environment variable. The request contains one user
-message with:
+message with `type:message` and:
 
 - `{"type":"input_image","image_url":"..."}`
 - `{"type":"input_text","text":"..."}`

@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 
+# Official Responses API quick start and response object:
+# https://www.volcengine.com/docs/82379/1795150?lang=zh
+# https://www.volcengine.com/docs/82379/1783703?lang=zh
+# Agent Plan exposes the same request shape under the fixed /api/plan/v3 base.
 BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
 MODEL_ID = "doubao-seed-2.0-lite"
 MAX_OUTPUT_TOKENS = 2000
@@ -89,6 +93,7 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
         "model": MODEL_ID,
         "input": [
             {
+                "type": "message",
                 "role": "user",
                 "content": [
                     {"type": "input_image", "image_url": image_url},

@@ -17,16 +17,16 @@ Build requests with these rules:
 - Put the user's search text in `Query`. Keep it focused and within 1 to 100 characters.
 - Use `SearchType=web` when the user needs webpages, current facts, news, official pages, or cited textual evidence.
 - Use `SearchType=image` only when the user asks for image search results.
-- Do not send `SearchType=web_summary`. For summarized web results, send `SearchType=web` and keep `NeedSummary=true`.
+- Do not send `SearchType=web_summary` or an undocumented summary request field. Use `SearchType=web` and consume `Summary` or `Snippet` when the provider returns it.
 - Set `Count` to the number of results needed for the task. Defaults are `10` for `web` and `5` for `image`; hard limits are `50` for `web` and `5` for `image`.
 - Use `TimeRange` only with `web`. Valid values are `OneDay`, `OneWeek`, `OneMonth`, `OneYear`, or `YYYY-MM-DD..YYYY-MM-DD`.
-- Put all filters inside `Filter`; omit empty filters instead of sending null values.
+- Put the documented result filters inside `Filter`; omit empty filters instead of sending null values.
 - Set `Filter.NeedContent=true` when the answer needs page body text, not only snippets.
 - Set `Filter.NeedUrl=true` when the answer must cite original URLs.
-- Set `Filter.Sites` to a `|`-separated allowlist of complete domains when the user asks for specific sites or high-trust sources.
-- Set `Filter.BlockHosts` to a `|`-separated blocklist of complete domains when noisy domains should be excluded.
+- Set `Filter.Sites` to a `|`-separated allowlist of at most 20 complete domains when the user asks for specific sites or high-trust sources.
+- Set `Filter.BlockHosts` to a `|`-separated blocklist of at most five complete domains when noisy domains should be excluded.
 - Set `Filter.AuthInfoLevel=1` when the answer should prefer very authoritative sources.
-- Set `Filter.QueryRewrite=true` only when recall matters more than latency.
+- Set `QueryControl.QueryRewrite=true` only when recall matters more than latency.
 
 ## Response Rules
 

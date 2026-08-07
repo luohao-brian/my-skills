@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 FINISH_CODE = 20_000_000
+# Official V3 HTTP chunked protocol and payload fields:
+# https://www.volcengine.com/docs/6561/1598757?lang=zh
+# Agent Plan exposes the same protocol through the fixed /api/v3/plan route.
 BASE_URL = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
 RESOURCE_ID = "seed-tts-2.0"
 DEFAULT_VOICE = "zh_female_vv_uranus_bigtts"
@@ -36,7 +39,6 @@ def build_payload(
 ) -> dict[str, Any]:
     additions: dict[str, Any] = {
         "disable_markdown_filter": True,
-        "enable_subtitle": True,
     }
     return {
         "user": {"uid": "ark-tts"},

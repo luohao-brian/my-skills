@@ -12,6 +12,8 @@ import sys
 import textwrap
 from typing import Any
 
+# Official WebSearch request and error contract:
+# https://www.volcengine.com/docs/87772/2272953?lang=zh
 ENDPOINT = "https://open.feedcoopapi.com/search_api/web_search"
 REQUEST_TIMEOUT_SECONDS = 30
 TIME_RANGE_SHORTCUTS = {"OneDay", "OneWeek", "OneMonth", "OneYear"}
@@ -57,6 +59,24 @@ def _validate_time_range(time_range: str | None) -> str | None:
     return time_range
 
 
+def _validate_query(query: str) -> str:
+    normalized = query.strip()
+    if not 1 <= len(normalized) <= 100:
+        raise ValueError("query must contain 1 to 100 characters")
+    return normalized
+
+
+def _normalize_pipe_list(value: str | None, option: str, *, max_items: int | None = None) -> str | None:
+    if value is None:
+        return None
+    items = [item.strip() for item in value.split("|") if item.strip()]
+    if not items:
+        raise ValueError(f"{option} must contain at least one domain")
+    if max_items is not None and len(items) > max_items:
+        raise ValueError(f"{option} supports at most {max_items} domains")
+    return "|".join(items)
+
+
 def build_body(
     query: str,
     search_type: str = "web",
@@ -68,17 +88,17 @@ def build_body(
     need_content: bool = False,
     need_url: bool = False,
     query_rewrite: bool = False,
-    need_summary: bool = True,
 ) -> dict[str, Any]:
+    query = _validate_query(query)
+    sites = _normalize_pipe_list(sites, "--sites", max_items=20)
+    block_hosts = _normalize_pipe_list(block_hosts, "--block-hosts", max_items=5)
     body: dict[str, Any] = {"Query": query, "SearchType": search_type, "Count": count}
     filters: dict[str, Any] = {}
 
     if query_rewrite:
-        filters["QueryRewrite"] = True
+        body["QueryControl"] = {"QueryRewrite": True}
 
     if search_type == "web":
-        if need_summary:
-            body["NeedSummary"] = True
         if need_content:
             filters["NeedContent"] = True
         if need_url:
@@ -168,13 +188,12 @@ def main() -> int:
     parser.add_argument("--type", "-t", default="web", choices=["web", "image"], help="Use web for textual evidence; use image only for image results.")
     parser.add_argument("--count", "-c", type=int, help="Number of results. Defaults: web=10, image=5. Limits: web<=50, image<=5.")
     parser.add_argument("--time-range", help="Web-only publish-time filter: OneDay, OneWeek, OneMonth, OneYear, or YYYY-MM-DD..YYYY-MM-DD.")
-    parser.add_argument("--sites", help="Web-only allowlist of complete domains separated by |, for example volcengine.com|openai.com.")
-    parser.add_argument("--block-hosts", help="Web-only blocklist of complete domains separated by |.")
+    parser.add_argument("--sites", help="Web-only allowlist of at most 20 complete domains separated by |, for example volcengine.com|openai.com.")
+    parser.add_argument("--block-hosts", help="Web-only blocklist of at most 5 complete domains separated by |.")
     parser.add_argument("--auth-level", type=int, default=0, choices=[0, 1], help="Web-only authority filter. Use 1 for very authoritative sources.")
     parser.add_argument("--need-content", action="store_true", help="Web-only. Require results with page Content for deeper evidence.")
     parser.add_argument("--need-url", action="store_true", help="Web-only. Require original URLs for citation-ready results.")
     parser.add_argument("--query-rewrite", action="store_true", help="Ask the provider to rewrite the query when recall matters more than latency.")
-    parser.add_argument("--no-summary", action="store_true", help="Web-only. Skip requesting Summary; useful when snippets are enough.")
     args = parser.parse_args()
 
     count = args.count
@@ -211,7 +230,6 @@ def main() -> int:
             need_content=args.need_content,
             need_url=args.need_url,
             query_rewrite=args.query_rewrite,
-            need_summary=not args.no_summary,
         )
         data = do_search(body, api_key=api_key)
     except Exception as exc:

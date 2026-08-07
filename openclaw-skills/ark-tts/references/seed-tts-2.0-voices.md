@@ -1,5 +1,7 @@
 # 豆包语音合成模型2.0 音色列表
 
+官方音色目录：https://www.volcengine.com/docs/6561/1257544?lang=zh
+
 | 场景 | 音色名称 | voice_type | 语种/方言 |
 |---|---|---|---|
 | 通用场景 | Vivi 2.0 | `zh_female_vv_uranus_bigtts` | 语种：中文、日文、印尼、墨西哥西班牙语；方言：四川、陕西、东北 |

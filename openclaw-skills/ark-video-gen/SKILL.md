@@ -30,6 +30,6 @@ python3 {baseDir}/scripts/volc_video_gen.py "镜头缓慢推进，人物转身" 
 
 1. The script reads only `ARK_AGENT_PLAN_API_KEY`.
 2. Use the fixed Agent Plan endpoint and `doubao-seedance-2.0-fast` model.
-3. Submit one task, poll until success, failure, or timeout.
+3. Submit one task, poll until success, failure, cancellation, expiry, or timeout.
 4. Expect stdout JSON containing `success`, `task_id`, `status`, `video_url`, `model`, and generation settings.
 5. On timeout, use the last known task status and task id from the script output.

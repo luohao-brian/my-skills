@@ -12,13 +12,22 @@ from pathlib import Path
 from typing import Any
 
 
+# Official create/get task contracts:
+# https://api.volcengine.com/api-docs/view?action=CreateContentsGenerationsTasks&serviceCode=ark&version=2024-01-01
+# https://api.volcengine.com/api-docs/view?action=GetContentsGenerationsTask&serviceCode=ark&version=2024-01-01
+# Agent Plan exposes the same task resources under the fixed /api/plan/v3 base.
 BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
 MODEL_ID = "doubao-seedance-2.0-fast"
 DEFAULT_DURATION_SECONDS = 5
 DEFAULT_ASPECT_RATIO = "16:9"
 DEFAULT_RESOLUTION = "720p"
+SUPPORTED_DURATIONS = (-1, *range(4, 16))
+SUPPORTED_ASPECT_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
+# The fixed doubao-seedance-2.0-fast model does not support 1080p.
+SUPPORTED_RESOLUTIONS = ("480p", "720p")
 TASK_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 5
+TERMINAL_FAILURE_STATUSES = {"failed", "cancelled", "expired"}
 
 
 def api_key_value() -> str:
@@ -32,13 +41,34 @@ def file_to_data_url(path: str) -> str:
     return f"data:{mime};base64,{payload}"
 
 
+def build_generation_settings(
+    *,
+    resolution: str,
+    aspect_ratio: str,
+    duration: int,
+    generate_audio: bool,
+) -> dict[str, Any]:
+    """Return provider-native top-level task fields.
+
+    ``extra_body`` is used at the SDK call site only as a compatibility bridge:
+    the Ark SDK serializes these entries at the top level of the JSON request.
+    """
+    return {
+        "generate_audio": generate_audio,
+        "resolution": resolution,
+        "ratio": aspect_ratio,
+        "duration": duration,
+        "watermark": False,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate video with Ark Agent Plan")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional first-frame image path, data URL, or remote URL")
-    parser.add_argument("--duration", type=int, choices=range(5, 13), default=DEFAULT_DURATION_SECONDS)
-    parser.add_argument("--aspect-ratio", default=DEFAULT_ASPECT_RATIO)
-    parser.add_argument("--resolution", default=DEFAULT_RESOLUTION)
+    parser.add_argument("--duration", type=int, choices=SUPPORTED_DURATIONS, default=DEFAULT_DURATION_SECONDS)
+    parser.add_argument("--aspect-ratio", choices=SUPPORTED_ASPECT_RATIOS, default=DEFAULT_ASPECT_RATIO)
+    parser.add_argument("--resolution", choices=SUPPORTED_RESOLUTIONS, default=DEFAULT_RESOLUTION)
     parser.add_argument("--audio", action="store_true")
     args = parser.parse_args()
 
@@ -50,18 +80,18 @@ def main() -> int:
     from volcenginesdkarkruntime import Ark
 
     duration = args.duration
-    full_prompt = " ".join([
-        args.prompt.strip(),
-        f"--rs {args.resolution}",
-        f"--rt {args.aspect_ratio}",
-        "--fps 24",
-        f"--dur {duration}",
-        "--wm false",
-    ])
+    generation_settings = build_generation_settings(
+        resolution=args.resolution,
+        aspect_ratio=args.aspect_ratio,
+        duration=duration,
+        generate_audio=bool(args.audio),
+    )
 
+    task_id: str | None = None
+    last_status = "not_submitted"
     try:
         client = Ark(base_url=BASE_URL, api_key=api_key)
-        content: list[dict[str, Any]] = [{"type": "text", "text": full_prompt}]
+        content: list[dict[str, Any]] = [{"type": "text", "text": args.prompt.strip()}]
         if args.image:
             image_url = args.image
             if not (image_url.startswith("http://") or image_url.startswith("https://") or image_url.startswith("data:")):
@@ -71,43 +101,55 @@ def main() -> int:
         created = client.content_generation.tasks.create(
             model=MODEL_ID,
             content=content,
-            extra_body={"generate_audio": bool(args.audio)},
+            extra_body=generation_settings,
         )
         task_id = created.id
         last_status = getattr(created, "status", "created")
         deadline = time.time() + TASK_TIMEOUT_SECONDS
         while time.time() < deadline:
             task = client.content_generation.tasks.get(task_id=task_id)
-            last_status = task.status
-            if task.status == "succeeded":
+            last_status = str(task.status)
+            if last_status == "succeeded":
                 video_url = task.content.video_url
+                if not video_url:
+                    raise RuntimeError(f"task_id={task_id}; succeeded without video_url")
+                actual_generate_audio = getattr(task, "generate_audio", None)
                 print(json.dumps({
                     "success": True,
                     "type": "video",
                     "task_id": task_id,
-                    "status": task.status,
+                    "status": last_status,
                     "video_url": video_url,
                     "model": MODEL_ID,
                     "prompt": args.prompt,
-                    "duration": duration,
-                    "aspect_ratio": args.aspect_ratio,
-                    "resolution": args.resolution,
+                    "duration": getattr(task, "duration", None) or duration,
+                    "aspect_ratio": getattr(task, "ratio", None) or args.aspect_ratio,
+                    "resolution": getattr(task, "resolution", None) or args.resolution,
+                    "generate_audio": actual_generate_audio if actual_generate_audio is not None else bool(args.audio),
                     "used_reference_image": bool(args.image),
                 }, ensure_ascii=False, indent=2))
                 return 0
-            if task.status == "failed":
-                raise RuntimeError(f"task_id={task_id}; error={task.error}")
+            if last_status in TERMINAL_FAILURE_STATUSES:
+                raise RuntimeError(
+                    f"task_id={task_id}; status={last_status}; error={getattr(task, 'error', None)}"
+                )
             time.sleep(POLL_INTERVAL_SECONDS)
         print(json.dumps({
             "success": False,
             "error": "task timed out",
             "task_id": task_id,
-            "last_status": last_status,
+            "status": last_status,
             "model": MODEL_ID,
         }, ensure_ascii=False), file=sys.stderr)
         return 1
     except Exception as exc:
-        print(json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({
+            "success": False,
+            "error": str(exc),
+            "task_id": task_id,
+            "status": last_status,
+            "model": MODEL_ID,
+        }, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

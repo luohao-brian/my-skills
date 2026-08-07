@@ -14,6 +14,8 @@ is used.
 - Endpoint: `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream`
 - Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
 - Header `X-Api-Resource-Id`: `volc.seedasr.sauc.duration`
+- Official Agent Plan API: https://www.volcengine.com/docs/82379/2516286?lang=zh
+- Official binary protocol: https://www.volcengine.com/docs/6561/1354869?lang=zh
 
 ## Usage
 
@@ -27,9 +29,11 @@ python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --raw
 
 - `wav`, `pcm`, and `mp3` default to codec `raw`.
 - `ogg` and `opus` default to codec `opus`.
-- The default sample rate in the request metadata is `24000`.
-- Use `--sample-rate` when the input audio has another sample rate.
-- The script sends chunked binary frames at a fixed cadence and waits for the final package.
+- The request sample rate is fixed to the provider-supported `16000` Hz.
+- WAV and PCM input must be uncompressed signed 16-bit mono audio at 16 kHz; MP3 frame headers must also report 16 kHz.
+- The script derives duration from PCM or WAV metadata. It preserves complete MP3 frames and Ogg Opus pages when grouping encoded audio into approximately 100-200 ms packages.
+- It paces packages by their calculated audio duration while continuously receiving provider frames, then waits for the final package.
+- Invalid or mismatched audio metadata fails before audio packages are sent.
 - Default output omits the provider payload; `--raw` includes it.
 
 ## Failure Reporting

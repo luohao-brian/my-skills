@@ -28,13 +28,12 @@ python3 {baseDir}/scripts/web_search.py "故宫博物院" --type image --count 3
 - `--type web|image`: defaults to `web`.
 - `--count N`: defaults to `10` for `web` and `5` for `image`; `web` max is 50; `image` max is 5.
 - `--time-range OneDay|OneWeek|OneMonth|OneYear|YYYY-MM-DD..YYYY-MM-DD`: web only.
-- `--sites "a.com|b.com"`: restrict search to sites.
-- `--block-hosts "a.com|b.com"`: exclude sites.
+- `--sites "a.com|b.com"`: restrict search to at most 20 sites.
+- `--block-hosts "a.com|b.com"`: exclude at most five sites.
 - `--auth-level 1`: prefer authoritative sources.
 - `--need-content`: only return web results with `Content`.
 - `--need-url`: only return web results with original `Url`.
 - `--query-rewrite`: enable provider query rewrite.
-- `--no-summary`: do not request `Summary` for web results.
 
 ## Contract
 

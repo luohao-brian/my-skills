@@ -14,12 +14,15 @@ the Agent Plan `seed-tts-2.0` service.
 - Endpoint: `https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional`
 - Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
 - Header `X-Api-Resource-Id`: `seed-tts-2.0`
+- Official V3 protocol: https://www.volcengine.com/docs/6561/1598757?lang=zh
 - Default voice: `zh_female_vv_uranus_bigtts`
 - Default format: `mp3`
 - Default sample rate: `24000`
 
 `--voice`, `--format`, and `--sample-rate` can override the three media settings
 for one call. Select `--voice` from [seed-tts-2.0-voices.md](seed-tts-2.0-voices.md).
+Subtitle events are enabled with `req_params.audio_params.enable_subtitle`; the
+script does not duplicate that flag inside the JSON-encoded `additions` field.
 
 ## Usage
 

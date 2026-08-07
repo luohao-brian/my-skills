@@ -5,6 +5,7 @@
 - Environment: `ARK_AGENT_PLAN_API_KEY`
 - Endpoint: `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
 - Model: `doubao-seedream-5.0-lite`
+- Official request contract: https://www.volcengine.com/docs/82379/1541523?lang=zh
 
 The script reads no other environment variable.
 
@@ -24,14 +25,16 @@ script corrects the suffix and reports the actual path in `local_path`.
 Use provider-native values when known. The script accepts common aspect labels and converts them to provider `WIDTHxHEIGHT` values:
 
 - `1:1` -> `2048x2048`
-- `3:4` -> `1536x2048`
-- `4:3` -> `2048x1536`
-- `16:9` -> `2048x1152`
-- `9:16` -> `1152x2048`
-- `21:9` -> `2560x1080`
-- `2k`, `3k`, `4k`
+- `3:4` -> `1728x2304`
+- `4:3` -> `2304x1728`
+- `3:2` -> `2496x1664`
+- `2:3` -> `1664x2496`
+- `16:9` -> `2848x1600`
+- `9:16` -> `1600x2848`
+- `21:9` -> `3136x1344`
+- `2K`, `3K`, `4K` (lowercase input is normalized to the provider spelling)
 
-The default is `2k`, matching the provider-native size format.
+The default is `2K`, matching the provider-native size format.
 
 ## Output
 
@@ -44,6 +47,6 @@ The script prints JSON:
   "local_path": "outputs/images/ark_image_20260615_120000.png",
   "remote_url": "https://...",
   "model": "doubao-seedream-5.0-lite",
-  "size": "2k"
+  "size": "2K"
 }
 ```
