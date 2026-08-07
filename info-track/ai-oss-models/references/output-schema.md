@@ -114,9 +114,25 @@
 }
 ```
 
+模型存在 HF 精确低拒绝 tags 时还包含 `alignment`：
+
+```json
+{
+  "alignment": {
+    "profile": "low-refusal",
+    "signals": [
+      {"source": "hf-tag", "value": "uncensored"},
+      {"source": "hf-tag", "value": "heretic"}
+    ]
+  }
+}
+```
+
+只识别 `uncensored`、`abliterated`、`heretic` 和 `decensored` 精确 tags，不从仓库名或 model card 文案推断。该字段表示发布者声明的低拒绝定位，不证明零拒绝、能力保持或安全质量。命中时当前热门本地候选的 `selection` 还包含 `low-refusal`。
+
 只有注册表通过 `model_overrides.<repo>.variant_group` 显式声明同组时，同一发布者下的多个仓库才折叠为一个代表条目，并在 `metadata.variants` 中列出仓库 ID、链接、部署格式和热度指标。不同发布者不跨发布者折叠；仅有相同 `base_model` 不触发折叠。
 
-当前运行的热门衍生/本地部署模型 `selection` 必须包含 `hot`，还可包含 `priority`、`flagship-lineage`、`trusted-publisher`、`local-ecosystem-publisher`、`breakout` 或 `derivative`。历史运行只纳入注册表中的重点本地模型，`selection` 包含 `priority` 且不包含 `hot`，metadata 省略实时 `trendingScore`、`downloads`、`likes` 和 `trend`。正式数据集可由 `hot`、`priority` 或 `technical-artifact` 入选；`technical-artifact` 表示注册表确认其属于数据、训练、偏好、评测等开发链路。`groups.local` 为兼容字段名，报告标题使用“热门衍生与本地部署模型”。
+当前运行的热门衍生/本地部署模型 `selection` 必须包含 `hot`，还可包含 `priority`、`flagship-lineage`、`trusted-publisher`、`local-ecosystem-publisher`、`breakout`、`derivative` 或 `low-refusal`。历史运行只纳入注册表中的重点本地模型，`selection` 包含 `priority` 且不包含 `hot`，metadata 省略实时 `trendingScore`、`downloads`、`likes` 和 `trend`。正式数据集可由 `hot`、`priority` 或 `technical-artifact` 入选；`technical-artifact` 表示注册表确认其属于数据、训练、偏好、评测等开发链路。`groups.local` 为兼容字段名，报告标题使用“热门衍生与本地部署模型”。
 
 `groups.notable_discoveries` 是从发现池自动选出的成稿候选：
 

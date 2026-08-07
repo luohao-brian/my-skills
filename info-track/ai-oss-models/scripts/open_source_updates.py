@@ -58,6 +58,8 @@ FLAGSHIP_ROLES = [
     "robotics",
 ]
 DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetune", "adapter"]
+ALIGNMENT_QUERY_FILTERS = ["uncensored", "abliterated", "heretic", "decensored"]
+LOCAL_MODEL_FILTERS = DERIVATIVE_FILTERS + ALIGNMENT_QUERY_FILTERS
 MODALITY_QUERY_FILTERS = {
     "image-generation": ["text-to-image", "image-to-image"],
     "video-generation": [
@@ -150,6 +152,8 @@ CAPABILITY_TAGS = {
     "automatic-speech-recognition": "stt",
     "sentence-similarity": "embedding",
 }
+
+LOW_REFUSAL_TAGS = {"uncensored", "abliterated", "heretic", "decensored"}
 
 MOE_CONFIG_KEYS = {"num_experts", "num_experts_per_tok", "num_local_experts", "n_routed_experts"}
 BASE_MODEL_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
@@ -772,6 +776,17 @@ def capability_facets(row: dict[str, Any], override: dict[str, Any] | None = Non
     return sorted(values)
 
 
+def alignment_facet(row: dict[str, Any]) -> dict[str, Any]:
+    """Preserve exact publisher tags without inferring alignment from a model ID."""
+    signals = [
+        {"source": "hf-tag", "value": tag}
+        for tag in sorted(lower_tags(row) & LOW_REFUSAL_TAGS)
+    ]
+    if not signals:
+        return {}
+    return {"profile": "low-refusal", "signals": signals}
+
+
 def stage_facets(row: dict[str, Any]) -> list[str]:
     tags = lower_tags(row)
     values = {value for value in ["base", "instruct", "chat", "finetune", "adapter"] if value in tags}
@@ -837,6 +852,7 @@ def model_metadata(
             "task_signals": modality_signals["signals"],
         },
         "capabilities": capability_facets(row, override),
+        "alignment": alignment_facet(row),
         "deployment": deployment,
         "stage": stage_facets(row),
         "architecture": architecture_facet(row),
@@ -953,8 +969,8 @@ def query_local_candidates() -> list[dict[str, Any]]:
             return []
         return result if isinstance(result, list) else []
 
-    with ThreadPoolExecutor(max_workers=len(DERIVATIVE_FILTERS)) as executor:
-        results = executor.map(query, DERIVATIVE_FILTERS)
+    with ThreadPoolExecutor(max_workers=len(LOCAL_MODEL_FILTERS)) as executor:
+        results = executor.map(query, LOCAL_MODEL_FILTERS)
         for result in results:
             for row in result:
                 model_id = str(row.get("id") or "")
@@ -1209,9 +1225,14 @@ def local_discovery_items(
         event = local_signal(row, start, end, include_persistent_hot)
         deployment = set(deployment_facets(row))
         derivation = set(derivation_facets(row))
+        alignment = alignment_facet(row)
         if (
             not event
-            or not (deployment & LOCAL_DEPLOYMENTS or derivation & DERIVATIVE_RELATIONS)
+            or not (
+                deployment & LOCAL_DEPLOYMENTS
+                or derivation & DERIVATIVE_RELATIONS
+                or alignment
+            )
             or not is_hot_local(row)
         ):
             continue
@@ -1221,7 +1242,14 @@ def local_discovery_items(
         trusted_publisher = publisher in local_publishers
         breakout = is_breakout_local(row)
         derivative = bool(derivation & DERIVATIVE_RELATIONS)
-        if canonical is None and not trusted_publisher and not breakout and not derivative:
+        low_refusal = bool(alignment)
+        if (
+            canonical is None
+            and not trusted_publisher
+            and not breakout
+            and not derivative
+            and not low_refusal
+        ):
             continue
         base_record = flagship.get(str(canonical or ""), {})
         selection = ["hot"]
@@ -1235,6 +1263,8 @@ def local_discovery_items(
             selection.append("breakout")
         if derivative:
             selection.append("derivative")
+        if low_refusal:
+            selection.append("low-refusal")
         role = base_record.get("role") or model_role(row, default="llm")
         if role in MODALITY_FOCUS_ROLES:
             selection.append("modality-radar")
@@ -2596,6 +2626,7 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
             "canonical_model",
             "modalities",
             "role_evidence",
+            "alignment",
             "deployment",
             "architecture",
             "architecture_classes",

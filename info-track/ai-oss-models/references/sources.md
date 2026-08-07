@@ -5,7 +5,7 @@
 - 精确查询模型、数据集和可复现项目注册表中的 Hugging Face 仓库。
 - 当前运行查询 HF 全局 Trending Top 500 和最近更新 Top 1000，召回未登记 owner 的热门社区模型和未被过滤器覆盖的完整权重仓库；历史运行不查询这两个实时池。
 - 当前运行额外按结构化任务查询图像生成、视频生成和 TTS 的 Trending 与最近更新池，并保留 HF 官方任务内排名；这是模态级召回漏斗，不依赖模型名或发布者。历史运行不查询这些实时池。
-- 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选。
+- 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选，并查询 uncensored、abliterated、heretic、decensored 精确 tags 形成低拒绝候选池。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
 - 使用已认证的 `gh api` 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
@@ -28,7 +28,7 @@
 ## 入选条件
 
 - 旗舰模型：精确 ID 位于白名单，且本窗口内发布或更新。
-- 热门衍生与本地部署：当前运行要求具有本地部署格式或 HF `base_model` 衍生关系并满足 HF 热门条件，也可用 `trending-observed` 纳入窗口外更新但仍处于热门池的模型；HF `lora` 标签统一视为 `adapter` 衍生关系。指定历史日期时不使用实时热榜、下载、点赞或 TrendingScore，只纳入注册表中标记为重点且在窗口内发布或更新的本地模型；不自动发现未登记的历史衍生模型。
+- 热门衍生与本地部署：当前运行要求具有本地部署格式、HF `base_model` 衍生关系或精确低拒绝 tag，并满足 HF 热门条件，也可用 `trending-observed` 纳入窗口外更新但仍处于热门池的模型；HF `lora` 标签统一视为 `adapter` 衍生关系。指定历史日期时不使用实时热榜、下载、点赞或 TrendingScore，只纳入注册表中标记为重点且在窗口内发布或更新的本地模型；不自动发现未登记的历史衍生模型。
 - 可复现项目：项目位于白名单，且本窗口内有已登记交付件发布或更新。
 - 数据集：精确 ID 位于技术数据注册表且本窗口内发布或更新时，重点、关联可复现项目或明确技术角色可以作为入选理由，不要求同时进入 HF 热榜；未登记 owner 的发现仍需满足热门条件。
 - 重点新发现：已登记官方 owner 的窗口内新模型或数据集可进入发现池；未登记 owner 的热门模型和数据集只在当前运行中从全局候选池发现，历史运行不使用这类实时热门信号。
@@ -64,6 +64,7 @@ HF 热门条件：
 - 部署：精确 tags、量化配置和模型注册表。
 - 依赖：`cardData.base_model`、`base_model_relation` 和 `base_model:*` tags。
 - 衍生关系：只接受 HF 结构化 `adapter`、`finetune`、`merge` 和 `quantized` 关系。
+- 对齐信号：只接受 HF 精确 `uncensored`、`abliterated`、`heretic`、`decensored` tags，归一为 `alignment.profile=low-refusal` 并保留原 tag 证据；不从模型 ID 或自然语言介绍推断，也不作为质量或安全结论。
 - 架构：只在 config 含明确 expert 字段或精确 tags 支持时标记 MoE，在精确 `diffusers` tag 支持时标记 Diffusion；普通 config 的存在不足以证明 Dense，其余情况使用 `unknown`。
 - 架构类：读取 `config.architectures`；model card 存在明确 Architecture 小节时保留短证据片段。
 - 参数量：`safetensors.total` 或 `gguf.total`。

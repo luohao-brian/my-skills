@@ -33,6 +33,7 @@
 - 原模型：canonical model ID
 - 衍生：Merge | Finetune | Adapter | Quantized
 - 部署：GGUF | MLX | Ollama | Quantized | On-device
+- 对齐信号：Low-refusal · HF tags: Uncensored / Abliterated / Heretic / Decensored；仅表示发布者定位，不代表零拒绝、能力保持或安全质量。
 - 规模：HF 结构化字段提供的参数量。
 - 热度：TrendingScore N · 下载 N · 点赞 N；有趋势快照时可补充排名和相对上次的变化。历史运行省略。
 - 窗口信号：新发布 | 仓库更新 | 当前热门
@@ -117,6 +118,7 @@
 - `窗口信号` 只写候选和 HF 页面支持的事实，不把 `lastModified` 扩写为版本发布。
 - `当前热门` 只表示观察日仍满足热门条件，不写成“本周发布”“本周更新”或“热度上升”；只有 `metadata.trend` 的非空增量才能支持趋势变化表述。
 - `关注` 按候选的 `selection` 写为“HF 热门”“HF 热门 · 重点白名单”或“重点白名单”；历史运行不写实时热度与趋势变化。
+- `对齐信号` 只根据 `metadata.alignment.signals` 写；保留具体 HF tag，并明确这是发布者定位信号。不得把 `low-refusal`、`uncensored`、`abliterated` 或 `heretic` 写成能力、安全或质量加分，也不得声称一定零拒绝。
 - `方向` 只根据 `metadata.modalities` 和 `metadata.role_evidence` 写；没有完整结构化输入/输出时保留“待确认”，不根据模型名或 model card 宣传语猜测。
 - 正式数据集含 `technical-artifact` 时可写“重点技术资产”，不把它描述成 HF 热门；重点新发现含 `trusted-publisher` 但不含 `hot` 时写“主要厂商技术数据”。
 - 参数规模只使用 HF 结构化字段，不从模型名推断。
@@ -139,7 +141,7 @@
 - `card.excerpt` 必须改写成中文摘要，不长段引用；只写片段明确支持的能力、用途和交付件。
 - 仓库更新时，model/dataset card 只提供当前背景或状态摘要，不得据此声称这些能力、数据或交付件在本窗口新增。
 - `card.ok` 为 `false` 或片段缺少证据时省略“本期看点”“为什么关注”或“用途与内容”，不根据名称推断。
-- 最终报告不展示采集状态、原始 tags、分类过程或顶层发现池。
+- 最终报告不展示采集状态、与报告字段无关的原始 tags、分类过程或顶层发现池；`metadata.alignment.signals` 是可展示的结构化证据。
 - 最终报告以覆盖完整候选和证据边界为优先，不追求固定篇幅；没有评测、架构、论文或提交证据的可选字段直接省略，不用空话补齐行数。
 - 热门衍生/本地部署模型最多 20 条，只折叠注册表显式声明同一 `variant_group` 的变体，再覆盖最多 8 个不同发布者，并保证 Merge、Finetune、Adapter、GGUF、MLX、On-device 和 Quantized 类型覆盖。当前运行先按可用的 HF 排名/互动增量证据，再按 TrendingScore、重点标记、点赞和下载量稳定排序；历史运行按重点标记、窗口事件日期和仓库 ID 排序。数据集按主要厂商/重点技术资产和可用热度排序。
 

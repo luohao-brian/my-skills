@@ -235,6 +235,91 @@ class ArchitectureFacetTests(unittest.TestCase):
         self.assertEqual(MODULE.derivation_facets(row), ["adapter"])
 
 
+class AlignmentSignalTests(unittest.TestCase):
+    def setUp(self):
+        self.registry = {
+            "families": [],
+            "flagship_models": {},
+            "local_models": [],
+            "local_roots": [],
+            "local_publishers": [],
+            "model_overrides": {},
+        }
+
+    def test_exact_hf_tags_create_low_refusal_alignment_signal(self):
+        row = model_row(
+            "community/model",
+            tags=["GGUF", "Uncensored", "Heretic", "conversational"],
+        )
+        self.assertEqual(
+            MODULE.alignment_facet(row),
+            {
+                "profile": "low-refusal",
+                "signals": [
+                    {"source": "hf-tag", "value": "heretic"},
+                    {"source": "hf-tag", "value": "uncensored"},
+                ],
+            },
+        )
+
+    def test_model_name_does_not_infer_alignment(self):
+        row = model_row("community/Definitely-Uncensored-Heretic", tags=[])
+        self.assertEqual(MODULE.alignment_facet(row), {})
+
+    def test_alignment_filters_are_queried_with_existing_local_filters(self):
+        observed = []
+
+        def fake_hf_api(path, retries=1):
+            parsed = MODULE.urllib.parse.parse_qs(MODULE.urllib.parse.urlparse(path).query)
+            observed.append(parsed["filter"][0])
+            return []
+
+        with mock.patch.object(MODULE, "hf_api", side_effect=fake_hf_api):
+            MODULE.query_local_candidates()
+
+        self.assertEqual(set(observed), set(MODULE.LOCAL_MODEL_FILTERS))
+        self.assertTrue(set(MODULE.ALIGNMENT_QUERY_FILTERS) <= set(observed))
+
+    def test_hot_tagged_model_enters_local_group_without_name_or_relation_inference(self):
+        row = model_row(
+            "community/plain-model-id",
+            tags=["uncensored"],
+            trendingScore=20,
+            downloads=5_000,
+            likes=30,
+        )
+        items = MODULE.local_discovery_items(
+            [row],
+            self.registry,
+            {row["id"]: row},
+            dt.date(2026, 7, 27),
+            dt.date(2026, 8, 2),
+            set(),
+        )
+        self.assertEqual([item["title"] for item in items], [row["id"]])
+        metadata = items[0]["metadata"]
+        self.assertIn("low-refusal", metadata["selection"])
+        self.assertEqual(metadata["alignment"]["profile"], "low-refusal")
+
+    def test_compact_report_payload_preserves_alignment_evidence(self):
+        item = {
+            "title": "community/model",
+            "url": "https://huggingface.co/community/model",
+            "date": "2026-08-02",
+            "event": "trending-observed",
+            "category": "local",
+            "metadata": {
+                "selection": ["hot", "low-refusal"],
+                "alignment": {
+                    "profile": "low-refusal",
+                    "signals": [{"source": "hf-tag", "value": "uncensored"}],
+                },
+            },
+        }
+        compact = MODULE.report_item(item)
+        self.assertEqual(compact["metadata"]["alignment"], item["metadata"]["alignment"])
+
+
 class ModalityRadarTests(unittest.TestCase):
     def test_sparse_modality_hot_threshold_does_not_lower_llm_threshold(self):
         image = model_row(

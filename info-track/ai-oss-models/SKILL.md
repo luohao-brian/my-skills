@@ -1,6 +1,6 @@
 ---
 name: ai-oss-models
-description: 追踪连续 7 天内主要 AI 厂商的开放模型更新、可复现训练链路与技术数据迭代、热门本地部署模型和部署方案，以及新出现的社区热点；覆盖 LLM/VLM、图像生成、视频生成、TTS/语音等模型方向，综合 Hugging Face 与已登记 GitHub 工程仓库生成旗舰模型、开发过程、数据集、本地部署和重点发现报告。适用于开源模型生态周报、复现研究、部署选型和指定日期窗口追踪。
+description: 追踪连续 7 天内主要 AI 厂商的开放模型更新、可复现训练链路与技术数据迭代、热门本地部署及 uncensored/abliterated/heretic 等低拒绝模型信号，以及新出现的社区热点；覆盖 LLM/VLM、图像生成、视频生成、TTS/语音等方向，综合 Hugging Face 与已登记 GitHub 工程生成旗舰模型、开发过程、数据集、本地部署和重点发现报告。适用于开源模型生态周报、低拒绝模型观察、复现研究、部署选型和指定日期窗口追踪。
 metadata: {"openclaw":{"skillKey":"ai-oss-models","emoji":"🧩","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-oss-models","requires":{"bins":["python3","gh"]}}}
 ---
 
@@ -14,6 +14,7 @@ metadata: {"openclaw":{"skillKey":"ai-oss-models","emoji":"🧩","homepage":"htt
 - 生成式媒体与语音：使用 HF 官方结构化任务池及任务内 Trending 排名召回图像生成、视频生成、TTS 和 ASR，避免被全局 LLM 候选量淹没。
 - 开放复现：预训练与后训练数据、训练 recipe/config、阶段 checkpoint、评测和部署交付件。
 - 本地生态：GGUF、MLX、量化、Ollama、vLLM 与 on-device 方案。
+- 低拒绝衍生：从 HF 精确 tags 召回并标注 uncensored、abliterated、heretic 和 decensored 模型；只作为发布者定位信号，不作为质量或安全结论。
 - 开发过程：数据集、数据管线、SFT/Preference/RL 资产、训练代码和评测方法。
 
 具体模型和发布者只作为可维护注册表与回归样本，不得在算法中为单一案例设置专属名额、名称匹配或阈值。
