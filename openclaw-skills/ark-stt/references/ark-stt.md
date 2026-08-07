@@ -14,6 +14,10 @@ is used.
 - Endpoint: `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream`
 - Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
 - Header `X-Api-Resource-Id`: `volc.seedasr.sauc.duration`
+- Header `X-Api-Request-Id`: a fresh UUID for each connection
+- Header `X-Api-Sequence`: `-1`
+- This implementation uses the new-console `X-Api-Request-Id` plus `X-Api-Sequence` request form.
+- `X-Api-Connect-Id` is an alternative request correlation header used by compatible examples. This implementation does not need to send it; it is not a response-only field.
 - Official Agent Plan API: https://www.volcengine.com/docs/82379/2516286?lang=zh
 - Official binary protocol: https://www.volcengine.com/docs/6561/1354869?lang=zh
 

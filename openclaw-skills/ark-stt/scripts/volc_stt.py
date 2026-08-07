@@ -40,6 +40,15 @@ def api_key_value() -> str:
     return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
 
 
+def build_connection_headers(api_key: str, request_id: str | None = None) -> list[str]:
+    return [
+        f"X-Api-Resource-Id: {RESOURCE_ID}",
+        f"X-Api-Request-Id: {request_id or uuid.uuid4()}",
+        "X-Api-Sequence: -1",
+        f"X-Api-Key: {api_key}",
+    ]
+
+
 def infer_format(path: Path) -> str:
     ext = path.suffix.lower().lstrip(".")
     if ext in {"wav", "pcm", "mp3"}:
@@ -458,11 +467,7 @@ def main() -> int:
     if audio_format == "opus":
         audio_format = "ogg"
     codec = (args.codec or infer_codec(audio_format)).lower()
-    headers = [
-        f"X-Api-Resource-Id: {RESOURCE_ID}",
-        f"X-Api-Connect-Id: {uuid.uuid4()}",
-        f"X-Api-Key: {api_key}",
-    ]
+    headers = build_connection_headers(api_key)
     ws = None
     try:
         validate_audio_options(audio_format, codec, args.sample_rate)

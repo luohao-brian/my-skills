@@ -134,6 +134,18 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(transcript, "verified")
         self.assertEqual(payload["audio_info"]["duration"], 1)
 
+    def test_stt_handshake_uses_new_console_request_headers(self) -> None:
+        headers = STT.build_connection_headers(
+            "speech-key",
+            "67ee89ba-7050-4c04-a3d7-ac61a63499b3",
+        )
+        self.assertEqual(headers, [
+            "X-Api-Resource-Id: volc.seedasr.sauc.duration",
+            "X-Api-Request-Id: 67ee89ba-7050-4c04-a3d7-ac61a63499b3",
+            "X-Api-Sequence: -1",
+            "X-Api-Key: speech-key",
+        ])
+
     def test_stt_chunks_pcm_by_audio_duration(self) -> None:
         one_second_pcm = b"\x00" * (16000 * 2)
         chunks, packet_durations_ms = STT.chunk_audio(
