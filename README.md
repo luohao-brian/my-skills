@@ -39,7 +39,6 @@
 | `ark-vision` | `openclaw-skills/ark-vision/` | Ark Agent Plan 图片理解，`scripts/vision_analyze.py` |
 | `ark-search` | `openclaw-skills/ark-search/` | Ark Agent Plan 搜索，`scripts/web_search.py` |
 | `ark-data-pro` | `openclaw-skills/ark-data-pro/` | Ark Agent Plan 专业数据集，`scripts/data_pro_search.py` |
-| `ark-viking` | `openclaw-skills/ark-viking/` | OpenViking 知识浏览、语义检索与 RAG 上下文组装，`scripts/openviking.py` |
 | `volc-search` | `openclaw-skills/volc-search/` | 火山引擎 WebSearch，`scripts/web_search.py` |
 | `popular-web-designs` | `openclaw-skills/popular-web-designs/` | 54 套可移植 HTML/CSS 设计模板，`templates/*.md` |
 | `guizang-ppt-skill` | `openclaw-skills/guizang-ppt-skill/` | 单文件 HTML PPT，22 个 Swiss 版式契约、golden deck 与静态/视觉校验 |
