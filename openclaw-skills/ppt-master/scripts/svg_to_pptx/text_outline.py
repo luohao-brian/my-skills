@@ -343,8 +343,8 @@ def _load_harfbuzz() -> Any:
         import uharfbuzz
     except ImportError as exc:
         raise RuntimeError(
-            "Text operands in Shape Boolean require uharfbuzz in the "
-            "caller-selected Python environment (see requirements.txt)"
+            "Text operands in Shape Boolean require uharfbuzz. Install the "
+            "project requirements, or run: pip install uharfbuzz"
         ) from exc
     required = ("Blob", "Buffer", "DrawFuncs", "Face", "Font", "StyleTag", "shape")
     missing = [name for name in required if not hasattr(uharfbuzz, name)]

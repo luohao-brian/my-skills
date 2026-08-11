@@ -4,7 +4,12 @@ description: Generate source-intake stage that fills externally verifiable factu
 
 # Topic Research Stage
 
-> Factual preparation inside [`generate-pptx`](../generate-pptx.md) source intake. Default Generate hands its output to Strategist; Quick Generate keeps it with the current agent. Run immediately for topic-only input, or after supplied material is converted and read when it leaves planning-critical factual gaps. Output is a research supplement plus stable fact provenance for project import.
+> Factual preparation inside the active Generate profile's source intake.
+> Default Generate hands its output to Strategist; Quick Generate's main agent
+> consumes the same output. Run immediately for topic-only input, or after
+> supplied material is converted and read when it leaves planning-critical
+> factual gaps. Output is a research supplement plus stable fact provenance for
+> project import.
 
 This stage supplies facts needed to build the requested deck. It does not select,
 download, or generate images. Default Generate resolves image selection in the
@@ -18,7 +23,7 @@ phase without adding a confirmation gate.
 |---|---|
 | Topic or requirements with no supporting facts | Research the factual baseline needed for the requested outcome |
 | Supplied files or chat content cover only part of the requested outcome | After conversion and reading, research only the identified externally verifiable gaps |
-| Supplied material already supports the requested outcome | Skip this stage and continue Generate Step 1 |
+| Supplied material already supports the requested outcome | Skip this stage and continue the active Generate profile's source preparation |
 | User requires a closed corpus, source-only transformation, or no external enrichment | Skip this stage and keep planning within supplied material |
 
 **Sufficiency test**: a gap exists when the active content owner would otherwise need to invent, omit, or leave unsupported an externally verifiable claim required by the user's requested outcome. File presence, source length, and a generic topic taxonomy do not decide sufficiency.
@@ -55,12 +60,27 @@ confirmation stage.
 
 ---
 
+## Execution Context
+
+**Default — isolated research when available**: The main agent owns the sufficiency decision and gap brief. When the current AI editor supports and permits an isolated subagent with web/fetch access and write access to the declared outputs, dispatch exactly one research worker. Otherwise the main agent runs Steps 2–3 locally.
+
+| Actor | Contract |
+|---|---|
+| Main agent | Supply the topic/outcome, baseline or relevant source paths, declared gaps, output language, two exact unused output paths, and this stage's absolute path as execution authority; use paths instead of pasting source bodies when possible |
+| Research worker | Read the supplied stage file completely, then follow Steps 2–3 using the brief and declared source paths as its baseline; limit project writes to the two output artifacts; acquire no images and make no deck-planning or design decisions |
+
+**Hard rule — isolate retrieval, not research**: Raw page content and fetch transcripts stay in the worker context. The 250-word limit applies only to its chat receipt: return `status`, exact artifact paths, covered/unresolved gap counts, external-fact count, and material conflicts. It does not cap or replace the two artifacts. After validation and import, the active content owner reads the complete imported research supplement and fact-provenance JSON into the main context before planning or direct SVG authoring; never use the receipt or validation summary as content.
+
+**Validation**: Before import, the main agent verifies both exact files exist, the Markdown contains `## Research Brief` and `## Sources`, the JSON parses with schema `ppt-master.fact-provenance.v1` and unique sequential IDs, and the two files agree. Return an invalid pair to the research worker for owning-artifact repair; use main-context web research only when isolated execution is unavailable.
+
+---
+
 ## Step 2: Gather factual sources
 
-Use the web search and fetch tools supplied by the current IDE. If none are available, pause and ask the user for authoritative URLs covering the declared gaps, then fetch each with:
+Use the web search and fetch tools available in the active research context. An isolated worker without them returns `blocked: web-tools-unavailable`. If no usable research context has search/fetch tools, the main agent pauses and asks the user for authoritative URLs covering the declared gaps, then fetches each with:
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/web_to_md.py <URL>
+python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>
 ```
 
 | Phase | Action |
@@ -121,23 +141,25 @@ IDs are immutable within the file. Correct a claim under the same ID; never reus
 
 ## Hand-off
 
-Import the research supplement and provenance alongside any user-supplied sources in Generate Step 2:
+Import the research supplement and provenance alongside any user-supplied
+sources through the active profile's source intake:
 
 ```bash
-python3 {baseDir}/scripts/project_manager.py import-sources projects/<project_name> [<source_paths...>] projects/<research_slug>.md projects/<research_slug>.facts.json
+python3 ${SKILL_DIR}/scripts/project_manager.py import-sources projects/<project_name> [<source_paths...>] projects/<research_slug>.md projects/<research_slug>.facts.json
 ```
 
-The Research Brief remains evidence-facing context, not a locked presentation
-contract. Default Generate has Strategist read the imported material, confirm
-the complete contract, and select the content, page roster, and image resource
-plan before Step 5 acquisition. Quick Generate has the current agent read the
-same facts, decide those routine details in active context, and continue to its
-resource-preparation phase.
+The imported pair remains evidence-facing context, not a locked presentation
+contract. Default Generate has Strategist read both files completely before
+confirmation and use them to select the content, page roster, and image resource
+plan. Quick Generate has the current agent read both completely before its
+active-context content, design, and resource decisions.
 
 ```markdown
 ## ✅ Topic Research Complete
+- [x] Research execution: <isolated worker | main-context fallback>
 - [x] Research supplement: `projects/<research_slug>.md` (N declared gaps covered)
 - [x] Fact provenance: `projects/<research_slug>.facts.json` (N external facts)
+- [x] Artifact contract validated: `## Research Brief`, `## Sources`, `ppt-master.fact-provenance.v1`, unique sequential IDs, and Markdown/JSON agreement
 - [x] No images acquired inside this factual-research stage
-- [ ] **Next**: return to [`generate-pptx`](../generate-pptx.md) Step 1, then import all source artifacts in Step 2
+- [ ] **Next**: Default returns to [`generate-pptx`](../generate-pptx.md) Step 2; Quick returns to [`quick-generate`](../profiles/quick-generate.md) §2. Import all source artifacts, then fully read the imported research pair before planning or direct SVG authoring
 ```

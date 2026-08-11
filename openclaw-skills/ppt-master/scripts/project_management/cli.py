@@ -2,18 +2,18 @@
 """PPT Master project-management CLI implementation.
 
 Usage:
-    python3 {baseDir}/scripts/project_manager.py init <project_name> --format ppt169 --dir <absolute-projects-root> [--quick-generate]
-    python3 {baseDir}/scripts/project_manager.py import-sources <absolute-project> <source1> [<source2> ...] [--move | --copy]
-    python3 {baseDir}/scripts/project_manager.py scaffold-spec <absolute-project>
-    python3 {baseDir}/scripts/project_manager.py scaffold-lock <absolute-project>
-    python3 {baseDir}/scripts/project_manager.py validate <absolute-project>
-    python3 {baseDir}/scripts/project_manager.py info <absolute-project>
-    python3 {baseDir}/scripts/project_manager.py page-context <absolute-project> P07 [--record-usage]
-    python3 {baseDir}/scripts/project_manager.py page-context-report <absolute-project>
+    python3 scripts/project_manager.py init <project_name> [--format ppt169] [--dir <path>] [--quick-generate]
+    python3 scripts/project_manager.py import-sources <project_path> <source1> [<source2> ...] [--move | --copy]
+    python3 scripts/project_manager.py scaffold-spec <project_path>
+    python3 scripts/project_manager.py scaffold-lock <project_path>
+    python3 scripts/project_manager.py validate <project_path>
+    python3 scripts/project_manager.py info <project_path>
+    python3 scripts/project_manager.py page-context <project_path> P07 [--record-usage]
+    python3 scripts/project_manager.py page-context-report <project_path>
 
 Examples:
-    python3 {baseDir}/scripts/project_manager.py init demo --format ppt169 --dir <absolute-projects-root>
-    python3 {baseDir}/scripts/project_manager.py validate <absolute-projects-root>/demo
+    python3 scripts/project_manager.py init demo --format ppt169
+    python3 scripts/project_manager.py validate projects/demo
 
 Dependencies:
     Standard library plus local PPT Master project and source-conversion modules.
@@ -47,6 +47,10 @@ from .paths import (
     SOURCE_TO_MD_DIR,
 )
 from .project_specs import scaffold_project_artifact, validate_project_artifacts
+
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from workflow_log import append_note  # noqa: E402
 
 try:
     from project_utils import (
@@ -308,7 +312,7 @@ class ProjectManager:
                     "- `live_preview/`: browser preview runtime files and history (lock.json, server.log, edits.jsonl, annotations.jsonl)\n"
                     "- `sources/`: source materials and normalized markdown\n"
                     "- `analysis/`: machine-extracted intermediate analysis (PPTX intake, image_analysis.csv) — the pipeline's canonical must-read source/asset facts\n"
-                    "- `validation/`: SVG quality reports and PPTX postflight audit reports\n"
+                    "- `validation/`: cold workflow audit log, SVG quality reports, and PPTX postflight audit reports\n"
                     "- `exports/`: final native DrawingML pptx deliverables only (timestamped); `_native_charts_tables.pptx` name with `--native-charts-and-tables`, `_narrated.pptx` name when narration audio is embedded\n"
                     "- `backup/<timestamp>/`: svg_output/ archive (always written in default-flow mode; safe to delete old timestamps)\n"
                 ),
@@ -1055,14 +1059,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="PPT Master project management helpers.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python3 {baseDir}/scripts/project_manager.py init demo --format ppt169 --dir <absolute-projects-root>
-  python3 {baseDir}/scripts/project_manager.py import-sources <absolute-projects-root>/demo file.md
-  python3 {baseDir}/scripts/project_manager.py scaffold-spec <absolute-projects-root>/demo
-  python3 {baseDir}/scripts/project_manager.py scaffold-lock <absolute-projects-root>/demo
-  python3 {baseDir}/scripts/project_manager.py validate <absolute-projects-root>/demo
-  python3 {baseDir}/scripts/project_manager.py info <absolute-projects-root>/demo
-  python3 {baseDir}/scripts/project_manager.py page-context <absolute-projects-root>/demo P07 --record-usage
-  python3 {baseDir}/scripts/project_manager.py page-context-report <absolute-projects-root>/demo
+  python3 scripts/project_manager.py init demo --format ppt169
+  python3 scripts/project_manager.py import-sources projects/demo file.md
+  python3 scripts/project_manager.py scaffold-spec projects/demo_ppt169_20260718
+  python3 scripts/project_manager.py scaffold-lock projects/demo_ppt169_20260718
+  python3 scripts/project_manager.py validate projects/demo
+  python3 scripts/project_manager.py info projects/demo
+  python3 scripts/project_manager.py page-context projects/demo P07 --record-usage
+  python3 scripts/project_manager.py page-context-report projects/demo
 """,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1070,11 +1074,18 @@ def build_parser() -> argparse.ArgumentParser:
     init = subparsers.add_parser("init", help="Create a project directory")
     init.add_argument("project_name", help="Project name")
     init.add_argument("--format", default="ppt169", help="Canvas format (default: ppt169)")
-    init.add_argument("--dir", default=None, help="Base directory for the project")
+    init.add_argument(
+        "--dir",
+        required=True,
+        help="Absolute caller-selected base directory for the project",
+    )
     init.add_argument(
         "--quick-generate",
         action="store_true",
-        help="Create only the svg_output directory and omit README.md",
+        help=(
+            "Create svg_output plus the validation workflow audit log and "
+            "omit README.md"
+        ),
     )
 
     import_sources = subparsers.add_parser(
@@ -1158,10 +1169,23 @@ def main(argv: list[str] | None = None) -> int:
             if args.quick_generate:
                 print("1. Generate SVG files into svg_output/")
                 print("2. Run the Quick Generate final checker and exporter")
+                profile = "quick"
             else:
                 print("1. Put source files into sources/ (or use import-sources)")
                 print("2. Save your design spec to the project root")
                 print("3. Generate SVG files into svg_output/")
+                profile = "default"
+            try:
+                append_note(
+                    project_path,
+                    f"Project initialized: profile={profile}; "
+                    f"canvas={args.format}; path={project_path}",
+                )
+            except OSError as exc:
+                print(
+                    f"[WARN] Workflow audit unavailable: {exc}",
+                    file=sys.stderr,
+                )
             return 0
 
         if args.command == "import-sources":

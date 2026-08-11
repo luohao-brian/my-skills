@@ -13,7 +13,6 @@ PPT Master uses rendering-neutral compiler hints only where ordinary SVG cannot 
 | `data-pptx-layer="layout"` | Direct atomic child of root | Promote one fixed visual object to the named Layout. |
 | `data-pptx-placeholder` | Direct child `<g id>` of root | Declare one reusable Layout slot whose visible content remains Slide-local. |
 | `data-pptx-role` | Structural page-frame element | Supply package, page-number, or animation behavior not already expressed by specialized metadata. |
-| `data-pptx-text-role` | `<text>` / `<tspan>` using an auxiliary typography role | Name the numeric `spec_lock.md` typography anchor for intentional small text such as `footnote`, `source_url`, or `annotation`; it is a quality-check hint and does not alter rendering. |
 
 The completed SVG remains the full visible page. Removing the metadata must not change browser rendering. Do not copy visible text, geometry, style, or asset values into metadata.
 

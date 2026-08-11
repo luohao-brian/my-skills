@@ -1,0 +1,16 @@
+diff --git a/scripts/project_management/cli.py b/scripts/project_management/cli.py
+--- a/scripts/project_management/cli.py
++++ b/scripts/project_management/cli.py
+@@ -1076,7 +1076,11 @@ def build_parser() -> argparse.ArgumentParser:
+     init = subparsers.add_parser("init", help="Create a project directory")
+     init.add_argument("project_name", help="Project name")
+     init.add_argument("--format", default="ppt169", help="Canvas format (default: ppt169)")
+-    init.add_argument("--dir", default=None, help="Base directory for the project")
++    init.add_argument(
++        "--dir",
++        required=True,
++        help="Absolute caller-selected base directory for the project",
++    )
+     init.add_argument(
+         "--quick-generate",
+         action="store_true",

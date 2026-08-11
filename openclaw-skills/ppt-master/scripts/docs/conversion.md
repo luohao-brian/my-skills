@@ -37,16 +37,16 @@ Routing is centralized in `source_to_md/_dispatcher.py` and reused by
 `project_manager.py import-sources`; do not add a second type-to-backend table.
 
 ```bash
-python3 {baseDir}/scripts/source_to_md.py paper.pdf
-python3 {baseDir}/scripts/source_to_md.py paper.pdf report.docx deck.pptx
-python3 {baseDir}/scripts/source_to_md.py ./sources
-python3 {baseDir}/scripts/source_to_md.py ./pdfs/*.pdf
-python3 {baseDir}/scripts/source_to_md.py ./decks/*.pptx
-python3 {baseDir}/scripts/source_to_md.py report.docx -o report.md
-python3 {baseDir}/scripts/source_to_md.py ./sources -o ./markdown  # explicit separate output directory
-python3 {baseDir}/scripts/source_to_md.py workbook.xlsx --json
-python3 {baseDir}/scripts/source_to_md.py deck.pptx
-python3 {baseDir}/scripts/source_to_md.py https://example.com/article -o article.md
+python3 scripts/source_to_md.py paper.pdf
+python3 scripts/source_to_md.py paper.pdf report.docx deck.pptx
+python3 scripts/source_to_md.py ./sources
+python3 scripts/source_to_md.py ./pdfs/*.pdf
+python3 scripts/source_to_md.py ./decks/*.pptx
+python3 scripts/source_to_md.py report.docx -o report.md
+python3 scripts/source_to_md.py ./sources -o ./markdown  # explicit separate output directory
+python3 scripts/source_to_md.py workbook.xlsx --json
+python3 scripts/source_to_md.py deck.pptx
+python3 scripts/source_to_md.py https://example.com/article -o article.md
 ```
 
 Useful options:
@@ -73,16 +73,16 @@ non-recursive directory inputs.
 Recommended first choice for native PDFs.
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf -o output.md
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf appendix.pdf
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py ./pdfs
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py ./pdfs -o ./markdown  # explicit separate output directory
+python3 scripts/source_to_md/pdf_to_md.py book.pdf
+python3 scripts/source_to_md/pdf_to_md.py book.pdf -o output.md
+python3 scripts/source_to_md/pdf_to_md.py book.pdf appendix.pdf
+python3 scripts/source_to_md/pdf_to_md.py ./pdfs
+python3 scripts/source_to_md/pdf_to_md.py ./pdfs -o ./markdown  # explicit separate output directory
 
 # Image extraction control (default: filtered)
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf --images filtered  # size/quality filters applied
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf --images all       # extract all images, no filtering
-python3 {baseDir}/scripts/source_to_md/pdf_to_md.py book.pdf --images none      # skip all images (text only)
+python3 scripts/source_to_md/pdf_to_md.py book.pdf --images filtered  # size/quality filters applied
+python3 scripts/source_to_md/pdf_to_md.py book.pdf --images all       # extract all images, no filtering
+python3 scripts/source_to_md/pdf_to_md.py book.pdf --images none      # skip all images (text only)
 ```
 
 Use cases:
@@ -95,7 +95,11 @@ Prefer MinerU or another OCR/layout tool when:
 - Multi-column layout parsing is poor
 - Encoding is garbled
 
-Required capability: `PyMuPDF` in the caller-selected Python environment.
+Dependency:
+
+```bash
+pip install PyMuPDF
+```
 
 ## `source_to_md/doc_to_md.py`
 
@@ -111,19 +115,26 @@ Pandoc fallback (only if you need these):
 - `.doc`, `.odt`, `.rtf`, `.tex`/`.latex`, `.rst`, `.org`, `.typ`
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py lecture.docx
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py lecture.docx -o output.md
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py lecture.docx notes.html
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py ./docs
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py ./docs -o ./markdown  # explicit separate output directory
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py notes.epub
-python3 {baseDir}/scripts/source_to_md/doc_to_md.py paper.tex -o paper.md  # uses pandoc
+python3 scripts/source_to_md/doc_to_md.py lecture.docx
+python3 scripts/source_to_md/doc_to_md.py lecture.docx -o output.md
+python3 scripts/source_to_md/doc_to_md.py lecture.docx notes.html
+python3 scripts/source_to_md/doc_to_md.py ./docs
+python3 scripts/source_to_md/doc_to_md.py ./docs -o ./markdown  # explicit separate output directory
+python3 scripts/source_to_md/doc_to_md.py notes.epub
+python3 scripts/source_to_md/doc_to_md.py paper.tex -o paper.md  # uses pandoc
 ```
 
-Required native-path capabilities: `mammoth`, `markdownify`, `ebooklib`,
-`nbconvert`, and `beautifulsoup4` in the caller-selected Python environment.
-Fallback formats (`.doc`, `.odt`, `.rtf`, `.tex`, `.rst`, `.org`, `.typ`) also
-require a `pandoc` executable supplied by the calling runtime.
+Dependencies:
+
+```bash
+# Native path — always required
+pip install mammoth markdownify ebooklib nbconvert beautifulsoup4
+
+# Fallback path — only for .doc/.odt/.rtf/.tex/.rst/.org/.typ
+# macOS:   brew install pandoc
+# Ubuntu:  sudo apt install pandoc
+# Windows: https://pandoc.org/installing.html
+```
 
 All paths produce the same output convention: `<input>.md` plus a sibling `<input>_files/` directory containing extracted images with relative references.
 On success, a sibling `<input>.conversion_profile.json` is also written.
@@ -140,12 +151,12 @@ Unsupported by default:
 - `.xls` — resave as `.xlsx` first
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py report.xlsx
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py report.xlsx -o output.md
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py report.xlsx budget.xlsm
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py ./workbooks
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py ./workbooks -o ./markdown  # explicit separate output directory
-python3 {baseDir}/scripts/source_to_md/excel_to_md.py report.xlsm --max-rows 200 --max-cols 40
+python3 scripts/source_to_md/excel_to_md.py report.xlsx
+python3 scripts/source_to_md/excel_to_md.py report.xlsx -o output.md
+python3 scripts/source_to_md/excel_to_md.py report.xlsx budget.xlsm
+python3 scripts/source_to_md/excel_to_md.py ./workbooks
+python3 scripts/source_to_md/excel_to_md.py ./workbooks -o ./markdown  # explicit separate output directory
+python3 scripts/source_to_md/excel_to_md.py report.xlsm --max-rows 200 --max-cols 40
 ```
 
 Behavior:
@@ -156,7 +167,11 @@ Behavior:
 - exports formula cells as cached values; it does not recalculate formulas
 - writes `<input>.conversion_profile.json` after successful conversion
 
-Required capability: `openpyxl` in the caller-selected Python environment.
+Dependency:
+
+```bash
+pip install openpyxl
+```
 
 CSV/TSV files are already plain-text table sources and do not require this converter.
 
@@ -170,12 +185,12 @@ Supported formats include:
 - `.potx`, `.potm`
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py sales_deck.pptx
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py sales_deck.pptx -o output.md
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py sales_deck.pptx appendix.pptx
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py ./decks
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py ./decks -o ./markdown  # explicit separate output directory
-python3 {baseDir}/scripts/source_to_md/ppt_to_md.py template.ppsx -o notes/template.md
+python3 scripts/source_to_md/ppt_to_md.py sales_deck.pptx
+python3 scripts/source_to_md/ppt_to_md.py sales_deck.pptx -o output.md
+python3 scripts/source_to_md/ppt_to_md.py sales_deck.pptx appendix.pptx
+python3 scripts/source_to_md/ppt_to_md.py ./decks
+python3 scripts/source_to_md/ppt_to_md.py ./decks -o ./markdown  # explicit separate output directory
+python3 scripts/source_to_md/ppt_to_md.py template.ppsx -o notes/template.md
 ```
 
 Behavior:
@@ -188,7 +203,11 @@ Behavior:
 - appends speaker notes when present
 - writes `<input>.conversion_profile.json` after successful conversion
 
-Required capability: `python-pptx` in the caller-selected Python environment.
+Dependency:
+
+```bash
+pip install python-pptx
+```
 
 Legacy `.ppt` is not parsed directly. Resave it as `.pptx` or export it to PDF first.
 
@@ -199,7 +218,7 @@ than replacing it: Markdown remains the normalized content source, while intake
 artifacts provide source facts for Strategist and standalone PPTX workflows.
 
 ```bash
-python3 {baseDir}/scripts/pptx_intake.py deck.pptx -o projects/demo/analysis
+python3 scripts/pptx_intake.py deck.pptx -o projects/demo/analysis
 ```
 
 Outputs (per source deck, prefixed by file stem):
@@ -219,10 +238,10 @@ Usage boundary:
 Reconstruct a PPTX package as editable SVG views by reading OOXML directly.
 
 ```bash
-python3 {baseDir}/scripts/pptx_to_svg.py deck.pptx --inheritance-mode both
-python3 {baseDir}/scripts/pptx_to_svg.py deck.pptx --inheritance-mode layered
-python3 {baseDir}/scripts/pptx_to_svg.py deck.pptx --inheritance-mode flat
-python3 {baseDir}/scripts/pptx_to_svg.py deck.pptx --strict
+python3 scripts/pptx_to_svg.py deck.pptx --inheritance-mode both
+python3 scripts/pptx_to_svg.py deck.pptx --inheritance-mode layered
+python3 scripts/pptx_to_svg.py deck.pptx --inheritance-mode flat
+python3 scripts/pptx_to_svg.py deck.pptx --strict
 ```
 
 | Mode | Output |
@@ -512,11 +531,11 @@ Error: PPTX-to-SVG conversion failed: Invalid DrawingML sRGB color structure
 Convert web pages to Markdown and download images locally.
 
 ```bash
-python3 {baseDir}/scripts/source_to_md/web_to_md.py https://example.com/article
-python3 {baseDir}/scripts/source_to_md/web_to_md.py https://url1.com https://url2.com
-python3 {baseDir}/scripts/source_to_md/web_to_md.py -f urls.txt
-python3 {baseDir}/scripts/source_to_md/web_to_md.py https://example.com -o output.md
-python3 {baseDir}/scripts/source_to_md/web_to_md.py https://example.com --emit-result /tmp/result.json
+python3 scripts/source_to_md/web_to_md.py https://example.com/article
+python3 scripts/source_to_md/web_to_md.py https://url1.com https://url2.com
+python3 scripts/source_to_md/web_to_md.py -f urls.txt
+python3 scripts/source_to_md/web_to_md.py https://example.com -o output.md
+python3 scripts/source_to_md/web_to_md.py https://example.com --emit-result /tmp/result.json
 ```
 
 When `curl_cffi` is installed (included in `requirements.txt`), this script
@@ -531,14 +550,43 @@ Markdown output.
 when the converter derives a title-based filename.
 
 
-## `rotate_images.py`
+## Image Orientation Review
 
-Fix image EXIF orientation in downloaded or imported assets.
+Run this review when the user requests orientation correction, converted text
+asks the reader to rotate the device, or a downloaded asset is visibly
+sideways. EXIF and dimensions may trigger review, but they cannot determine the
+semantic direction of pixels that are already stored sideways.
+
+Generate a labeled static contact sheet. This command previews the first frame
+after EXIF normalization and does not modify source images:
 
 ```bash
-python3 {baseDir}/scripts/rotate_images.py auto projects/xxx_files
-python3 {baseDir}/scripts/rotate_images.py gen projects/xxx_files
-python3 {baseDir}/scripts/rotate_images.py fix fixes.json
+python3 ${SKILL_DIR}/scripts/rotate_images.py sheet <images_directory>
 ```
 
-Use this when extracted photos appear sideways after conversion or import.
+The default output is
+`<images_directory>/../analysis/<directory>_orientation_contact_sheet.jpg`.
+Inspect it with the current multimodal agent, identify only visually confirmed
+rotations, and write a temporary JSON list. `rotation` is clockwise degrees and
+must be `90`, `180`, or `270`:
+
+```json
+[
+  {"path": "/absolute/path/to/sideways.jpg", "rotation": 270}
+]
+```
+
+Apply the confirmed fixes and regenerate image facts:
+
+```bash
+python3 ${SKILL_DIR}/scripts/rotate_images.py fix /tmp/orientation_fixes.json
+python3 ${SKILL_DIR}/scripts/analyze_images.py <images_directory>
+```
+
+GIF files are excluded: `sheet` does not list them, and `fix` rejects a batch
+that references one so all GIF files remain unchanged.
+
+Do not infer a rotation from prose, EXIF, or aspect ratio alone, and do not
+launch the HTML `gen` command in source intake. `auto` remains an in-place EXIF
+normalizer. `gen` is a compatibility UI that runs the same normalization before
+writing HTML; neither belongs to source intake.

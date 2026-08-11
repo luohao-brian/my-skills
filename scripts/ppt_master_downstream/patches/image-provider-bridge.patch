@@ -1,0 +1,304 @@
+diff --git a/scripts/image_gen.py b/scripts/image_gen.py
+index a6ebb0a..334b25c 100644
+--- a/scripts/image_gen.py
++++ b/scripts/image_gen.py
+@@ -2,7 +2,7 @@
+ """
+ Unified Image Generation Tool
+
+-Dispatches to the appropriate backend based on explicit provider configuration.
++Dispatches to the appropriate backend based on provider configuration.
+
+ Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment):
+   IMAGE_BACKEND=gemini      -> Gemini backend (google-genai SDK)
+@@ -14,6 +14,8 @@ Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment)
+   IMAGE_BACKEND=qwen        -> Alibaba Qwen image backend
+   IMAGE_BACKEND=zhipu       -> Zhipu GLM-Image backend
+   IMAGE_BACKEND=volcengine  -> Volcengine Seedream backend
++  IMAGE_BACKEND=ark-api     -> Normal Ark API profile via Volcengine backend
++  IMAGE_BACKEND=ark-agent-plan -> Ark Agent Plan profile via Volcengine backend
+   IMAGE_BACKEND=modelscope  -> ModelScope backend
+   IMAGE_BACKEND=siliconflow -> SiliconFlow backend
+   IMAGE_BACKEND=fal         -> fal.ai backend
+@@ -29,7 +31,11 @@ Configuration source (process env wins, `.env` is the fallback layer):
+      - `~/.ppt-master/.env` (user-level config)
+
+ Supported keys:
+-  IMAGE_BACKEND    (required) backend name
++  IMAGE_BACKEND    optional explicit backend override
++
++  A caller provider bridge may supply IMAGE_GEN_PROVIDER, IMAGE_GEN_BASEURL,
++  and IMAGE_GEN_MODEL_ID. The Volcengine backend is selected
++  automatically for volc-ark and volc-ark-agent-plan; the latter is the default.
+
+   Provider-specific keys are used for credentials and overrides, for example:
+     GEMINI_API_KEY / GEMINI_MODEL / GEMINI_BASE_URL
+@@ -142,9 +148,9 @@ BACKEND_REGISTRY = {
+         "module": "backend_volcengine",
+         "tier": "core",
+         "label": "Volcengine Seedream",
+-        "default_model": "doubao-seedream-4-5-251128",
+-        "key_hint": "VOLCENGINE_API_KEY / ARK_API_KEY",
+-        "aliases": ["ark", "doubao", "seedream"],
++        "default_model": "doubao-seedream-5.0-lite",
++        "key_hint": "ARK_AGENT_PLAN_API_KEY / ARK_API_KEY / VOLCENGINE_API_KEY",
++        "aliases": ["ark", "ark-api", "ark-agent-plan", "doubao", "seedream"],
+     },
+     "modelscope": {
+         "module": "backend_modelscope",
+@@ -211,6 +217,15 @@ BACKEND_REGISTRY = {
+
+ TIER_ORDER = {"core": 0, "extended": 1, "experimental": 2}
+ SUPPORTED_BACKENDS = tuple(sorted(BACKEND_REGISTRY))
++IMAGE_BACKEND_PROFILES = {
++    "ark-api": "volcengine",
++    "ark-agent-plan": "volcengine",
++}
++IMAGE_PROVIDER_BACKENDS = {
++    "volc-ark": "volcengine",
++    "volc-ark-agent-plan": "volcengine",
++}
++IMAGE_BACKEND_CHOICES = tuple(sorted(set(SUPPORTED_BACKENDS) | set(IMAGE_BACKEND_PROFILES)))
+
+
+ def _load_image_env_file() -> None:
+@@ -323,28 +338,14 @@ def _resolve_backend() -> tuple[object, str]:
+             sys.exit(1)
+         return _load_backend(canonical)
+
+-    supported = ", ".join(SUPPORTED_BACKENDS)
+-    print(
+-        "Error: No image backend configured for Path A (image_gen.py).\n"
+-        "\n"
+-        "If your host (Codex / Antigravity / Claude Code / etc.) has a native image\n"
+-        "generation tool, do NOT run this script — switch to Path B: invoke the host's\n"
+-        "image tool directly with the prompts from images/image_prompts.json and save\n"
+-        "the outputs to images/<filename>. See references/image-generator.md §7 Path B.\n"
+-        "\n"
+-        "To use Path A instead, set IMAGE_BACKEND in one of these places:\n"
+-        f"  1. Current process environment\n"
+-        f"  2. {ENV_PATH}\n"
+-        "\n"
+-        f"Supported backends: {supported}\n"
+-        "\n"
+-        "Example:\n"
+-        "  IMAGE_BACKEND=openai\n"
+-        "  OPENAI_API_KEY=sk-xxx\n"
+-    )
+-    sys.exit(1)
++    provider = os.environ.get("IMAGE_GEN_PROVIDER", "").strip().lower()
++    provider_backend = IMAGE_PROVIDER_BACKENDS.get(provider)
++    if provider_backend:
++        return _load_backend(provider_backend)
+
++    return _load_backend("volcengine")
+
++
+ _AI_IMAGE_PATH_ROW_RE = re.compile(
+     r"^\s*\|\s*AI Image Acquisition Path\s*\|\s*([^|]+?)\s*\|\s*$",
+     re.MULTILINE,
+@@ -1138,7 +1139,7 @@ def main() -> None:
+         help="Model name. Default depends on backend."
+     )
+     parser.add_argument(
+-        "--backend", "-b", default=None, choices=SUPPORTED_BACKENDS,
++        "--backend", "-b", default=None, choices=IMAGE_BACKEND_CHOICES,
+         help="Override IMAGE_BACKEND env var."
+     )
+     parser.add_argument(
+diff --git a/scripts/image_backends/backend_volcengine.py b/scripts/image_backends/backend_volcengine.py
+index 446a752..9c8a1a9 100644
+--- a/scripts/image_backends/backend_volcengine.py
++++ b/scripts/image_backends/backend_volcengine.py
+@@ -3,9 +3,12 @@
+ Volcengine Seedream image generation backend.
+
+ Configuration keys:
+-  VOLCENGINE_API_KEY / ARK_API_KEY   (required)
+-  VOLCENGINE_BASE_URL                (optional)
+-  VOLCENGINE_MODEL                   (optional)
++  ARK_AGENT_PLAN_API_KEY             (Agent Plan profile)
++  ARK_API_KEY                        (Ark API profile)
++  IMAGE_GEN_PROVIDER / IMAGE_GEN_BASEURL / IMAGE_GEN_MODEL_ID
++                                     (optional caller provider bridge)
++  VOLCENGINE_API_KEY                 (legacy upstream fallback)
++  VOLCENGINE_BASE_URL / VOLCENGINE_MODEL (legacy optional overrides)
+ """
+
+ import sys
+@@ -43,6 +46,59 @@ from image_backends.backend_common import (
+
+ DEFAULT_ENDPOINT = "https://operator.las.cn-beijing.volces.com/api/v1/images/generations"
+ DEFAULT_MODEL = "doubao-seedream-4-5-251128"
++ARK_API_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3"
++ARK_API_MODEL = "doubao-seedream-5-0-260128"
++ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3"
++ARK_AGENT_PLAN_MODEL = "doubao-seedream-5.0-lite"
++
++ARK_ASPECT_RATIO_SIZE_MAP = {
++    "1:1": (2048, 2048),
++    "3:4": (1728, 2304),
++    "4:3": (2304, 1728),
++    "16:9": (2848, 1600),
++    "9:16": (1600, 2848),
++    "3:2": (2496, 1664),
++    "2:3": (1664, 2496),
++    "21:9": (3136, 1344),
++}
++ARK_SIZE_SCALE = {
++    # Ark image profiles enforce a provider-native minimum canvas. PPT Master's
++    # smaller logical presets therefore resolve to the same valid 2K canvas.
++    "512px": 1.0,
++    "1K": 1.0,
++    "2K": 1.0,
++    "4K": 1.0,
++}
++
++# IMAGE_BACKEND selects a profile; every profile resolves to the canonical
++# key/base_url/model inputs consumed by this single upstream backend.
++IMAGE_BACKEND_PROFILES = {
++    "ark-api": {
++        "provider": "volc-ark",
++        "key_envs": ("ARK_API_KEY",),
++        "base_url": ARK_API_ENDPOINT,
++        "model": ARK_API_MODEL,
++        "ark_api": True,
++    },
++    "ark-agent-plan": {
++        "provider": "volc-ark-agent-plan",
++        "key_envs": ("ARK_AGENT_PLAN_API_KEY",),
++        "base_url": ARK_AGENT_PLAN_ENDPOINT,
++        "model": ARK_AGENT_PLAN_MODEL,
++        "ark_api": True,
++    },
++    "volcengine": {
++        "provider": "volcengine",
++        "key_envs": ("VOLCENGINE_API_KEY",),
++        "base_url": DEFAULT_ENDPOINT,
++        "model": DEFAULT_MODEL,
++        "ark_api": False,
++    },
++}
++IMAGE_PROVIDER_PROFILES = {
++    "volc-ark": "ark-api",
++    "volc-ark-agent-plan": "ark-agent-plan",
++}
+
+ ASPECT_RATIO_SIZE_MAP = {
+     "512px": {
+@@ -101,12 +157,25 @@ def _resolve_url(base_url: str) -> str:
+     base = base_url.rstrip("/")
+     if base.endswith("/images/generations"):
+         return base
++    if base.endswith(("/api/v3", "/api/plan/v3")):
++        return base + "/images/generations"
+     return base + "/api/v1/images/generations"
+
+
+-def _resolve_size(aspect_ratio: str, image_size: str) -> str:
++def _resolve_size(aspect_ratio: str, image_size: str, *, ark_api: bool = False) -> str:
+     """Resolve the target resolution for a ratio and logical size preset."""
+     normalized = normalize_image_size(image_size)
++    if ark_api:
++        dimensions = ARK_ASPECT_RATIO_SIZE_MAP.get(aspect_ratio)
++        scale = ARK_SIZE_SCALE.get(normalized)
++        if dimensions and scale:
++            width, height = dimensions
++            return f"{round(width * scale)}x{round(height * scale)}"
++        supported = sorted(ARK_ASPECT_RATIO_SIZE_MAP)
++        raise ValueError(
++            f"Unsupported aspect ratio '{aspect_ratio}' for Ark image generation. "
++            f"Supported: {supported}"
++        )
+     size = (ASPECT_RATIO_SIZE_MAP.get(normalized) or {}).get(aspect_ratio)
+     if not size:
+         supported = sorted(ASPECT_RATIO_SIZE_MAP["1K"])
+@@ -120,9 +189,10 @@ def _resolve_size(aspect_ratio: str, image_size: str) -> str:
+ def _generate_image(api_key: str, prompt: str,
+                     aspect_ratio: str = "1:1", image_size: str = "1K",
+                     output_dir: str = None, filename: str = None,
+-                    model: str = DEFAULT_MODEL, base_url: str = DEFAULT_ENDPOINT) -> str:
++                    model: str = DEFAULT_MODEL, base_url: str = DEFAULT_ENDPOINT,
++                    ark_api: bool = False) -> str:
+     """Generate one image with the Volcengine backend."""
+-    size = _resolve_size(aspect_ratio, image_size)
++    size = _resolve_size(aspect_ratio, image_size, ark_api=ark_api)
+     url = _resolve_url(base_url)
+     headers = {
+         "Authorization": f"Bearer {api_key}",
+@@ -161,31 +231,65 @@ def _generate_image(api_key: str, prompt: str,
+     return download_image(image_url, path)
+
+
++def _resolve_profile(model: str = None) -> dict[str, object]:
++    """Resolve IMAGE_BACKEND to canonical Volcengine key/base URL/model inputs."""
++    profile_name = os.environ.get("IMAGE_BACKEND", "").strip().lower()
++    if profile_name not in IMAGE_BACKEND_PROFILES:
++        provider = os.environ.get("IMAGE_GEN_PROVIDER", "").strip().lower()
++        profile_name = IMAGE_PROVIDER_PROFILES.get(provider, "")
++
++    if not profile_name:
++        profile_name = "ark-agent-plan"
++
++    profile = IMAGE_BACKEND_PROFILES[profile_name]
++    key_envs = tuple(str(name) for name in profile["key_envs"])
++    api_key = require_api_key(
++        *key_envs,
++        message=(
++            f"No image key found for IMAGE_BACKEND={profile_name}. "
++            f"Configure {' or '.join(key_envs)}."
++        ),
++    )
++
++    return {
++        "profile": profile_name,
++        "provider": profile["provider"],
++        "api_key": api_key,
++        "base_url": (
++            os.environ.get("IMAGE_GEN_BASEURL")
++            or os.environ.get("VOLCENGINE_BASE_URL")
++            or profile["base_url"]
++        ),
++        "model": (
++            model
++            or os.environ.get("IMAGE_GEN_MODEL_ID")
++            or os.environ.get("VOLCENGINE_MODEL")
++            or profile["model"]
++        ),
++        "ark_api": profile["ark_api"],
++    }
++
++
+ def generate(prompt: str,
+              aspect_ratio: str = "1:1", image_size: str = "1K",
+              output_dir: str = None, filename: str = None,
+              model: str = None, max_retries: int = MAX_RETRIES) -> str:
+     """Generate an image with retries using the Volcengine backend."""
+-    api_key = require_api_key(
+-        "VOLCENGINE_API_KEY",
+-        "ARK_API_KEY",
+-        message="No API key found. Set VOLCENGINE_API_KEY or ARK_API_KEY in the current environment or a .env file.",
+-    )
+-    base_url = os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
+-    resolved_model = model or os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
++    profile = _resolve_profile(model)
+
+     last_error = None
+     for attempt in range(max_retries + 1):
+         try:
+             return _generate_image(
+-                api_key=api_key,
++                api_key=str(profile["api_key"]),
+                 prompt=prompt,
+                 aspect_ratio=aspect_ratio,
+                 image_size=image_size,
+                 output_dir=output_dir,
+                 filename=filename,
+-                model=resolved_model,
+-                base_url=base_url,
++                model=str(profile["model"]),
++                base_url=str(profile["base_url"]),
++                ark_api=bool(profile["ark_api"]),
+             )
+         except Exception as exc:
+             last_error = exc

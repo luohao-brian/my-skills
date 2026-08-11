@@ -16,7 +16,7 @@ and filter/clip contracts.
 | Mode | Resource authority and preparation timing |
 |---|---|
 | Default Generate | `design_spec.md §VIII` plus its lock projection; when user-provided images are selected, run `analyze_images.py` after Strategist confirmation and complete the list before Executor |
-| Quick Generate | Active execution context's transient roster; materialize explicit user paths first, resolve unspecified acquisition decisions automatically, and finish user/ai/web/slice/formula preparation before SVG authoring without confirmation |
+| Quick Generate | Current main agent's active-context resource decisions; materialize explicit user paths first, resolve unspecified acquisition decisions automatically, and finish user/ai/web/slice/formula preparation before SVG authoring without confirmation or a persisted roster |
 
 ```markdown
 | Filename | Dimensions | Purpose | Type | Layout pattern | Crop Policy | Acquire Via | Status | Reference |
@@ -45,14 +45,14 @@ and filter/clip contracts.
 ```
 1. Resolve image needs:
    - Default Generate → Strategist-owned resource list + lock projection
-   - Quick Generate → the active execution context builds a transient roster; explicit user paths/URLs/choices win, unspecified choices use automatic resolution, no interaction
+   - Quick Generate → current main agent resolves the required resource in active context; explicit user paths/URLs/choices win, unspecified choices use automatic resolution, no interaction or persisted roster
 2. Prepare project-local resources before SVG authoring:
    - user → materialize the explicit source under project/images/ → Existing
    - formula → write formula_manifest.json and run latex_render.py → Rendered
-   - Pending / Failed + ai  → runtime image capability + manifest  → Generated
+   - Pending / Failed + ai  → Image_Generator runs image_gen.py     → Generated
    - Pending / Failed + web → Image_Searcher runs image_search.py   → Sourced
    - Pending + slice → after parent AI sheet is Generated, slice_images.py cuts element files → Generated
-3. SVG authoring consumes only prepared resources (Executor in Default Generate; active execution context in Quick Generate)
+3. SVG authoring consumes only prepared resources (Executor in Default Generate; current main agent in Quick Generate)
    ├── Existing / Generated → <image href="../images/xxx.png" .../>
    ├── Sourced + license_tier=no-attribution → <image href=...> only
    ├── Sourced + license_tier=attribution-required → <image href=...> + small <text> credit element on the slide
@@ -150,8 +150,8 @@ its project-local image references directly to DrawingML in both modes.
 For processing specific SVGs without the full pipeline:
 
 ```bash
-python3 {baseDir}/scripts/svg_finalize/align_embed_images.py <svg_file>
-python3 {baseDir}/scripts/svg_finalize/align_embed_images.py --dry-run <svg_file>
+python3 scripts/svg_finalize/align_embed_images.py <svg_file>
+python3 scripts/svg_finalize/align_embed_images.py --dry-run <svg_file>
 ```
 
 Use `finalize_svg.py --only align-images` for project-level batches. The old
@@ -168,9 +168,9 @@ aliases only when invoked through `finalize_svg.py --only`.
 
 | Need | Command |
 |---|---|
-| Normal native export | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path>` |
-| Explicit compact export | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --image-sizing display --image-scale 2 --image-quality 85` |
-| Force original bytes | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-image-optimize` |
+| Normal native export | `python3 scripts/svg_to_pptx.py <project_path>` |
+| Explicit compact export | `python3 scripts/svg_to_pptx.py <project_path> --image-sizing display --image-scale 2 --image-quality 85` |
+| Force original bytes | `python3 scripts/svg_to_pptx.py <project_path> --no-image-optimize` |
 
 ### File Organization
 

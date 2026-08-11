@@ -265,15 +265,16 @@ python3 {baseDir}/scripts/native_enhance_pptx.py validate "<project>" --material
 
 🚧 **GATE**: Step 6 complete; `audio.enabled` is true.
 
-Run [`generate-audio`](./stages/generate-audio.md) Steps 1–2. The shared stage owns runtime-neutral task preparation and TTS calls. Do not add provider/model/voice fields here.
+Run [`generate-audio`](./stages/generate-audio.md) Steps 1–3. That shared stage exclusively owns language selection, provider/voice catalog lookup, recommendation rules, and the one-shot confirmation. Do not repeat or fork those rules here.
 
-Record only capability state into `project.json`:
+Record the confirmed config into `project.json`:
 
 ```json
 {
   "audio": {
-    "enabled": true,
-    "runtime_managed": true
+    "provider": "edge",
+    "voice": "zh-CN-YunjianNeural",
+    "rate": "+0%"
   }
 }
 ```
@@ -285,7 +286,7 @@ Record only capability state into `project.json`:
 🚧 **GATE**: Step 7 confirmed; complete non-empty notes files exist under
 `<project>/notes/` for every slide.
 
-Finish the shared stage's manifest verification for `<project>`. Stop before its Generate-PPTX-only `svg_to_pptx.py --recorded-narration` integration. This route integrates audio through Step 9 instead.
+Run [`generate-audio`](./stages/generate-audio.md) Step 4 with `<project>` and the confirmed values. Stop after audio generation; do not run its Generate-PPTX-only `svg_to_pptx.py --recorded-narration` integration. This route integrates audio through Step 9 instead.
 
 **Naming contract**: Audio stems match note stems: `001.md` → `001.mp3`.
 

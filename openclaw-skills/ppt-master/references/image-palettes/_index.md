@@ -23,7 +23,7 @@ Compatibility tombstone for retired `image_palette` fields and historical palett
 
 ## 2. Legacy Interpretation and Maintenance
 
-The sibling preset files remain archived in place for diagnosing historical locks and maintaining the legacy palette comparison assets documented by [`_index.md`](../ai-image-comparison/_index.md). They are not a runtime catalog.
+The sibling preset files remain archived in place for diagnosing historical locks and maintaining the legacy palette comparison assets documented by [`README.md`](../ai-image-comparison/_index.md). They are not a runtime catalog.
 
 | Legacy row | Historical meaning |
 |---|---|

@@ -27,7 +27,7 @@ configure_utf8_stdio()
 try:
     import fitz  # PyMuPDF
 except ImportError:
-    print("[ERROR] PyMuPDF is unavailable in the caller-selected Python environment", file=sys.stderr)
+    print("[ERROR] PyMuPDF not installed. Run: pip install PyMuPDF", file=sys.stderr)
     sys.exit(1)
 
 FONT_BODY_SIZE = 12

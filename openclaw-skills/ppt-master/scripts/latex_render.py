@@ -338,7 +338,7 @@ def _image_dimensions(path: Path) -> tuple[int, int]:
     """Read PNG dimensions."""
     if Image is None:
         raise RuntimeError(
-            "Pillow is required to measure formula PNGs in the caller-selected Python environment"
+            "Pillow is required to measure formula PNGs. Run: pip install Pillow"
         )
     with Image.open(path) as img:
         return img.size
@@ -355,7 +355,7 @@ def _make_png_background_transparent(
     if Image is None:
         raise RuntimeError(
             "Pillow is required to post-process transparent formula PNGs. "
-            "Provide Pillow through the calling runtime"
+            "Run: pip install Pillow"
         )
 
     bg_rgb = _hex_to_rgb(background or "FFFFFF")

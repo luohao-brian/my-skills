@@ -1,6 +1,6 @@
 # Image Generation Prompts
 
-> Upstream visual-reference fixture; not an executable OpenClaw provider manifest.
+> Auto-generated from `image_prompts.json` by `image_gen.py --render-md`.
 > Do not hand-edit — re-run the command to refresh.
 
 > Project: {baseDir}/references/ai-image-comparison/type

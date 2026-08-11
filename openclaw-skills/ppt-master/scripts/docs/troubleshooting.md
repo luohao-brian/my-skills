@@ -5,7 +5,7 @@
 1. Run:
 
 ```bash
-python3 {baseDir}/scripts/project_manager.py validate <project_path>
+python3 scripts/project_manager.py validate <project_path>
 ```
 
 2. Fix missing files or invalid directories reported by the validator.
@@ -18,7 +18,7 @@ python3 {baseDir}/scripts/project_manager.py validate <project_path>
 3. Run the mandatory post-processing step when you need a self-contained preview:
 
 ```bash
-python3 {baseDir}/scripts/finalize_svg.py <project_path>
+python3 scripts/finalize_svg.py <project_path>
 python3 -m http.server --directory <project_path>/svg_final 8000
 ```
 
@@ -34,7 +34,7 @@ Check `total.md`:
 Then rerun:
 
 ```bash
-python3 {baseDir}/scripts/total_md_split.py <project_path>
+python3 scripts/total_md_split.py <project_path>
 ```
 
 ## PPT Export Quality Issues
@@ -42,9 +42,9 @@ python3 {baseDir}/scripts/total_md_split.py <project_path>
 Preferred sequence:
 
 ```bash
-python3 {baseDir}/scripts/total_md_split.py <project_path>
-python3 {baseDir}/scripts/finalize_svg.py <project_path>
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path>
+python3 scripts/total_md_split.py <project_path>
+python3 scripts/finalize_svg.py <project_path>
+python3 scripts/svg_to_pptx.py <project_path>
 ```
 
 Keep all three steps even though they have different consumers: Step 7.2 creates the mandatory `svg_final/` visual preview, while the supported native PPTX exporter reads `svg_output/` directly. Do not pass `-s final` for a release export; that override is diagnostic-only.
@@ -59,9 +59,8 @@ PowerPoint's manual Convert-to-Shape behavior is unsupported. `svg_final/` is su
 2. Export with the project-relative audio directory:
 
 ```bash
-python3 {baseDir}/scripts/audio_manifest.py prepare <absolute-project>
-python3 {baseDir}/scripts/audio_manifest.py pending <absolute-project>/audio/audio_tasks.json
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio
+python3 scripts/notes_to_audio.py <project_path> --voice zh-CN-XiaoxiaoNeural
+python3 scripts/svg_to_pptx.py <project_path> --recorded-narration audio
 ```
 
 `--recorded-narration` prepares PowerPoint recorded timings and narrations. If it fails, check:
@@ -73,9 +72,16 @@ Use `--narration-audio-dir audio` only when you intentionally want lower-level, 
 
 ## Dependency Checklist
 
-Do not maintain a package list in this document. The component
-`requirements.txt` is the dependency source of truth. Use the Python
-environment and dependency mechanism already owned by the calling runtime.
-PPT Master must not create or select a virtual environment, install packages,
-or change interpreters as part of a presentation task. If a dependency is
-missing, report its name and the blocked command or stage.
+Most tools use the standard library. Install extra dependencies only when needed:
+
+```bash
+pip install -r requirements.txt
+```
+
+Important optional packages:
+- `python-pptx` for PPTX export
+- `edge-tts` for `notes_to_audio.py` recorded narration audio
+- `Pillow` for image utilities
+- `numpy` for watermark removal
+- `PyMuPDF` for PDF conversion
+- `google-genai` for Gemini image generation

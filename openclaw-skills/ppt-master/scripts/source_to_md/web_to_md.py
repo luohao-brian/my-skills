@@ -10,7 +10,7 @@ Usage:
     python scripts/source_to_md/web_to_md.py <url> -o output.md
 
 Dependencies:
-    Requires requests and beautifulsoup4 in the caller-selected Python environment.
+    pip install requests beautifulsoup4
 
 TLS fingerprint handling:
     Some sites (e.g., WeChat mp.weixin.qq.com) block Python's default 'requests'
@@ -19,8 +19,8 @@ TLS fingerprint handling:
     'curl_cffi' is unavailable, it silently falls back to plain 'requests' — so
     non-blocking sites still work without the extra dependency.
 
-    Optional capability for WeChat / Chinese-portal coverage:
-        Provide curl_cffi through the calling runtime.
+    Install for WeChat / Chinese-portal coverage:
+        pip install curl_cffi
 
     If curl_cffi is unavailable on your platform, the Node.js counterpart
     (scripts/source_to_md/web_to_md.cjs) remains available as a fallback.
@@ -55,7 +55,7 @@ try:
     from bs4 import BeautifulSoup, NavigableString, Tag
 except ImportError:
     print("Error: This script requires 'requests' and 'beautifulsoup4'.")
-    print("Provide requests and beautifulsoup4 through the calling runtime")
+    print("Please run: pip install requests beautifulsoup4")
     sys.exit(1)
 
 # Prefer curl_cffi for TLS-fingerprint impersonation (bypasses JA3 blocking on
@@ -179,7 +179,7 @@ try:
 except ImportError:
     PILLOW_AVAILABLE = False
     print("[WARN] Pillow not installed. WebP images will not be converted to PNG.")
-    print("       Provide Pillow through the calling runtime")
+    print("       Run: pip install Pillow")
 
 # ============ Config ============
 CONFIG = {

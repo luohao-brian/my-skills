@@ -60,7 +60,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from console_encoding import configure_utf8_stdio  # noqa: E402
 from config import load_prefixed_env_file  # noqa: E402
-from image_download import download_image  # noqa: E402
+from image_backends.backend_common import download_image  # noqa: E402
 from image_sources.provider_common import (  # noqa: E402
     AssetCandidate,
     ImageSearchRequest,
@@ -339,7 +339,7 @@ def _validate_downloaded_quality(
     except ImportError as exc:
         raise RuntimeError(
             "Pillow is required to validate downloaded image dimensions. "
-            "Provide it through the caller-selected Python environment"
+            "Install it with: pip install Pillow"
         ) from exc
     try:
         with Image.open(path) as im:

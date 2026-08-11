@@ -18,7 +18,6 @@ from xml.etree import ElementTree as ET
 _SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
-
 from console_encoding import configure_utf8_stdio  # noqa: E402
 from language_tags import (  # noqa: E402
     LanguageTagError,
@@ -628,7 +627,7 @@ def _print_structure_contract_error(
         print(
             "  A legacy lock without pptx_structure.mode defaults only to flat. "
             "Mirror/layout reuse must first create a current template workspace "
-            "through skills/ppt-master/workflows/create-template.md, then generate "
+            "through {baseDir}/workflows/create-template.md, then generate "
             "new structured SVG pages.",
             file=sys.stderr,
         )
@@ -643,7 +642,7 @@ def _print_structure_contract_error(
         "  A legacy lock with no pptx_structure.mode defaults to flat. "
         "Explicit legacy or unknown values are not inferred. Mirror/layout reuse "
         "must first create a current template workspace "
-        "through skills/ppt-master/workflows/create-template.md, then generate "
+        "through {baseDir}/workflows/create-template.md, then generate "
         "new structured SVG pages.",
         file=sys.stderr,
     )
@@ -1282,8 +1281,8 @@ Recorded narration:
         )
         return 1
 
-    # Native DrawingML is the only PPTX product. ``-s`` remains an explicit
-    # diagnostic source override; standard export always reads svg_output/.
+    # Native DrawingML is the only PPTX product. A non-output ``-s`` remains a
+    # diagnostic source override; default and explicit output use release rules.
     native_source = args.source or 'output'
     native_files, native_source_dir = find_svg_files(
         project_path,
@@ -1309,19 +1308,27 @@ Recorded narration:
             print("Error: No SVG files found", file=sys.stderr)
         return 1
 
-    if args.quick_generate:
+    release_quality_gate = args.quick_generate or args.source in {None, 'output'}
+    if release_quality_gate:
         source_fingerprint = _svg_source_fingerprint(native_files)
         quality = _quality_report_context(project_path, source_fingerprint)
         quality_gate, _ = _quality_gate_status(quality)
         if quality_gate != 'passed':
-            print(
-                "Error: --quick-generate requires a passing final SVG quality "
-                f"report for the current svg_output/; found {quality_gate}.",
-                file=sys.stderr,
+            export_mode = (
+                '--quick-generate'
+                if args.quick_generate
+                else 'default release export'
             )
             print(
-                "Run: python3 skills/ppt-master/scripts/svg_quality_checker.py "
-                f'"{project_path}" --quick-generate --stage final --json',
+                f"Error: {export_mode} requires a passing final SVG quality "
+                f"report for the current {native_source_dir}/; found "
+                f"{quality_gate}.",
+                file=sys.stderr,
+            )
+            quick_flag = ' --quick-generate' if args.quick_generate else ''
+            print(
+                "Run: python3 {baseDir}/scripts/svg_quality_checker.py "
+                f'"{project_path}"{quick_flag} --stage final --json',
                 file=sys.stderr,
             )
             return 1

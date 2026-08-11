@@ -289,9 +289,10 @@ def main() -> int:
         from playwright.sync_api import sync_playwright  # noqa: F401
     except ImportError:
         _safe_print(
-            'playwright is unavailable in the caller-selected Python environment; '
-            'provide a compatible browser renderer through the calling runtime '
-            'or skip this optional visual-review stage'
+            'playwright not installed. Install with:\n'
+            '    pip install playwright\n'
+            '    python3 -m playwright install chromium\n'
+            '(see {baseDir}/requirements.txt)'
         )
         return 3
 
@@ -302,7 +303,7 @@ def main() -> int:
         _safe_print(str(e))
         _safe_print(
             'start it with:\n'
-            f'    python3 skills/ppt-master/scripts/svg_editor/server.py {project_path}'
+            f'    python3 {baseDir}/scripts/svg_editor/server.py {project_path}'
         )
         return 2
 
@@ -321,8 +322,7 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 — browser launch failure
             _safe_print(f'browser session failed: {type(e).__name__}: {e}')
             _safe_print(
-                'provide a compatible browser through the calling runtime or '
-                'skip this optional visual-review stage'
+                'try:  python3 -m playwright install chromium'
             )
             return 3
 

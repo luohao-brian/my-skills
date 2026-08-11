@@ -14,7 +14,7 @@ Create a lightweight editable authoring IR bundle from one PPTX-imported SVG or
 a directory of imported SVGs:
 
 ```bash
-python3 {baseDir}/scripts/svg_authoring_view.py <svg-file-or-directory> -o <output-dir> \
+python3 scripts/svg_authoring_view.py <svg-file-or-directory> -o <output-dir> \
   --projection-kind layered
 ```
 
@@ -52,7 +52,7 @@ Regenerate the summary after direct edits that do not pass through one of the
 in-place normalization tools:
 
 ```bash
-python3 {baseDir}/scripts/svg_authoring_view.py <authoring-dir> --refresh-summary
+python3 scripts/svg_authoring_view.py <authoring-dir> --refresh-summary
 ```
 
 This projection is separate from canonical preset authoring. New project SVGs
@@ -72,7 +72,8 @@ authoring guidance in
 Run this manual smoke from the repository root after changing
 `shape_boolean_svg.py`, preset geometry, path conversion, or custom-geometry
 import/export. It uses only a gitignored `projects/_smoke_*` workspace and the
-upstream inline-smoke convention; do not turn it into a test file or example deck.
+inline-smoke convention from [`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v4.5.0/docs/rules/code-style.md)
+§11; do not turn it into a test file or example deck.
 
 ```bash
 python3 - <<'PY'
@@ -311,8 +312,8 @@ Compact safe model-facing page-space coordinates without rewriting unrelated
 SVG formatting:
 
 ```bash
-python3 {baseDir}/scripts/compact_svg_coordinates.py <svg-file-or-directory>
-python3 {baseDir}/scripts/compact_svg_coordinates.py <template-directory> \
+python3 scripts/compact_svg_coordinates.py <svg-file-or-directory>
+python3 scripts/compact_svg_coordinates.py <template-directory> \
   --inplace --keep-native-frames
 ```
 
@@ -337,10 +338,10 @@ Factor large vector subtrees out of lightweight authoring IR documents and
 replace them with compact `<use data-icon>` references:
 
 ```bash
-python3 {baseDir}/scripts/extract_svg_assets.py <layered_svg_dir> \
+python3 scripts/extract_svg_assets.py <layered_svg_dir> \
   --icons-dir <icons_dir> --icon-namespace imported \
   --inplace --id-prefix layered
-python3 {baseDir}/scripts/extract_svg_assets.py <flat_svg_dir> \
+python3 scripts/extract_svg_assets.py <flat_svg_dir> \
   --icons-dir <icons_dir> --icon-namespace imported \
   --reuse-inventory <layered_inventory.json> \
   --inplace --id-prefix flat
@@ -366,7 +367,7 @@ Compile one Type A PPTX import workspace into a deterministic structured mirror
 template after the layered authoring IR has been reviewed and edited:
 
 ```bash
-python3 {baseDir}/scripts/mirror_template_materialize.py \
+python3 scripts/mirror_template_materialize.py \
   <import_workspace> <empty_template_workspace>
 ```
 
@@ -435,7 +436,7 @@ replaces the source group at the same parent index with one `<image>`. Native
 export therefore emits one `p:pic` backed by SVG media.
 
 ```bash
-python3 {baseDir}/scripts/extract_svg_pictures.py \
+python3 scripts/extract_svg_pictures.py \
   "<workspace>/authoring-svg/<layered_svg_file>.svg" \
   --select "<group_id>" \
   --resource-root "<workspace>" \
@@ -484,23 +485,23 @@ starting the next command.
 When the effective Speaker Notes outcome in `design_spec.md §I` is enabled, run:
 
 ```bash
-python3 {baseDir}/scripts/total_md_split.py <project_path>
+python3 scripts/total_md_split.py <project_path>
 ```
 
 After `total_md_split.py` exits successfully, run:
 
 ```bash
-python3 {baseDir}/scripts/finalize_svg.py <project_path>
+python3 scripts/finalize_svg.py <project_path>
 ```
 
 After `finalize_svg.py` exits successfully, run:
 
 ```bash
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path>
+python3 scripts/svg_to_pptx.py <project_path>
 ```
 
 When Speaker Notes is disabled, skip `total_md_split.py` and use
-`python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-notes` for the final
+`python3 scripts/svg_to_pptx.py <project_path> --no-notes` for the final
 command. This prevents stale files under `notes/` from being embedded.
 
 Do not start another post-processing command while the current command is still
@@ -524,27 +525,27 @@ It aggregates:
 Convert project SVGs into PPTX.
 
 ```bash
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path>
+python3 scripts/svg_to_pptx.py <project_path>
 # Explicit compact image export:
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --image-sizing display --image-scale 2 --image-quality 85
+python3 scripts/svg_to_pptx.py <project_path> --image-sizing display --image-scale 2 --image-quality 85
 # Force original image bytes:
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-image-optimize
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --native-charts-and-tables
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --pptx-structure structured  # deck/layout template override
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --pptx-structure flat  # free-design/brand-only override
+python3 scripts/svg_to_pptx.py <project_path> --no-image-optimize
+python3 scripts/svg_to_pptx.py <project_path> --native-charts-and-tables
+python3 scripts/svg_to_pptx.py <project_path> --pptx-structure structured  # deck/layout template override
+python3 scripts/svg_to_pptx.py <project_path> --pptx-structure flat  # free-design/brand-only override
 # Template-import visual round-trip diagnostic only:
-python3 {baseDir}/scripts/svg_to_pptx.py <template_import_output> -s svg-flat
+python3 scripts/svg_to_pptx.py <template_import_output> -s svg-flat
 # Post-processed-source comparison diagnostic only (never a release export):
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> -s final
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-notes
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> -t none
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --auto-advance 3
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --animation mixed --animation-duration 0.8
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --reflow-text  # opt-in PowerPoint reflow
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-merge    # one text frame per visual line
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio --animation-config animations.json
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --recorded-narration audio --no-animations
+python3 scripts/svg_to_pptx.py <project_path> -s final
+python3 scripts/svg_to_pptx.py <project_path> --no-notes
+python3 scripts/svg_to_pptx.py <project_path> -t none
+python3 scripts/svg_to_pptx.py <project_path> --auto-advance 3
+python3 scripts/svg_to_pptx.py <project_path> --animation mixed --animation-duration 0.8
+python3 scripts/svg_to_pptx.py <project_path> --reflow-text  # opt-in PowerPoint reflow
+python3 scripts/svg_to_pptx.py <project_path> --no-merge    # one text frame per visual line
+python3 scripts/svg_to_pptx.py <project_path> --recorded-narration audio
+python3 scripts/svg_to_pptx.py <project_path> --recorded-narration audio --animation-config animations.json
+python3 scripts/svg_to_pptx.py <project_path> --recorded-narration audio --no-animations
 ```
 
 Native image export defaults to `--image-sizing cap`: it preserves source bytes
@@ -569,9 +570,9 @@ After the complete SVG roster exists, run its lockless final checker, then
 export:
 
 ```bash
-python3 {baseDir}/scripts/svg_quality_checker.py <project_path> \
+python3 scripts/svg_quality_checker.py <project_path> \
   --quick-generate --stage final --json
-python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate
+python3 scripts/svg_to_pptx.py <project_path> --quick-generate
 ```
 
 This direct-export flag takes `svg_output/` as its authored page source, resolves
@@ -623,7 +624,7 @@ Behavior:
 - Native mode is strict about unsupported visual SVG elements: if a visual element cannot be represented or safely preserved, export fails with the SVG file, element tag, and position instead of silently dropping content.
 - Omitting `--pptx-structure` reads `spec_lock.md`. Free-design, brand-only, and `template_reuse_scope: style` releases declare `mode: flat`, omit Master/Layout mappings and SVG structure metadata, and materialize one clean project-owned Master plus one Blank Layout from the current lock. Deck/layout templates use `mode: structured` only for `template_reuse_scope: mirror|layout`, with complete unique `pptx_masters` / `pptx_layouts` rosters and one `page_pptx_layouts` assignment per page. A template-backed Layout definition may remain unused by pages and still register in the final package.
 - On structured template routes, every page root repeats Master/Layout keys and picker names. Master/Layout fixed visuals are direct semantic atoms. Ordinary layer `<g>` elements are invalid; one validated compact authored-preset `<g>` emitted by `preset_shape_svg.py` is the sole group exception because it compiles to one native shape.
-- Every visible direct root `<g>` requires root-coordinate `data-pptx-bounds`; nested bounds are ignored. Frame/native metadata never replaces it; placeholder bounds also define the slot frame. Checker compares root bounds with `viewBox` and only descendant text with that module. Images, shapes, paths, `<use>`, effects, and object frames are excluded. Per side: ≤`1px` ignored, ≤`5%` warns, >`5%` fails. Bounds never clip/reflow.
+- Every visible direct root `<g>` requires root-coordinate `data-pptx-bounds`; nested bounds are ignored. Frame/native metadata never replaces it; placeholder bounds also define the slot frame. Checker compares root bounds with `viewBox`, descendant text with its module using DrawingML wrapping headroom, and every estimable visible text carrier directly with the root `viewBox` before that headroom. Images, shapes, paths, `<use>`, effects, and object frames are excluded from module containment. Per side, ≤`1px` is ignored; module overflow ≤`5%` warns and >`5%` fails, while larger page text overflow always fails. Bounds never clip/reflow; unestimable visible text warns. A wholly off-canvas direct-root Morph endpoint may opt out of page containment with `data-pptx-morph-staging="true"`; it still needs valid module bounds, retained Morph uses an explicit pair, and partial overflow remains blocking.
 - Missing root bounds fails on final pages/templates and under `--template-mode`; references warn until adapted.
 - On structured template routes, each normal slot is a direct root `<g id>` with semantic type, positive design-zone bounds, and exactly one compatible carrier. Composite `object` slots use explicit proxy binding; zero-slot Layouts are valid. Flat pages keep all SVG objects Slide-local.
 - Flat export maps locked typography/colors into a clean project-owned theme/Master, removes stock content placeholders and unused built-in Layouts, retains only the standard date/footer/slide-number capability hooks, and keeps one Blank Layout without promoting Slide content. Structured export additionally creates one reusable Layout per declared key and reopens the package to verify the full Presentation → Master → Layout → Slide graph, fixed-object order, placeholder identities/bounds, carrier bindings, hidden proxies, and zero-slot Layouts.
@@ -633,6 +634,7 @@ Behavior:
 - `[Content_Types].xml` is generated from the actual media extensions written into the PPTX. Unknown media extensions fail unless Python's `mimetypes` can identify them.
 - Native export writes to a temporary file first and publishes the requested PPTX only after conversion succeeds. A failed conversion does not replace the main output file.
 - `--conversion-trace` without a path writes `validation/<output_stem>.trace.json`. `--conversion-trace <path>` respects the explicit destination; relative paths are resolved from the project root, so `exports/<name>.trace.json` remains available when intentionally requested.
+- Formal default and `--quick-generate` release export compute the exact SVG source fingerprint and refuse a missing, unreadable, unsupported, non-final, blocking, stale, or unverifiable final quality report before PPTX creation. A project without `validation/svg_quality_report.json` exits nonzero with the `not-provided` gate status; run the final checker against its current `svg_output/` first. An explicit non-`output` `--source` remains a diagnostic override and bypasses this release gate; postflight still records any verifiable report linkage.
 - After publication, native export writes `validation/<output_stem>.report.json`. The report distinguishes authored Slides from internal Layout definitions, reruns ZIP integrity and published Slide-count checks, records slide/layout/master/notes part counts, labels relationship/structured/transition/animation validation as enforced at build time, links the final SVG quality report only when its SHA-256 source fingerprint matches the exact export inputs, and surfaces stale/unverified gates, unresolved template tokens, generic-only font stacks, and external image references. A matching final quality report with introduced warnings yields `passed-with-warnings` and a `quality_introduced_warnings=<N>` receipt instead of a clean `passed` claim.
 - By default, a successful command also prints a compact receipt instead of requiring a report read: `[POSTFLIGHT] status=<...> quality_gate=<...> slides=<N> warning_categories=<N>`, followed by one compact line per warning category and the `[PPTX]` / `[REPORT]` paths. Resource-warning lines carry counts; a non-passing quality gate carries its status. Routine agents use this receipt and do not load either complete validation JSON into model context. Full reports remain cold audit artifacts; failure investigation and explicit audits extract only the required fields. `--quiet` keeps suppressing successful-run output.
 - Before publishing structured template output, export reopens the temporary PPTX and validates the Slide → Layout → Master graph and registrations, Layout identity, placeholder identity, reusable bounds, and prompt/level-one sizes. A mismatch aborts publication. Flat release instead validates its single referenced Master/Layout shell and exact date/footer/slide-number hook roster before packaging.
@@ -642,7 +644,7 @@ Behavior:
   Both map to native picture crop/geometry when possible.
 - The default Generate flow embeds speaker notes automatically unless `--no-notes` is used; Quick Generate defaults them off and enables them with `--with-notes`
 - Recorded narration is opt-in:
-  - the runtime-neutral `audio_manifest.py` exposes one TTS task per slide; the host runtime generates files into `audio/`
+  - `notes_to_audio.py` uses `edge-tts` by default, or a configured cloud TTS provider (`elevenlabs`, `minimax`, `qwen`, `cosyvoice`), and generates one audio file per slide into `audio/`
   - Narration text is read strictly from the matching `notes/*.md` file; the script only skips Markdown heading lines (`# ...`) and does not summarize, rewrite, or filter delivery notes
   - `--recorded-narration audio` prepares PowerPoint's "recorded timings and narrations": every slide must have matching `m4a` / `mp3` / `wav` audio, `ffprobe` must read every duration, and `--animation-trigger on-click` is rejected
   - `--recorded-narration audio` keeps speaker notes, embeds each matching audio file, and writes slide auto-advance timings from audio duration
@@ -653,8 +655,8 @@ Behavior:
   - `--narration-audio-dir audio` is the lower-level embedding path: it embeds whatever files match and allows partial audio coverage
   - Either narration flag names the default-flow export `<project_name>_<timestamp>_narrated.pptx`, telling it apart from silent exports in the same directory
   - This is intended for direct PowerPoint video export with "Use recorded timings and narrations"
-  - Long-audio import and automatic long-audio splitting are not supported; keep narration assets page-level and each request within 4000 characters
-  - provider/model/voice selection belongs to the host runtime; PPT Master passes only text and an absolute workspace output path
+  - Long-audio import and automatic long-audio splitting are not supported; keep narration assets page-level
+  - Voice choices can be listed with `python3 scripts/notes_to_audio.py --list-common-voices`, `python3 scripts/notes_to_audio.py --list-voices --locale zh-CN`, or provider-specific `--provider <name> --list-voices`
 - Page transitions are controlled by `-t/--transition`; per-element object animations are controlled by `-a/--animation`
 - Per-element animation applies to ordinary top-level SVG `<g id="...">` groups; each group is a PowerPoint shape-target anchor, not necessarily one Animation Pane row. Use one group per logical Slide-local content unit rather than targeting a group count. Master/Layout atoms and slot groups are structural and excluded; exact id tokens remain a fallback only when explicit structural roles are absent
 - An explicit `animations.json` group entry may override the marker-free legacy chrome-name heuristic. It cannot override `data-pptx-layer` or an explicit static role/placeholder marker
@@ -679,16 +681,20 @@ Behavior:
 - The animation writer does not emit paragraph/text-range builds (`p:bldP`), custom freeform motion paths, native Chart/SmartArt build sequences, or media playback commands for grouped SVG content. Direct-PPTX routes preserve source object animation and perform structural package validation only; they do not author effects
 - The full registry, OOXML rules, and compatibility boundary are documented in [`pptx-animations.md`](./pptx-animations.md)
 
-Required capability: `python-pptx` in the caller-selected Python environment.
+Dependency:
+
+```bash
+pip install python-pptx
+```
 
 ## `total_md_split.py`
 
 Split `total.md` into per-slide note files.
 
 ```bash
-python3 {baseDir}/scripts/total_md_split.py <project_path>
-python3 {baseDir}/scripts/total_md_split.py <project_path> -o <output_directory>
-python3 {baseDir}/scripts/total_md_split.py <project_path> -q
+python3 scripts/total_md_split.py <project_path>
+python3 scripts/total_md_split.py <project_path> -o <output_directory>
+python3 scripts/total_md_split.py <project_path> -q
 ```
 
 Requirements:
@@ -701,15 +707,15 @@ Requirements:
 Validate SVG technical compliance.
 
 ```bash
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project/svg_output/01_cover.svg
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project/svg_output
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project --stage first-page
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project --stage final --json
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project --format ppt169
-python3 {baseDir}/scripts/svg_quality_checker.py --all examples
-python3 {baseDir}/scripts/svg_quality_checker.py examples/project --export
-python3 {baseDir}/scripts/svg_quality_checker.py path/to/template/templates --template-mode
+python3 scripts/svg_quality_checker.py examples/project/svg_output/01_cover.svg
+python3 scripts/svg_quality_checker.py examples/project/svg_output
+python3 scripts/svg_quality_checker.py examples/project
+python3 scripts/svg_quality_checker.py examples/project --stage first-page
+python3 scripts/svg_quality_checker.py examples/project --stage final --json
+python3 scripts/svg_quality_checker.py examples/project --format ppt169
+python3 scripts/svg_quality_checker.py --all examples
+python3 scripts/svg_quality_checker.py examples/project --export
+python3 scripts/svg_quality_checker.py path/to/template/templates --template-mode
 ```
 
 Checks include:
@@ -751,10 +757,10 @@ Use this after `svg_quality_checker.py` passes, and only for chart types support
 ### Calculate expected coordinates
 
 ```bash
-python3 {baseDir}/scripts/svg_position_calculator.py calc bar --data "A:185,B:142" --area "130,155,1200,480" --bar-width 120
-python3 {baseDir}/scripts/svg_position_calculator.py calc line --data "0:50,10:80,20:120" --area "120,120,1200,600" --y-range "0,150"
-python3 {baseDir}/scripts/svg_position_calculator.py calc pie --data "A:35,B:25,C:20" --center "420,400" --radius 200
-python3 {baseDir}/scripts/svg_position_calculator.py calc grid --rows 2 --cols 3 --area "50,150,1230,670"
+python3 scripts/svg_position_calculator.py calc bar --data "A:185,B:142" --area "130,155,1200,480" --bar-width 120
+python3 scripts/svg_position_calculator.py calc line --data "0:50,10:80,20:120" --area "120,120,1200,600" --y-range "0,150"
+python3 scripts/svg_position_calculator.py calc pie --data "A:35,B:25,C:20" --center "420,400" --radius 200
+python3 scripts/svg_position_calculator.py calc grid --rows 2 --cols 3 --area "50,150,1230,670"
 ```
 
 For an area chart, use the line output as the top boundary:
@@ -768,7 +774,7 @@ Manually compare the calculator output with the coordinates already present in t
 ### Analyze (inspect existing SVG)
 
 ```bash
-python3 {baseDir}/scripts/svg_position_calculator.py analyze <svg_file>
+python3 scripts/svg_position_calculator.py analyze <svg_file>
 ```
 
 Use this after SVG generation to inspect existing SVG geometry when manual comparison needs more context.
@@ -778,29 +784,29 @@ Use this after SVG generation to inspect existing SVG geometry when manual compa
 ### `flatten_tspan.py`
 
 ```bash
-python3 {baseDir}/scripts/svg_finalize/flatten_tspan.py examples/<project>/svg_output
-python3 {baseDir}/scripts/svg_finalize/flatten_tspan.py path/to/input.svg path/to/output.svg
+python3 scripts/svg_finalize/flatten_tspan.py examples/<project>/svg_output
+python3 scripts/svg_finalize/flatten_tspan.py path/to/input.svg path/to/output.svg
 ```
 
 ### `align_embed_images.py`
 
 ```bash
-python3 {baseDir}/scripts/svg_finalize/align_embed_images.py path/to/slide.svg
-python3 {baseDir}/scripts/svg_finalize/align_embed_images.py --dry-run path/to/slide.svg
+python3 scripts/svg_finalize/align_embed_images.py path/to/slide.svg
+python3 scripts/svg_finalize/align_embed_images.py --dry-run path/to/slide.svg
 ```
 
 Use for rare single-file diagnostics when image `slice` / `meet` alignment and
 Base64 embedding must be inspected outside `finalize_svg.py`. In normal project
-runs, use `python3 {baseDir}/scripts/finalize_svg.py <project_path>`; the old
+runs, use `python3 scripts/finalize_svg.py <project_path>`; the old
 `crop-images`, `fix-aspect`, and `embed-images` names remain accepted only as
 `finalize_svg.py --only` aliases for the merged `align-images` step.
 
 ### `embed_icons.py`
 
 ```bash
-python3 {baseDir}/scripts/svg_finalize/embed_icons.py output.svg
-python3 {baseDir}/scripts/svg_finalize/embed_icons.py svg_output/*.svg
-python3 {baseDir}/scripts/svg_finalize/embed_icons.py --dry-run svg_output/*.svg
+python3 scripts/svg_finalize/embed_icons.py output.svg
+python3 scripts/svg_finalize/embed_icons.py svg_output/*.svg
+python3 scripts/svg_finalize/embed_icons.py --dry-run svg_output/*.svg
 ```
 
 Replaces `<use data-icon="chunk-filled/name" .../>`, `<use data-icon="tabler-filled/name" .../>` and `<use data-icon="tabler-outline/name" .../>` placeholders with actual SVG path elements. Use for manual icon embedding checks outside `finalize_svg.py`.

@@ -4,12 +4,11 @@
 # Most tools use only the Python standard library. Below are optional dependencies.
 # 大部分工具仅使用 Python 标准库，以下为可选依赖。
 #
-# The calling runtime chooses how and where these packages are provided.
-# This file does not require uv, venv, pip, or a fixed interpreter path.
-# 依赖由调用方运行时按自身机制提供；本文件不要求 uv、venv、pip 或固定解释器路径。
+# Install / 安装方式：
+#   pip install -r requirements.txt
 
 # ─────────────────────────────────────────────────────────────
-# SVG to PPTX tool / SVG 转 PPTX 工具 ({baseDir}/scripts/svg_to_pptx.py)
+# SVG to PPTX tool / SVG 转 PPTX 工具 (skills/ppt-master/scripts/svg_to_pptx.py)
 # ─────────────────────────────────────────────────────────────
 # Batch-convert SVG files to PowerPoint presentations.
 # 用于将 SVG 文件批量转换为 PowerPoint 演示文稿
@@ -22,18 +21,20 @@ skia-pathops>=0.9.2
 # OpenType shaping + glyph outlines for text operands / 文字 operand 的排版与轮廓
 uharfbuzz>=0.50.0
 
-# Browser geometry audit / 浏览器几何检查
-playwright>=1.45.0
+# Recorded narration / 录制计时和旁白
+# notes_to_audio.py generates per-slide narration audio on macOS/Linux/Windows.
+# notes_to_audio.py 用于在 macOS/Linux/Windows 上生成逐页旁白音频。
+edge-tts>=7.2.8
 
 # ─────────────────────────────────────────────────────────────
-# PDF to Markdown tool / PDF 转 Markdown 工具 ({baseDir}/scripts/source_to_md/pdf_to_md.py)
+# PDF to Markdown tool / PDF 转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/pdf_to_md.py)
 # ─────────────────────────────────────────────────────────────
 # Converts PDF to Markdown with text, image, and table extraction.
 # 用于将 PDF 文件转换为 Markdown 格式，支持文本、图片、表格提取
 PyMuPDF>=1.23.0
 
 # ─────────────────────────────────────────────────────────────
-# Document to Markdown tool / 文档转 Markdown 工具 ({baseDir}/scripts/source_to_md/doc_to_md.py)
+# Document to Markdown tool / 文档转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/doc_to_md.py)
 # ─────────────────────────────────────────────────────────────
 # Native (pure-Python) paths — no external binary required:
 # 原生路径（纯 Python，无需外部程序）：
@@ -47,7 +48,7 @@ ebooklib>=0.18
 nbconvert>=7.0.0
 
 # ─────────────────────────────────────────────────────────────
-# Excel to Markdown tool / Excel 转 Markdown 工具 ({baseDir}/scripts/source_to_md/excel_to_md.py)
+# Excel to Markdown tool / Excel 转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/excel_to_md.py)
 # ─────────────────────────────────────────────────────────────
 # Converts .xlsx/.xlsm workbooks to Markdown while preserving sheet structure.
 # 用于将 .xlsx/.xlsm 工作簿转换为 Markdown，并保留工作表结构。
@@ -59,7 +60,9 @@ openpyxl>=3.1.0
 # 备用路径 —— 仅在需要处理以下小众格式时才用到
 # (.doc .odt .rtf .tex/.latex .rst .org .typ)。
 # 如果只处理上述四种原生格式，无需安装。
-#   Provide a pandoc executable through the calling runtime when those formats are needed.
+#   macOS:   brew install pandoc
+#   Ubuntu:  sudo apt install pandoc
+#   Windows: https://pandoc.org/installing.html
 
 # ─────────────────────────────────────────────────────────────
 # Image processing tools / 图片处理工具
@@ -72,7 +75,7 @@ Pillow>=9.0.0
 numpy>=1.20.0
 
 # ─────────────────────────────────────────────────────────────
-# Web to Markdown tool / 网页转 Markdown 工具 ({baseDir}/scripts/source_to_md/web_to_md.py)
+# Web to Markdown tool / 网页转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/web_to_md.py)
 # ─────────────────────────────────────────────────────────────
 requests>=2.31.0
 beautifulsoup4>=4.12.0
@@ -85,7 +88,15 @@ beautifulsoup4>=4.12.0
 curl_cffi>=0.7.0
 
 # ─────────────────────────────────────────────────────────────
-# SVG Editor / SVG 编辑器 ({baseDir}/scripts/svg_editor/server.py)
+# AI image generation tool / AI 图片生成工具 (skills/ppt-master/scripts/image_gen.py)
+# ─────────────────────────────────────────────────────────────
+# Gemini backend / Gemini 后端 (IMAGE_BACKEND=gemini)
+google-genai>=1.0.0
+# OpenAI-compatible backend uses requests from the web tooling section above.
+# OpenAI 兼容后端复用上方网页工具所需的 requests。
+
+# ─────────────────────────────────────────────────────────────
+# SVG Editor / SVG 编辑器 (skills/ppt-master/scripts/svg_editor/server.py)
 # ─────────────────────────────────────────────────────────────
 # Localhost web editor for annotating SVG elements with edit instructions.
 # 本地 Web 编辑器，用于在 SVG 元素上添加编辑标注指令

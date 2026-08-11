@@ -30,7 +30,6 @@ import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 from xml.etree import ElementTree as ET
-
 from console_encoding import configure_utf8_stdio
 
 

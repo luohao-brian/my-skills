@@ -4,8 +4,9 @@ Run this manual smoke from the repository root after changing nested image
 crop finalization, native picture export, deterministic Morph pairing, authored
 PowerPoint presets, or their planning contracts. It builds one temporary
 two-slide project under the gitignored `projects/_smoke_*` namespace and follows
-the upstream inline-smoke convention; do not turn it into a test file or public
-example deck.
+the inline-smoke convention from
+[`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v4.5.0/docs/rules/code-style.md) §11; do not turn it into
+a test file or public example deck.
 
 The fixture deliberately closes the full planning and execution chain:
 

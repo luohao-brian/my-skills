@@ -61,8 +61,8 @@ paths or contours, or upgrade ordinary SVG during export.
 Use registry search for a less common literal shape:
 
 ```bash
-python3 {baseDir}/scripts/preset_shape_svg.py list --search arrow
-python3 {baseDir}/scripts/preset_shape_svg.py describe rightArrow
+python3 ${SKILL_DIR}/scripts/preset_shape_svg.py list --search arrow
+python3 ${SKILL_DIR}/scripts/preset_shape_svg.py describe rightArrow
 ```
 
 **Shape-first diagram rule**: use `<line>` for straight thin relationships;
@@ -92,7 +92,7 @@ from the confirmed brief and template `design_spec.md`. Mirror/preserve input
 keeps the source object's paint instead of regenerating this authored form.
 
 ```bash
-python3 {baseDir}/scripts/preset_shape_svg.py render rightArrow \
+python3 ${SKILL_DIR}/scripts/preset_shape_svg.py render rightArrow \
   --id p03-growth-arrow \
   --frame 160 210 320 112 \
   --fill "#2563EB" \
@@ -103,7 +103,7 @@ python3 {baseDir}/scripts/preset_shape_svg.py render rightArrow \
 For a stock bent / curved contour that does not require endpoint attachment:
 
 ```bash
-python3 {baseDir}/scripts/preset_shape_svg.py render bentConnector3 \
+python3 ${SKILL_DIR}/scripts/preset_shape_svg.py render bentConnector3 \
   --id p03-flow-connector \
   --object-kind connector \
   --frame 420 180 220 140 \
@@ -209,7 +209,7 @@ not a prerequisite or tool command; Executor may adopt, adapt, or decline it
 from the actual content and explicit user/template constraints.
 
 ```bash
-python3 {baseDir}/scripts/shape_boolean_svg.py render <svg-file> \
+python3 ${SKILL_DIR}/scripts/shape_boolean_svg.py render <svg-file> \
   --operation subtract \
   --source body \
   --source cutout \

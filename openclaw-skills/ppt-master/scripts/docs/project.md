@@ -11,18 +11,19 @@ Project tools create, validate, and inspect the standard PPT Master workspace.
 Main entry point for project setup and validation.
 
 ```bash
-python3 {baseDir}/scripts/project_manager.py init <project_name> --format ppt169 --dir <absolute-projects-root>
-python3 {baseDir}/scripts/project_manager.py import-sources <project_path> <source1_or_dir> [<source2_or_dir> ...]
-python3 {baseDir}/scripts/project_manager.py scaffold-spec <project_path>  # optional manual helper
-python3 {baseDir}/scripts/project_manager.py scaffold-lock <project_path>  # optional manual helper
-python3 {baseDir}/scripts/project_manager.py validate <project_path>
-python3 {baseDir}/scripts/project_manager.py info <project_path>
-python3 {baseDir}/scripts/project_manager.py page-context <project_path> P07 [--pretty] [--record-usage]
-python3 {baseDir}/scripts/project_manager.py page-context-report <project_path>
+python3 scripts/project_manager.py init <project_name> --format ppt169 --dir <absolute-projects-root>
+python3 scripts/project_manager.py import-sources <project_path> <source1_or_dir> [<source2_or_dir> ...]
+python3 scripts/project_manager.py scaffold-spec <project_path>  # optional manual helper
+python3 scripts/project_manager.py scaffold-lock <project_path>  # optional manual helper
+python3 scripts/project_manager.py validate <project_path>
+python3 scripts/project_manager.py info <project_path>
+python3 scripts/project_manager.py page-context <project_path> P07 [--pretty] [--record-usage]
+python3 scripts/project_manager.py page-context-report <project_path>
 ```
 
 Notes:
-- `init --quick-generate`: only `svg_output/`; no README
+- `init --quick-generate`: `svg_output/` plus
+  `validation/workflow.log`; no README
 - Files outside `projects/` are always copied into `sources/`
 - `--move` applies only to sources under the repository's `projects/` tree
 - A directly supplied supported bitmap is also copied into `images/` with a
@@ -137,14 +138,62 @@ Common formats:
 Examples:
 
 ```bash
-python3 {baseDir}/scripts/project_manager.py init my_presentation --format ppt169 --dir <absolute-projects-root>
-python3 {baseDir}/scripts/project_manager.py scaffold-spec projects/my_presentation_ppt169_20251116  # optional
-python3 {baseDir}/scripts/project_manager.py scaffold-lock projects/my_presentation_ppt169_20251116  # optional
-python3 {baseDir}/scripts/project_manager.py validate projects/my_presentation_ppt169_20251116
-python3 {baseDir}/scripts/project_manager.py info projects/my_presentation_ppt169_20251116
-python3 {baseDir}/scripts/project_manager.py page-context projects/my_presentation_ppt169_20251116 P07 --record-usage
-python3 {baseDir}/scripts/project_manager.py page-context-report projects/my_presentation_ppt169_20251116
+python3 scripts/project_manager.py init my_presentation --format ppt169 --dir <absolute-projects-root>
+python3 scripts/project_manager.py scaffold-spec projects/my_presentation_ppt169_20251116  # optional
+python3 scripts/project_manager.py scaffold-lock projects/my_presentation_ppt169_20251116  # optional
+python3 scripts/project_manager.py validate projects/my_presentation_ppt169_20251116
+python3 scripts/project_manager.py info projects/my_presentation_ppt169_20251116
+python3 scripts/project_manager.py page-context projects/my_presentation_ppt169_20251116 P07 --record-usage
+python3 scripts/project_manager.py page-context-report projects/my_presentation_ppt169_20251116
 ```
+
+## `workflow_transcript.py` and `workflow_log.py`
+
+Project initialization creates `validation/workflow.log` and records its own
+milestone. Run later project-scoped Python tools normally:
+
+```bash
+python3 scripts/<tool>.py <project_path> <args...>
+```
+
+Their shared CLI bootstrap discovers the existing project log from the working
+directory or command arguments. `workflow_transcript.py` records a UTC command
+envelope plus explicit error/failure and receipt/report lines, bounded
+warning/OK/stderr samples, limited summary context, and per-run omission counts;
+no outer launcher or second Python process is used. It leaves full output on
+the original console instead of copying it into the audit log. Commands before
+project initialization are not backfilled. Binary-buffer writes, hidden child
+output, and detached service activity are not recorded; Confirm UI and live
+preview retain detailed output in their component `server.log` files. Their
+shared detached-process launcher disables automatic workflow recording in the
+long-running child while preserving the short foreground launcher's own record.
+
+For a Python helper whose arguments and working directory do not identify the
+active project, set the routing signal on the same command:
+
+```bash
+PPT_MASTER_PROJECT_PATH="<project_path>" python3 scripts/<helper>.py <args...>
+```
+
+This variable selects only the destination transcript; it does not authorize
+the helper to read project artifacts or change its ownership.
+
+Append a manual note only when an important audit detail has no owning command
+output:
+
+```bash
+python3 scripts/workflow_log.py <project_path> "<material audit detail>"
+```
+
+Suitable notes include a material stage handoff or rework reason, a
+user-approved exception, or a manual recovery choice. Do not duplicate
+artifact contents, routine page progress, or private reasoning.
+
+The log is append-only audit evidence. It is not a complete console transcript,
+stage, quality, or artifact authority and is not read during normal generation
+or resume. Inspect it only when the user explicitly requests a run review. An
+automatic recording failure emits a warning but does not change the Python
+tool's result; an explicit manual entry that cannot be written exits non-zero.
 
 ## `project_utils.py`
 
@@ -159,7 +208,7 @@ from project_utils import get_project_info, validate_project_structure
 You can also run it directly for quick checks:
 
 ```bash
-python3 {baseDir}/scripts/project_utils.py <project_path>
+python3 scripts/project_utils.py <project_path>
 ```
 
 ## `batch_validate.py`
@@ -167,10 +216,10 @@ python3 {baseDir}/scripts/project_utils.py <project_path>
 Batch-check project structure and compliance.
 
 ```bash
-python3 {baseDir}/scripts/batch_validate.py examples
-python3 {baseDir}/scripts/batch_validate.py examples projects
-python3 {baseDir}/scripts/batch_validate.py --all
-python3 {baseDir}/scripts/batch_validate.py examples --export
+python3 scripts/batch_validate.py examples
+python3 scripts/batch_validate.py examples projects
+python3 scripts/batch_validate.py --all
+python3 scripts/batch_validate.py examples --export
 ```
 
 Use this for repository-wide health checks before release or cleanup.
@@ -180,8 +229,8 @@ Use this for repository-wide health checks before release or cleanup.
 Rebuild `examples/README.md` automatically.
 
 ```bash
-python3 {baseDir}/scripts/generate_examples_index.py
-python3 {baseDir}/scripts/generate_examples_index.py examples
+python3 scripts/generate_examples_index.py
+python3 scripts/generate_examples_index.py examples
 ```
 
 ## `pptx_template_import.py`
@@ -189,14 +238,14 @@ python3 {baseDir}/scripts/generate_examples_index.py examples
 Unified PPTX preparation entry point for `/create-template`.
 
 ```bash
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx>
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> -o <output_dir>
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --manifest-only
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --skip-manifest
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --embed-images
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --inheritance-mode both
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --inheritance-mode flat
-python3 {baseDir}/scripts/pptx_template_import.py <template.pptx> --inheritance-mode layered
+python3 scripts/pptx_template_import.py <template.pptx>
+python3 scripts/pptx_template_import.py <template.pptx> -o <output_dir>
+python3 scripts/pptx_template_import.py <template.pptx> --manifest-only
+python3 scripts/pptx_template_import.py <template.pptx> --skip-manifest
+python3 scripts/pptx_template_import.py <template.pptx> --embed-images
+python3 scripts/pptx_template_import.py <template.pptx> --inheritance-mode both
+python3 scripts/pptx_template_import.py <template.pptx> --inheritance-mode flat
+python3 scripts/pptx_template_import.py <template.pptx> --inheritance-mode layered
 ```
 
 Notes:
@@ -229,7 +278,7 @@ Implementation note:
 Show standardized fixes for common project errors.
 
 ```bash
-python3 {baseDir}/scripts/error_helper.py
-python3 {baseDir}/scripts/error_helper.py missing_readme
-python3 {baseDir}/scripts/error_helper.py missing_readme project_path=my_project
+python3 scripts/error_helper.py
+python3 scripts/error_helper.py missing_readme
+python3 scripts/error_helper.py missing_readme project_path=my_project
 ```

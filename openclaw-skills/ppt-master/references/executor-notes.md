@@ -15,7 +15,7 @@ create `notes/total.md`.
 
 Write the complete deck to `notes/total.md` in one batch for coherent transitions. Use `# <number>_<page_title>` per page and `---` between pages; only the heading is stripped before TTS.
 
-**Pure spoken narration**: runtime TTS receives the body verbatim. Write prose only; never add Markdown list/bullet markup, stage markers, key-point labels, duration lines, or other metadata. Keep each slide within 4000 characters.
+**Pure spoken narration**: `notes_to_audio.py` reads the body verbatim. Write prose only; never add Markdown list/bullet markup, stage markers, key-point labels, duration lines, or other metadata.
 
 **Length follows content**: size natural sentences to semantic burden. Two to five is typical, not a cap; anchor pages may use less and dense pages more. Honor the active Design Spec or Quick context plus source rules. Duration is pacing guidance only: never pad, repeat, compress, or omit meaning to hit it.
 

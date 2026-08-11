@@ -296,8 +296,8 @@ def _load_pathops() -> Any:
         import pathops
     except ImportError as exc:
         raise RuntimeError(
-            "Shape Boolean operations require skia-pathops in the "
-            "caller-selected Python environment (see requirements.txt)"
+            "Shape Boolean operations require skia-pathops. Install the "
+            "project requirements, or run: pip install skia-pathops"
         ) from exc
     required = (
         "FillType",

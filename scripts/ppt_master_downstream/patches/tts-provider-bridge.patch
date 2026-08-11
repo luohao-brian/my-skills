@@ -1,0 +1,171 @@
+diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
+--- a/scripts/notes_to_audio.py
++++ b/scripts/notes_to_audio.py
+@@ -14,6 +14,8 @@
+     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
+     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
+     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
++    python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider ark-api
++    python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider ark-agent-plan
+     python3 {baseDir}/scripts/notes_to_audio.py --list-common-voices
+     python3 {baseDir}/scripts/notes_to_audio.py --list-voices --locale zh-CN
+
+@@ -23,6 +25,8 @@
+     MINIMAX_API_KEY=<key> for --provider minimax
+     QWEN_API_KEY or DASHSCOPE_API_KEY=<key> for --provider qwen
+     COSYVOICE_API_KEY or DASHSCOPE_API_KEY=<key> for --provider cosyvoice
++    ARK_TTS_API_KEY=<Doubao Speech X-Api-Key> for --provider ark-api
++    ARK_AGENT_PLAN_API_KEY=<key> for --provider ark-agent-plan
+ """
+
+ from __future__ import annotations
+@@ -47,6 +51,7 @@
+     backend_elevenlabs,
+     backend_minimax,
+     backend_qwen,
++    backend_volcengine,
+ )
+ from tts_backends.backend_common import temporary_path
+
+@@ -62,6 +67,8 @@
+     extension: str
+     api_key: str = ""
+     voice_id: str = ""
++    base_url: str = ""
++    model: str = ""
+
+
+ @dataclass(frozen=True)
+@@ -85,6 +92,9 @@
+         "QWEN_",
+         "DASHSCOPE_",
+         "COSYVOICE_",
++        "TTS_",
++        "ARK_TTS_",
++        "ARK_AGENT_PLAN_",
+     ))
+
+
+@@ -259,6 +269,10 @@
+             "optimize_instructions": args.qwen_optimize_instructions,
+             "custom_instructions": True if args.qwen_instructions else None,
+         }
++    if backend.provider in backend_volcengine.SUPPORTED_PROFILES:
++        return backend.model, {
++            "sample_rate": args.volcengine_sample_rate,
++        }
+     return args.cosyvoice_model, {
+         "volume": args.cosyvoice_volume,
+         "rate": args.cosyvoice_rate,
+@@ -364,6 +378,8 @@
+ def main() -> int:
+     _load_tts_env_file()
+
++    default_provider = backend_volcengine.configured_profile("edge") or "edge"
++
+     parser = argparse.ArgumentParser(
+         description=__doc__,
+         formatter_class=argparse.RawDescriptionHelpFormatter,
+@@ -372,9 +388,19 @@
+     parser.add_argument("-o", "--output", type=Path, default=None)
+     parser.add_argument(
+         "--provider",
+-        choices=["edge", "elevenlabs", "minimax", "qwen", "cosyvoice"],
+-        default="edge",
+-        help="audio generation backend (default: edge)",
++        choices=[
++            "edge",
++            "elevenlabs",
++            "minimax",
++            "qwen",
++            "cosyvoice",
++            *backend_volcengine.SUPPORTED_PROFILES,
++        ],
++        default=default_provider,
++        help=(
++            "audio generation backend (default: TTS_BACKEND/TTS_PROVIDER, "
++            "otherwise edge)"
++        ),
+     )
+     parser.add_argument(
+         "--voice",
+@@ -511,6 +537,13 @@
+             "support them"
+         ),
+     )
++    parser.add_argument(
++        "--volcengine-sample-rate",
++        type=int,
++        default=backend_volcengine.DEFAULT_SAMPLE_RATE,
++        choices=[8000, 16000, 22050, 24000, 32000, 44100, 48000],
++        help="Volcengine Seed-TTS sample rate (default: 24000)",
++    )
+     parser.add_argument("--list-common-voices", action="store_true", help="print a curated voice list and exit")
+     parser.add_argument("--list-voices", action="store_true", help="query provider voices and exit")
+     parser.add_argument("--locale", default=None, help='filter --list-voices by locale, e.g. "zh-CN"')
+@@ -532,6 +565,8 @@
+                 backend_qwen.print_voices()
+             elif args.provider == "cosyvoice":
+                 backend_cosyvoice.print_voices()
++            elif args.provider in backend_volcengine.SUPPORTED_PROFILES:
++                backend_volcengine.print_voices()
+             else:
+                 asyncio.run(backend_edge.print_voices(args.locale))
+         except Exception as exc:
+@@ -543,6 +578,11 @@
+         parser.error("project_path is required unless --list-voices or --list-common-voices is used")
+
+     voice_id = args.voice_id or args.voice
++    if args.provider in backend_volcengine.SUPPORTED_PROFILES and not voice_id:
++        voice_id = (
++            os.environ.get("TTS_VOICE", "").strip()
++            or backend_volcengine.DEFAULT_VOICE
++        )
+
+     if args.provider == "edge" and not args.voice:
+         parser.error(
+@@ -642,6 +682,21 @@
+             api_key=api_key,
+             voice_id=voice_id,
+         )
++    elif args.provider in backend_volcengine.SUPPORTED_PROFILES:
++        try:
++            profile = backend_volcengine.resolve_profile(args.provider)
++            extension = backend_volcengine.output_extension()
++        except Exception as exc:
++            print(f"error: {exc}", file=sys.stderr)
++            return 1
++        backend = AudioBackend(
++            provider=profile.name,
++            extension=extension,
++            api_key=profile.api_key,
++            voice_id=voice_id,
++            base_url=profile.base_url,
++            model=profile.model,
++        )
+     else:
+         backend = AudioBackend(
+             provider=args.provider,
+@@ -804,6 +859,22 @@
+                         base_url=args.cosyvoice_base_url,
+                         subtitle_path=subtitle_path,
+                         subtitle_max_chars=args.subtitle_max_chars,
++                    )
++                elif backend.provider in backend_volcengine.SUPPORTED_PROFILES:
++                    backend_volcengine.generate(
++                        text,
++                        output_path,
++                        profile=backend_volcengine.TtsProfile(
++                            name=backend.provider,
++                            provider=backend_volcengine.TTS_BACKEND_PROFILES[
++                                backend.provider
++                            ]["provider"],
++                            api_key=backend.api_key,
++                            base_url=backend.base_url,
++                            model=backend.model,
++                        ),
++                        voice_id=backend.voice_id,
++                        sample_rate=args.volcengine_sample_rate,
+                     )
+                 _remove_stale_audio_variants(output_path)
+                 if not writes_subtitles:

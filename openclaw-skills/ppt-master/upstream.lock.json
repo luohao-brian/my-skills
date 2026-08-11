@@ -1,29 +1,57 @@
 {
-  "schema_version": 1,
-  "repository": "https://github.com/hugohe3/ppt-master.git",
-  "subtree": "skills/ppt-master",
-  "base_commit": "6b42a6a652f9d6e9fc0c81e634c9fdfe771eee10",
-  "reviewed_through": "8858c4960b870f12baf952994fbd0c76ab5ba4ec",
-  "excluded_commits": [
-    {
-      "commit": "82ec87edb3c3109f716aea55f87ddaf4a5131dcf",
-      "reason": "The independent attribution/runtime identity guard conflicts with the OpenClaw package metadata and runtime adapter contract."
-    },
-    {
-      "commit": "3d1f26448576be29104cf69e28c950afcbbe400c",
-      "reason": "This documentation preflight requires the excluded independent identity guard."
-    },
-    {
-      "commit": "8858c4960b870f12baf952994fbd0c76ab5ba4ec",
-      "reason": "This extends the excluded independent identity guard into shared runtime bootstrap code."
-    }
+  "schema_version": 2,
+  "upstream": {
+    "repository": "https://github.com/hugohe3/ppt-master.git",
+    "subtree": "skills/ppt-master",
+    "release": "v4.5.0",
+    "commit": "ec824aecd551a0bc2990b617a131d907a5d808ea"
+  },
+  "packaging_transforms": [
+    "openclaw_frontmatter",
+    "runtime_contract_load_order",
+    "disable_runtime_identity_guard",
+    "portable_base_dir_paths",
+    "portable_project_init",
+    "readme_to_progressive_index",
+    "external_upstream_links",
+    "text_whitespace_normalization"
   ],
-  "required_local_contracts": [
-    "OpenClaw metadata and {baseDir} command paths",
-    "absolute caller-selected project roots",
-    "provider-neutral image and TTS manifests",
-    "SVG and exported-PPTX layout audits",
-    "target-host font preflight and explicit SVG-to-PowerPoint typeface parity",
-    "role-aware body readability regression gate"
+  "additive_overlays": [
+    ".env.example",
+    "references/runtime.md",
+    "references/runtime-directory.md",
+    "references/runtime-fonts.md",
+    "references/runtime-dependencies.md",
+    "references/runtime-media.md",
+    "scripts/audio_duration.py",
+    "scripts/audio_manifest.py",
+    "scripts/downstream_release.py",
+    "scripts/downstream_svg_checker.py",
+    "scripts/font_preflight.py",
+    "scripts/pptx_layout_audit.py",
+    "scripts/visual_layout_audit.py",
+    "scripts/tests/test_downstream_svg_checker.py",
+    "scripts/tests/test_font_preflight.py",
+    "scripts/tests/test_font_resolution.py",
+    "scripts/tests/test_image_provider_bridge.py",
+    "scripts/tts_backends/backend_volcengine.py",
+    "scripts/tests/test_tts_provider_bridge.py",
+    "scripts/tests/test_pptx_layout_audit.py",
+    "scripts/tests/test_runtime_media_manifests.py",
+    "scripts/tests/test_visual_layout_audit.py"
+  ],
+  "core_patches": [
+    "image-provider-bridge.patch",
+    "tts-provider-bridge.patch",
+    "agent-plan-media-only.patch",
+    "directory-cli-required.patch",
+    "target-host-fonts.patch"
+  ],
+  "subsumed_by_upstream": [
+    "formal release export requires a current passing final SVG quality report"
+  ],
+  "unsupported_upstream_features": [
+    "runtime attribution and independent identity guards",
+    "repository-owned project roots"
   ]
 }

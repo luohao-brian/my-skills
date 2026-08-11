@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify portable runtime-path and media boundaries for ppt-master."""
+"""Verify PPT Master's pinned release plus downstream runtime boundaries."""
 
 from __future__ import annotations
 
@@ -11,14 +11,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "openclaw-skills" / "ppt-master"
-FORBIDDEN = (
-    "${SKILL_DIR}",
-    "image_gen.py",
-    "notes_to_audio.py",
-    "IMAGE_BACKEND",
-    "image_backends",
-    "tts_backends",
-)
+DOWNSTREAM = ROOT / "scripts" / "ppt_master_downstream"
+MANIFEST = DOWNSTREAM / "manifest.json"
+LOCK = SKILL / "upstream.lock.json"
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 FULL_GIT_SHA = re.compile(r"[0-9a-f]{40}")
 
@@ -76,73 +71,125 @@ def shell_blocks(text: str) -> list[tuple[int, str]]:
     return blocks
 
 
-def verify_upstream_lock(errors: list[str]) -> None:
-    path = SKILL / "upstream.lock.json"
+def load_json(path: Path, errors: list[str]) -> dict[str, object]:
     try:
-        lock = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        errors.append(f"{path.relative_to(ROOT)}: cannot read upstream lock: {exc}")
+        errors.append(f"{path.relative_to(ROOT)}: cannot read JSON: {exc}")
+        return {}
+    if not isinstance(payload, dict):
+        errors.append(f"{path.relative_to(ROOT)}: top level must be an object")
+        return {}
+    return payload
+
+
+def verify_manifest(errors: list[str]) -> None:
+    manifest = load_json(MANIFEST, errors)
+    lock = load_json(LOCK, errors)
+    if not manifest or not lock:
         return
-
-    if lock.get("repository") != "https://github.com/hugohe3/ppt-master.git":
-        errors.append(f"{path.relative_to(ROOT)}: unexpected upstream repository")
-    if lock.get("subtree") != "skills/ppt-master":
-        errors.append(f"{path.relative_to(ROOT)}: unexpected upstream subtree")
-    for field in ("base_commit", "reviewed_through"):
-        value = lock.get(field)
-        if not isinstance(value, str) or not FULL_GIT_SHA.fullmatch(value):
-            errors.append(f"{path.relative_to(ROOT)}: {field} must be a full Git commit SHA")
-
-    exclusions = lock.get("excluded_commits")
-    if not isinstance(exclusions, list):
-        errors.append(f"{path.relative_to(ROOT)}: excluded_commits must be a list")
+    if manifest.get("schema_version") != 2 or lock.get("schema_version") != 2:
+        errors.append("ppt-master sync manifest and published lock must use schema_version 2")
+    upstream = lock.get("upstream")
+    if not isinstance(upstream, dict):
+        errors.append("openclaw-skills/ppt-master/upstream.lock.json: upstream must be an object")
         return
-    commits: list[str] = []
-    for index, item in enumerate(exclusions):
-        if not isinstance(item, dict):
-            errors.append(f"{path.relative_to(ROOT)}: excluded_commits[{index}] must be an object")
-            continue
-        commit = item.get("commit")
-        reason = item.get("reason")
-        if not isinstance(commit, str) or not FULL_GIT_SHA.fullmatch(commit):
-            errors.append(f"{path.relative_to(ROOT)}: excluded_commits[{index}].commit must be a full Git SHA")
-        else:
-            commits.append(commit)
-        if not isinstance(reason, str) or not reason.strip():
-            errors.append(f"{path.relative_to(ROOT)}: excluded_commits[{index}].reason is required")
-    if len(commits) != len(set(commits)):
-        errors.append(f"{path.relative_to(ROOT)}: excluded commit SHAs must be unique")
+    expected = {
+        "repository": manifest.get("repository"),
+        "subtree": manifest.get("subtree"),
+        "release": manifest.get("release"),
+        "commit": manifest.get("release_commit"),
+    }
+    if upstream != expected:
+        errors.append("published upstream lock does not match the downstream sync manifest")
+    commit = upstream.get("commit")
+    if not isinstance(commit, str) or not FULL_GIT_SHA.fullmatch(commit):
+        errors.append("published upstream commit must be a full Git SHA")
+    for field in (
+        "packaging_transforms",
+        "additive_overlays",
+        "core_patches",
+        "subsumed_by_upstream",
+        "unsupported_upstream_features",
+    ):
+        if lock.get(field) != manifest.get(field, []):
+            errors.append(f"published {field} does not match the sync manifest")
+    overlays = manifest.get("additive_overlays")
+    if isinstance(overlays, list):
+        for raw in overlays:
+            relative = Path(str(raw))
+            source = DOWNSTREAM / "overlay" / relative
+            published = SKILL / relative
+            if not source.is_file():
+                errors.append(f"missing overlay source: {source.relative_to(ROOT)}")
+            elif not published.is_file():
+                errors.append(f"missing published overlay: {published.relative_to(ROOT)}")
+            elif source.read_bytes() != published.read_bytes():
+                errors.append(f"published overlay drifted: {relative.as_posix()}")
+    patches = manifest.get("core_patches")
+    if isinstance(patches, list):
+        for raw in patches:
+            path = DOWNSTREAM / "patches" / str(raw)
+            if not path.is_file():
+                errors.append(f"missing core patch: {path.relative_to(ROOT)}")
 
 
-def main() -> int:
-    errors: list[str] = []
-    verify_upstream_lock(errors)
+def verify_runtime_files(errors: list[str]) -> None:
+    required = (
+        "references/runtime.md",
+        "references/runtime-directory.md",
+        "references/runtime-fonts.md",
+        "references/runtime-dependencies.md",
+        "scripts/downstream_release.py",
+        "scripts/downstream_svg_checker.py",
+    )
+    for relative in required:
+        if not (SKILL / relative).is_file():
+            errors.append(f"openclaw-skills/ppt-master/{relative}: required downstream runtime file is missing")
+    skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    if "[`references/runtime.md`](references/runtime.md)" not in skill_text:
+        errors.append("SKILL.md does not make the downstream runtime contract mandatory")
+    if "metadata: {\"openclaw\":" not in skill_text:
+        errors.append("SKILL.md does not contain single-line OpenClaw metadata")
+    if '\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\"' not in skill_text:
+        errors.append("SKILL.md does not expose the default Agent Plan credential as primaryEnv")
+    if '\"env\":[\"ARK_AGENT_PLAN_API_KEY\"]' not in skill_text:
+        errors.append("SKILL.md does not declare the fixed Agent Plan credential dependency")
+    runtime_text = (SKILL / "references" / "runtime.md").read_text(encoding="utf-8")
+    for name in ("runtime-directory.md", "runtime-fonts.md", "runtime-dependencies.md"):
+        if name not in runtime_text:
+            errors.append(f"runtime.md does not load {name}")
+    if "downstream_release.py" not in runtime_text:
+        errors.append("runtime.md does not route formal export through downstream_release.py")
+    if (SKILL / "scripts" / "attribution_guard.py").exists():
+        errors.append("unsupported upstream attribution_guard.py is present")
+    for path in sorted((SKILL / "scripts").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"^\s*from attribution_guard import", text, re.MULTILINE):
+            errors.append(f"{path.relative_to(ROOT)}: active attribution guard import survived packaging")
+        if re.search(r"^\s*require_skill_integrity\(\)\s*$", text, re.MULTILINE):
+            errors.append(f"{path.relative_to(ROOT)}: active attribution guard call survived packaging")
+    if list(SKILL.rglob("README.md")):
+        errors.append("README.md survived progressive-loading packaging")
+
+
+def verify_markdown(errors: list[str]) -> None:
     markdown_files = sorted(SKILL.rglob("*.md"))
     for path in markdown_files:
         text = path.read_text(encoding="utf-8")
-        for token in FORBIDDEN:
-            for match in re.finditer(re.escape(token), text):
-                report(errors, path, line_number(text, match.start()), f"stale runtime/provider reference: {token}")
         for match in re.finditer(r"(?<!openclaw-)skills/ppt-master", text):
             line_start = text.rfind("\n", 0, match.start()) + 1
             line_end = text.find("\n", match.end())
             line = text[line_start : None if line_end < 0 else line_end]
-            if "禁止假设" not in line:
-                report(errors, path, line_number(text, match.start()), "installation-relative skills/ppt-master path")
-
+            if "https://" in line or path.name == "upstream-source.md":
+                continue
+            report(errors, path, line_number(text, match.start()), "installation-relative skills/ppt-master path")
+        for match in re.finditer(r"/(?:Users|home)/[^/\s]+/", text):
+            report(errors, path, line_number(text, match.start()), "non-portable local absolute path")
         for block_line, block in shell_blocks(text):
             for command in logical_commands(block):
                 if "project_manager.py init" in command and "--dir" not in command:
-                    report(
-                        errors,
-                        path,
-                        block_line,
-                        "project initialization must pass --dir <absolute-projects-root>",
-                    )
-                script_match = re.search(r"\bpython3?\s+([^\s]+/scripts/[^\s]+)", command)
-                if script_match and not script_match.group(1).lstrip("\"'").startswith("{baseDir}/scripts/"):
-                    report(errors, path, block_line, f"script command must use {{baseDir}}: {command}")
-
+                    report(errors, path, block_line, "project initialization must pass --dir")
         for match in MARKDOWN_LINK.finditer(text):
             target = match.group(1).strip().split("#", 1)[0]
             if not target or target.startswith(("http://", "https://", "mailto:", "#", "{")):
@@ -157,22 +204,58 @@ def main() -> int:
                 continue
             if not resolved.exists():
                 report(errors, path, line_number(text, match.start()), f"broken relative link: {target}")
+    if not markdown_files:
+        errors.append("ppt-master has no Markdown files")
 
-    for removed in (
-        "scripts/image_gen.py",
-        "scripts/notes_to_audio.py",
-        "scripts/image_backends",
-        "scripts/tts_backends",
-        "scripts/update_repo.py",
-    ):
-        if (SKILL / removed).exists():
-            errors.append(f"openclaw-skills/ppt-master/{removed}: excluded upstream component is present")
 
+def verify_patch_effects(errors: list[str]) -> None:
+    project_cli = (SKILL / "scripts" / "project_management" / "cli.py").read_text(encoding="utf-8")
+    if not re.search(r'"--dir",\s*\n\s*required=True,', project_cli):
+        errors.append("Directory core patch is not active")
+    font_utils = (SKILL / "scripts" / "svg_to_pptx" / "drawingml" / "utils.py").read_text(encoding="utf-8")
+    if "ea_font = ea_font or win_font" in font_utils:
+        errors.append("target-host font patch is not active")
+    if "return {'latin': ea, 'ea': ea, 'cs': ea}" not in font_utils:
+        errors.append("East Asian run pinning patch is not active")
+    exporter = (SKILL / "scripts" / "svg_to_pptx" / "pptx_package" / "cli.py").read_text(encoding="utf-8")
+    if "release_quality_gate = args.quick_generate or args.source in {None, 'output'}" not in exporter:
+        errors.append("upstream formal release fail-closed gate is missing")
+    image_gen = (SKILL / "scripts" / "image_gen.py").read_text(encoding="utf-8")
+    if 'FIXED_IMAGE_BACKEND = "volcengine"' not in image_gen:
+        errors.append("fixed Agent Plan image backend patch is not active")
+    volcengine = (SKILL / "scripts" / "image_backends" / "backend_volcengine.py").read_text(encoding="utf-8")
+    for marker in ("ARK_AGENT_PLAN_ENDPOINT", "ARK_AGENT_PLAN_API_KEY"):
+        if marker not in volcengine:
+            errors.append(f"Volcengine image profile patch is missing {marker}")
+    for forbidden in ("ARK_API_KEY", "VOLCENGINE_API_KEY", 'os.environ.get("IMAGE_BACKEND"'):
+        if forbidden in volcengine:
+            errors.append(f"fixed Agent Plan image backend still exposes {forbidden}")
+    notes_to_audio = (SKILL / "scripts" / "notes_to_audio.py").read_text(encoding="utf-8")
+    if "backend_volcengine.SUPPORTED_PROFILES" not in notes_to_audio:
+        errors.append("provider TTS bridge core patch is not active")
+    tts_volcengine = (
+        SKILL / "scripts" / "tts_backends" / "backend_volcengine.py"
+    ).read_text(encoding="utf-8")
+    for marker in ("FIXED_PROFILE", "ark-agent-plan", "ARK_AGENT_PLAN_API_KEY"):
+        if marker not in tts_volcengine:
+            errors.append(f"Volcengine TTS profile adapter is missing {marker}")
+    for forbidden in ("ARK_TTS_API_KEY", "ARK_API_KEY", 'os.environ.get("TTS_BACKEND"'):
+        if forbidden in tts_volcengine:
+            errors.append(f"fixed Agent Plan TTS backend still exposes {forbidden}")
+
+
+def main() -> int:
+    errors: list[str] = []
+    verify_manifest(errors)
+    verify_runtime_files(errors)
+    verify_markdown(errors)
+    verify_patch_effects(errors)
     if errors:
         for error in errors:
             print(f"FAIL: {error}", file=sys.stderr)
         return 1
-    print(f"OK: ppt-master runtime contract across {len(markdown_files)} Markdown files")
+    markdown_count = len(list(SKILL.rglob("*.md")))
+    print(f"OK: ppt-master v4.5.0 runtime contract across {markdown_count} Markdown files")
     return 0
 
 

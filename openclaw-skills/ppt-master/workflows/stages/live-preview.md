@@ -29,7 +29,7 @@ description: Main-pipeline editor stage for starting live preview and applying s
 **Precondition**: no preview service running on this project.
 
 ```bash
-python3 {baseDir}/scripts/svg_editor/server.py <project_path> --daemon
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --daemon
 ```
 
 (Plain mode — no `--live`. The `--live` flag is reserved for Step 6's auto-startup.)
@@ -53,7 +53,7 @@ Triggered by the user signals listed in "When to Run".
 
 1. Discover annotations:
    ```bash
-   python3 {baseDir}/scripts/check_annotations.py <project_path>
+   python3 ${SKILL_DIR}/scripts/check_annotations.py <project_path>
    ```
    The output already lists each pending change as `file → element_id → annotation text → content preview`. Use it directly as the to-do list; no need to re-parse SVG attributes yourself.
 2. If the output says no annotations: tell the user, stop.
@@ -92,9 +92,9 @@ Triggered by the user signals listed in "When to Run".
 If the project lives on a remote Linux server, run with `--no-browser`:
 
 ```bash
-python3 {baseDir}/scripts/svg_editor/server.py <project_path> --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --daemon --no-browser
 # or for Step 6's auto-startup on a remote host:
-python3 {baseDir}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
+python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live --daemon --no-browser
 ```
 
 Let `<P>` be the port in launch output or `<project_path>/live_preview/lock.json`:

@@ -13,14 +13,14 @@ Active when at least one resource row has `Acquire Via: ai` / `web` / `slice`. R
 | Mode | Trigger |
 |---|---|
 | Default Generate | `generate-ppt` workflow, `design_spec.md §VIII` image rows present |
-| Quick Generate | [`quick-generate`](../workflows/profiles/quick-generate.md) is active and its transient resource roster contains image rows |
+| Quick Generate | [`quick-generate`](../workflows/profiles/quick-generate.md) is active and the current main agent has resolved one or more required images in active context |
 | Standalone | Direct request against an existing project |
 
 ---
 
 ## 2. Image Resource List Format
 
-Default Generate uses Strategist-owned `design_spec.md §VIII` plus its lock projection. Quick Generate substitutes a transient active-context roster; it creates neither planning artifact. Status enum: [`svg-image-embedding.md`](svg-image-embedding.md).
+Default Generate uses Strategist-owned `design_spec.md §VIII` plus its lock projection. Quick Generate substitutes active-context resource decisions plus required operational manifests; it creates no planning artifact or general resource roster. Status enum: [`svg-image-embedding.md`](svg-image-embedding.md).
 
 | Filename | Dimensions | Purpose / Type | Layout pattern | Crop Policy | Acquire Via | Status | Reference |
 |---|---|---|---|---|---|---|---|
@@ -28,7 +28,7 @@ Default Generate uses Strategist-owned `design_spec.md §VIII` plus its lock pro
 
 **Required per non-skipped row**: `Acquire Via` and `Status`. `Reference` is required for every `web` / `slice` row and every newly authored `ai` row. An existing `ai` row whose `Reference` is omitted or blank may continue only through the declared inference in [`image-generator.md`](./image-generator.md) §8; no other path may infer it.
 
-**Quick Generate ownership**: explicit user assets, URLs, and path instructions win. Otherwise the active execution context chooses required `user` / `ai` / `web` / `slice` / `formula` rows and AI path `auto`, without interaction.
+**Quick Generate ownership**: explicit user assets, URLs, and path instructions win. Otherwise the main agent chooses required `user` / `ai` / `web` / `slice` / `formula` rows and AI path `auto`, without interaction.
 
 ---
 
@@ -38,7 +38,7 @@ For each row with `Status: Pending`:
 
 | Acquire Via | Load reference | Run | Success status |
 |---|---|---|---|
-| `ai` | [`image-generator.md`](./image-generator.md) | runtime image capability + `image_manifest.py` | `Generated` |
+| `ai` | [`image-generator.md`](./image-generator.md) | `image_gen.py` | `Generated` |
 | `web` | [`image-searcher.md`](./image-searcher.md) | `image_search.py` | `Sourced` |
 | `slice` | [`image-generator.md`](./image-generator.md) §4.3 | `slice_images.py` after parent AI sheet is `Generated` | `Generated` |
 | `user` | — | — | (already `Existing`) |
@@ -53,7 +53,7 @@ For each row with `Status: Pending`:
 
 Before processing any row:
 
-1. Read the Default Design Spec/lock, or reuse Quick's transient roster and active visual/page decisions
+1. Read the Default Design Spec/lock, or reuse Quick's active-context resource and visual/page decisions
 2. Group resource list rows by `Acquire Via`
 3. Confirm `project/images/` exists
 4. Materialize explicit user assets, render declared formulas, and finish triggered ai/web/slice acquisition before SVG authoring begins
@@ -86,14 +86,14 @@ After all rows reach terminal status:
 1. Run the selected path's initial strategy
 2. On recoverable failure (network, no candidates, license rejection, rate limit), continue through materially different strategies that remain inside that path's confirmed permissions; never loop an already exhausted strategy
 3. When the path-specific query/provider/license-stage or backend/retry strategy is exhausted, set `Status: Needs-Manual`, log the reason in conversation, and continue
-4. After the phase completes, summarize all unresolved rows — list filenames, where prompts live (`images/image_prompts.md`; refresh with `image_manifest.py render-md`), and where generated files belong (`project/images/<filename>`). After supply/replacement, validate and record the file. For `slice` rows, list the parent sheet filename and target element names; the user places the sheet, then the agent reruns `slice_images.py`.
+4. After the phase completes, summarize all `Needs-Manual` rows for the user — list filenames, where prompts live (`images/image_prompts.md` paste-ready blocks for ai rows; refresh via `image_gen.py --render-md` if stale), and where to place generated files (`project/images/<filename>`). After supply/replacement, validate the file and reconcile the owning row plus manifest to its usable status. For `slice` rows, list the parent sheet filename and target element names; the user places the sheet, then the agent reruns `slice_images.py`.
 
 **Quick Generate export gate**: exhaust allowed automation without asking; stop
 before `--quick-generate` when a required row is not both backed by its
 validated file/provenance and in a usable status. File presence alone never
 bypasses `Needs-Manual`.
 
-When no runtime image capability is available, preserve the AI prompts and report the missing capability. A later manually supplied file follows the same `image_manifest.py record` validation path.
+`Needs-Manual` is also the entry status for **Offline Manual Mode** (no `IMAGE_BACKEND` configured, no host-native image tool in use). Affected ai rows are marked `Needs-Manual` from the start without a failed attempt — see [`image-generator.md`](./image-generator.md) §7 Offline Manual Mode.
 
 Path-specific retry policies (provider chain, backend chain) live in the path's own reference.
 
@@ -116,7 +116,7 @@ Executor reads the manifest per slide and renders inline credits when needed —
 
 ## 8. Intent Ownership
 
-The `Reference` field is **intent**, not a query. Strategist owns it by default; Quick's active execution context owns it in the transient roster. The receiving role translates without reopening it.
+The `Reference` field is **intent**, not a query. Strategist owns it by default; Quick's main agent resolves it in active context. The receiving role translates without reopening it.
 
 | ✅ Intent | ❌ Pre-processed |
 |---|---|
@@ -127,16 +127,16 @@ The `Reference` field is **intent**, not a query. Strategist owns it by default;
 
 ## 9. Handoff with SVG Authoring
 
-SVG authoring consumes the resource roster plus:
+SVG authoring consumes the active profile's resource authority plus:
 
 | Artifact | Path | Purpose |
 |---|---|---|
 | Image files | `project/images/*.{jpg,png,webp}` | `<image>` references |
 | Manifest | `project/images/image_sources.json` | `license_tier` per Sourced image |
 
-**Default Generate boundary**: Executor does NOT invoke runtime image generation / `image_search.py` / `slice_images.py`; missing material returns to Strategist-owned preparation.
+**Default Generate boundary**: Executor does NOT invoke `image_gen.py` / `image_search.py` / `slice_images.py`; missing material returns to Strategist-owned preparation.
 
-**Quick Generate boundary**: the active execution context finishes acquisition before SVG authoring, then neither acquires nor reselects while drawing.
+**Quick Generate boundary**: the main agent finishes acquisition before SVG authoring, then neither acquires nor reselects while drawing.
 
 ---
 

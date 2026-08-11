@@ -2091,10 +2091,15 @@ def _estimate_text_runs_width(
 
 def estimate_single_line_text_frame_width(
     runs: list[dict[str, Any]],
+    *,
+    include_headroom: bool = True,
 ) -> float:
-    """Estimate the content width used by one generated DrawingML textbox."""
+    """Estimate one DrawingML textbox width with optional safety headroom."""
     content_runs, bullet = _extract_text_bullet(runs)
-    width = _estimate_text_runs_width(content_runs)
+    width = _estimate_text_runs_width(
+        content_runs,
+        include_headroom=include_headroom,
+    )
     if bullet:
         font_size = (
             float(content_runs[0].get('font_size', 16))
@@ -2546,16 +2551,10 @@ def _build_run_properties_xml(
     spc_attr = _letter_spacing_to_drawingml_spc(letter_spacing_px)
 
     fonts = parse_font_family(ff) if ff else default_fonts
-    # Keep CJK runs explicit. LibreOffice and some third-party viewers can
-    # ignore +mj/+mn East Asian theme slots and incorrectly use the Latin
-    # theme face, producing tofu even when the EA theme is valid.
-    if any(is_cjk_char(ch) for ch in text):
-        run_fonts = resolve_text_run_fonts(text, fonts)
-    else:
-        run_fonts = theme_font_tokens(
-            fonts,
-            ctx.theme_font_spec if ctx is not None else None,
-        ) or resolve_text_run_fonts(text, fonts)
+    run_fonts = theme_font_tokens(
+        fonts,
+        ctx.theme_font_spec if ctx is not None else None,
+    ) or resolve_text_run_fonts(text, fonts)
     lang = detect_text_lang(
         text,
         ctx.primary_language if ctx is not None else None,

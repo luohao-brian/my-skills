@@ -20,7 +20,6 @@ from pathlib import Path
 
 # Ensure the scripts directory is on sys.path so the package can be found.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from console_encoding import configure_utf8_stdio
 from template_fill_pptx import main
 
