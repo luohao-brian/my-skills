@@ -22,7 +22,18 @@ function parseArgs(argv) {
   return out;
 }
 
-export function assembleDeck({ style, title, slides, template }) {
+function serializeSpeakerNotes(notes) {
+  if (!Array.isArray(notes)) throw new Error('Speaker notes must be a JSON array.');
+  return JSON.stringify(notes, null, 2).replaceAll('<', '\\u003c');
+}
+
+function replaceSpeakerNotes(template, notes) {
+  const pattern = /const\s+SPEAKER_NOTES\s*=\s*\[[\s\S]*?\n\];/;
+  if (!pattern.test(template)) throw new Error('Template is missing const SPEAKER_NOTES = [...].');
+  return template.replace(pattern, `const SPEAKER_NOTES = ${serializeSpeakerNotes(notes)};`);
+}
+
+export function assembleDeck({ style, title, slides, notes = [], template }) {
   const start = '<!-- SLIDES_START -->';
   const end = '<!-- SLIDES_END -->';
   const startIndex = template.indexOf(start);
@@ -33,8 +44,9 @@ export function assembleDeck({ style, title, slides, template }) {
   if (!/<section\b[^>]*class=["'][^"']*\bslide\b/i.test(slides)) {
     throw new Error('Slides input must contain at least one <section class="slide"> block.');
   }
-  const assembled = `${template.slice(0, startIndex + start.length)}\n${slides.trim()}\n${template.slice(endIndex)}`
+  const withSlides = `${template.slice(0, startIndex + start.length)}\n${slides.trim()}\n${template.slice(endIndex)}`
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+  const assembled = replaceSpeakerNotes(withSlides, notes);
   if (style === 'swiss') {
     const result = validateSwissHtml({ html: assembled, checkRuntime: true });
     if (result.errors.length) throw new Error(`Swiss validation failed:\n- ${result.errors.join('\n- ')}`);
@@ -42,12 +54,13 @@ export function assembleDeck({ style, title, slides, template }) {
   return assembled;
 }
 
-export function createDeck({ style, title, slidesPath, outputPath }) {
+export function createDeck({ style, title, slidesPath, notesPath, outputPath }) {
   const templateName = style === 'swiss' ? 'template-swiss.html' : style === 'magazine' ? 'template.html' : '';
   if (!templateName) throw new Error('--style must be swiss or magazine.');
   const template = readFileSync(join(ROOT, 'assets', templateName), 'utf8');
   const slides = readFileSync(resolve(slidesPath), 'utf8');
-  const output = assembleDeck({ style, title, slides, template });
+  const notes = notesPath ? JSON.parse(readFileSync(resolve(notesPath), 'utf8')) : [];
+  const output = assembleDeck({ style, title, slides, notes, template });
   const absoluteOutput = resolve(outputPath);
   mkdirSync(dirname(absoluteOutput), { recursive: true });
   writeFileSync(absoluteOutput, output);
@@ -57,11 +70,11 @@ export function createDeck({ style, title, slidesPath, outputPath }) {
 function runCli() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.style || !args.title || !args.slides || !args.output) {
-    console.error('Usage: node scripts/create-deck.mjs --style <swiss|magazine> --title <title> --slides <slides.html> --output <index.html>');
+    console.error('Usage: node scripts/create-deck.mjs --style <swiss|magazine> --title <title> --slides <slides.html> [--notes <speaker-notes.json>] --output <index.html>');
     process.exit(2);
   }
   try {
-    const output = createDeck({ style: args.style, title: args.title, slidesPath: args.slides, outputPath: args.output });
+    const output = createDeck({ style: args.style, title: args.title, slidesPath: args.slides, notesPath: args.notes, outputPath: args.output });
     console.log(output);
   } catch (error) {
     console.error(error.message);

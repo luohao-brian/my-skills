@@ -11,9 +11,18 @@ export function buildGolden() {
   const contract = JSON.parse(readFileSync(join(ROOT, 'references/swiss-contract.json'), 'utf8'));
   const template = readFileSync(join(ROOT, contract.template), 'utf8');
   const slides = readFileSync(join(ROOT, contract.goldenSlides), 'utf8');
+  const notes = [...slides.matchAll(/<section\b[^>]*\bdata-layout=["']([^"']+)["'][^>]*\bdata-slide-id=["']([^"']+)["'][^>]*>/gi)]
+    .map((match) => ({
+      id: match[2],
+      title: `${match[1]} 版式示例`,
+      section: 'Swiss Golden',
+      purpose: `验证 ${match[1]} 的结构、动效与演讲者模式兼容性`,
+      talk: ['说明这一页承载的内容形状', '检查标题、信息层级和底部安全区', '确认动效终态与预览比例正确'],
+      transition: '进入下一个登记版式继续检查',
+    }));
   return {
     outputPath: join(ROOT, contract.goldenDeck),
-    html: assembleDeck({ style: 'swiss', title: 'Swiss Golden · 22 Layouts', slides, template }),
+    html: assembleDeck({ style: 'swiss', title: 'Swiss Golden · 22 Layouts', slides, notes, template }),
   };
 }
 

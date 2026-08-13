@@ -90,20 +90,30 @@ uv pip install -r openclaw-skills/ppt-master/requirements.txt
 
 ## 验证
 
-运行仓库静态检查：
+验证入口按组件解耦。普通 skill 文案、metadata、JSON 或语法改动先运行仓库基础检查：
 
 ```bash
-bash scripts/verify-all.sh
+bash scripts/verify-repo.sh
 ```
 
-检查内容包括：
+专项检查只在对应组件改动时运行：
+
+```bash
+bash scripts/verify-ark-skills.sh
+bash scripts/verify-guizang-ppt-skill.sh
+bash scripts/verify-guizang-ppt-skill.sh --visual
+PYTHON_BIN="$HOME/Documents/hermes-workspace/.venv/bin/python" bash scripts/verify-ppt-master.sh
+```
+
+`verify-ppt-master.sh` 默认优先使用 `$HOME/Documents/hermes-workspace/.venv/bin/python`，也可以通过 `PYTHON_BIN` 显式覆盖。`scripts/verify-all.sh` 只是串联所有入口的完整检查，不应作为单个 skill 改动的默认命令。
+
+仓库基础检查包括：
 
 - every skill directory contains `SKILL.md`
 - required frontmatter fields and valid single-line `metadata` JSON
 - `name` / `metadata.openclaw.skillKey` match the skill directory
 - repository JSON syntax
 - Python、JavaScript 和 Shell 语法
-- 组件测试与仓库工具测试
 - `pyproject.toml` 与 `uv.lock` 一致性
 
-该检查不会调用真实外部服务。涉及凭证、浏览器、PowerPoint 或实时 API 的行为验证，需要按具体 Skill 的执行合同单独运行。
+组件行为和测试依赖由各专项入口负责，避免修改一个 skill 时被另一个 skill 的依赖或测试失败阻塞。这些检查不会调用真实外部服务；涉及凭证、浏览器、PowerPoint 或实时 API 的行为验证，需要按具体 Skill 的执行合同单独运行。

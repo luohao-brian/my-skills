@@ -40,6 +40,10 @@ function runCli() {
   const unexpected = [...slidesSource.matchAll(/data-layout=["']([^"']+)["']/g)]
     .map((match) => match[1]).filter((id) => !stableIds.includes(id));
   if (unexpected.length) errors.push(`Golden slide source contains unexpected layouts: ${unexpected.join(', ')}.`);
+  const goldenSlideIds = [...slidesSource.matchAll(/data-slide-id=["']([^"']+)["']/g)].map((match) => match[1]);
+  if (goldenSlideIds.length !== stableIds.length) errors.push(`Golden slide source must contain ${stableIds.length} data-slide-id values, found ${goldenSlideIds.length}.`);
+  const duplicateSlideIds = goldenSlideIds.filter((id, index) => goldenSlideIds.indexOf(id) !== index);
+  if (duplicateSlideIds.length) errors.push(`Golden slide source contains duplicate data-slide-id values: ${[...new Set(duplicateSlideIds)].join(', ')}.`);
 
   for (const [name, source] of [['layouts-swiss.md', layouts], ['swiss-layout-lock.md', lock]]) {
     if (/\/Users\/[A-Za-z0-9._-]+\//.test(source)) errors.push(`${name}: contains a machine-local absolute path.`);

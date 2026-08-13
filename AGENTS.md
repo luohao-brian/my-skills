@@ -29,7 +29,11 @@
 - `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
 - `openclaw-skills/ppt-master/`：SVG/PPTX 演示文稿生成、转换与多层视觉校验
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要
-- `scripts/verify-all.sh`：仓库级静态验证
+- `scripts/verify-repo.sh`：与具体 skill 解耦的仓库基础静态验证
+- `scripts/verify-ark-skills.sh`：Ark skills 专项协议测试
+- `scripts/verify-ppt-master.sh`：PPT Master 专项验证
+- `scripts/verify-guizang-ppt-skill.sh`：Guizang PPT 专项契约、静态和可选视觉验证
+- `scripts/verify-all.sh`：显式串联全部验证入口；日常局部改动不要默认使用
 
 ## 工作方式
 
@@ -85,8 +89,11 @@
 
 按改动范围选择最小可行验证：
 
-- skill 文案或 metadata 改动：运行 `bash scripts/verify-all.sh`
-- Python 脚本改动：运行 `bash scripts/verify-all.sh`，必要时再运行对应脚本 `--help`
+- 通用 skill 文案或 metadata 改动：运行 `bash scripts/verify-repo.sh`
+- Ark skills 改动：运行 `bash scripts/verify-repo.sh` 和 `bash scripts/verify-ark-skills.sh`
+- `guizang-ppt-skill` 改动：运行 `bash scripts/verify-repo.sh` 和 `bash scripts/verify-guizang-ppt-skill.sh`；涉及布局或模板视觉时加 `--visual`
+- `ppt-master` 改动：使用 `~/Documents/hermes-workspace` 下由 `uv` 管理的 venv，通过 `PYTHON_BIN=~/Documents/hermes-workspace/.venv/bin/python bash scripts/verify-ppt-master.sh` 运行专项验证
+- 其他 Python 脚本改动：运行 `bash scripts/verify-repo.sh`，必要时再运行对应脚本 `--help` 或组件专项测试
 - Hermes 插件改动：至少运行 Python 编译检查；涉及安装/config 时再按插件 README 做本地命令验证
 - 依赖真实外部凭证、真实浏览器登录态或联网服务时，当前环境无法完整验证要明确说明只做了静态检查
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "upstreamCommit": "82fe5ae129e8c2a12e1155fcabed6703342749d6",
+  "upstreamCommit": "c91369c449d34755d320a8b81d0734000d99d1ab",
   "template": "assets/template-swiss.html",
   "goldenSlides": "templates/swiss-golden-slides.html",
   "goldenDeck": "assets/swiss-golden.html",

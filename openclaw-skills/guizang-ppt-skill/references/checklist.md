@@ -6,6 +6,34 @@
 
 ## 🔴 P0 · 一定不能犯的错
 
+### 0-P. 演讲者模式必须可控、可排练、可恢复、备注不串页
+
+**现象**:演讲者端已经翻页,观众屏仍停在上一页;观众窗口关闭后没有提示;页面重排后,用户改过的讲稿跑到了另一页;或演讲模式入口变成页面右上角的突兀按钮。
+
+**做法**:
+- 演讲入口只放在右下角现有快捷控制区,显示 `P 演讲模式`。
+- 演讲者主体只做“左侧预览 + 右侧备注”两栏;当前页在上、下一页在下,避免形成挤压当前页的三栏布局。
+- 两个预览 iframe 必须严格保持 `16:9`,容器不足时等比缩小并留边,不得裁切或拉伸;小屏优先压缩下一页预览高度。
+- 宫格用当前/下一页预览区内嵌替换,卡片显示页码、标题、章节和进度;点击卡片后立即返回预览。
+- 每页必须有唯一、稳定、语义化的 `data-slide-id`;讲稿备注按这个 ID 保存。
+- `SPEAKER_NOTES` 顺序和 ID 必须与 slide 一一对应;标题、目的、讲稿草稿分开显示。
+- 计时必须由用户显式开始;按钮文案区分“开始计时 / 继续计时 / 重置计时”;底栏分开显示已进行、本页、剩余或超时。
+- 排练记录每页实际时长;自动翻页默认关闭,并在宫格、圈选、设置、页面隐藏、观众屏黑白屏/冻结或失去同步时暂停。
+- 激光笔、圈选坐标归一化后传给观众屏;翻页清除圈选;`B/W/F` 分别控制黑屏、白屏和冻结。
+- 同步状态区分连接中、已同步、未同步、已冻结、未连接和弹窗被拦截;“重新打开观众屏”始终可用。
+- 退出演讲模式时发送 `bye`;能自动关闭的观众窗口关闭,否则显示“演示已结束”遮罩。
+- 浏览器只能确认观众页面的软件同步,不能宣称 HDMI、转接器或投影仪物理连接正常。
+- 两套模板的 presenter CSS / JavaScript 公共块必须保持字节一致。
+
+**自检命令**:
+
+```bash
+node {baseDir}/scripts/check-presenter-runtime-sync.mjs
+node {baseDir}/scripts/validate-presenter-mode.mjs path/to/index.html
+```
+
+浏览器里关闭观众窗口,确认状态变化;再点击“重新打开观众屏”,确认它恢复到演讲者当前页。再逐项实测内嵌宫格选页返回、计时、排练、自动翻页暂停/恢复、激光笔、圈选、清除、黑屏、白屏、冻结、设置组件和演前检查。缩小浏览器窗口再检查一次:当前页与下一页仍上下排列,两个 iframe 的 `width / height` 仍约等于 `16 / 9`,且没有超出预览容器。
+
 ### 0-S. Swiss locked mode:正文页必须来自登记的 22 个版式
 
 **现象**:颜色、字体看起来像 Swiss,但标题跑到中间、图片不在网格上、页面结构不属于登记版式。
@@ -19,7 +47,7 @@
 - 生成后必须运行:
 
 ```bash
-node <SKILL_ROOT>/scripts/validate-swiss-deck.mjs path/to/index.html
+node {baseDir}/scripts/validate-swiss-deck.mjs path/to/index.html
 ```
 
 **校验会拦截**:
@@ -171,6 +199,13 @@ node <SKILL_ROOT>/scripts/validate-swiss-deck.mjs path/to/index.html
 
 **根因**:瑞士风的图片不是装饰,而是 grid 里的证据块。没有先选原始版式和图片槽位,就会把任意图片硬塞进页面。
 
+**先判断图像角色**:
+- 证据截图、UI、代码、dashboard:保真优先,关键文字和数据不能裁;需要统一比例时先做截图背景画布和 `.fit-contain`。
+- 已按槽位生成的信息图/插图:按 S22/S15/S16 的目标比例铺满,不要再缩成短小图片。
+- 照片/产品图/人物图:必须写清 `object-position`,主体不能被裁切、标题块或 caption 压住。
+- 文字压图:必须先判断是否有足够 quiet zone;没有低细节留白就不要把标题压在图上。
+- 多图组:统一比例、高度、容器样式和 caption 密度;视觉角色不同的图不要硬放同一组。
+
 **做法**:
 - 先选版式:单张大图 + KPI 用 `S22`;多图用 `S15/S16` 的原始网格骨架改造
 - S22 生成图比例固定 `21:9`,并在 `<img>` 上写 `data-image-slot="s22-hero-21x9"`
@@ -181,6 +216,8 @@ node <SKILL_ROOT>/scripts/validate-swiss-deck.mjs path/to/index.html
 - 用户原始截图要先读 `references/screenshot-framing.md`:优先用 `assets/screenshot-backgrounds/` 内置主题背景 + 程序化缩放/留边/对齐,不要为了比例统一就重画截图内容
 - 截图背景必须跟随当前主题色,且可裁成 `21:9` / `16:10` / `4:3` / `1:1`;背景里不能有标题、页脚、边框、logo、人物或明显主体
 - 图像生成提示词必须写明:Swiss Style、单一 accent、直角、无渐变/阴影/圆角、无页眉页脚标题角标
+
+- 文字压图 / 全屏主视觉必须先做 quiet-zone 判断:至少约 30% 低细节区域可承载标题;不通过就换图、换裁切或改成图文分栏,不要整页套黑色/白色遮罩
 
 **自检命令**:
 - `grep -E "frame-img.*border-radius|box-shadow" index.html`——命中就删
@@ -204,6 +241,29 @@ node <SKILL_ROOT>/scripts/validate-swiss-deck.mjs path/to/index.html
 - 视觉:翻到该页,看最后一行 caption/label 是否明显高于分页组件
 - 代码:`grep -E "align-items:end|align-self:end|bottom:0|bottom:2vh|margin-top:auto" index.html`,命中后逐个确认是否有 nav safe zone
 
+### 0-D-3. 后验测量:先量超出和空白,再改版式
+
+**现象**:一页只超出 20-30px,但修的时候删掉大块内容,结果下方多出一大片空白;或者标题与正文贴在一起,肉眼检查时容易漏。
+
+**做法**:
+- 生成后运行 `node {baseDir}/scripts/validate-swiss-deck.mjs path/to/index.html`
+- 如果环境里能解析到 Playwright,校验器会额外执行真实渲染测量:
+  - `M1 DOM/visual overflow`:量出超出多少 px,并指出最低/最高的问题元素
+  - `M1 bottom whitespace`:量出底部空白和 active content height,防止从"超出"修成"巨空"
+  - `M1 nav-safe`:量出最低内容是否进入底部分页安全线
+  - `M2 title gap`:量出标题到下一块内容的距离,防止标题和正文贴住
+
+**Overflow 修正阶梯**:
+- `1-40px` over:只做微调,上移内容组或收紧一个 gap/padding;不要删内容。
+- `40-90px` over:局部压缩 gap/padding 或降低一个模块高度;仍然优先保留内容。
+- `90-160px` over:轻微压标题或压缩一段正文,再考虑拆页。
+- `160px+` over:才考虑换更高容量版式、合并模块或删内容。
+
+**修完反查**:
+- 如果 `M1 bottom whitespace` 变大,说明修过头了;恢复部分间距、放大最后一块或把内容组向下回调。
+- 每轮只做一个档位的调整,重渲染后再跑 validator。
+- 不要靠多模态肉眼先猜;超出、底部空白和标题间距先看测量值。
+
 ---
 
 ### 0-E. Swiss 模板还原度守卫:仓库内 golden deck 是基准
@@ -221,9 +281,9 @@ node <SKILL_ROOT>/scripts/validate-swiss-deck.mjs path/to/index.html
 **自检命令**:
 
 ```bash
-node <SKILL_ROOT>/scripts/build-swiss-golden.mjs --check
-node <SKILL_ROOT>/scripts/verify-swiss-contract.mjs
-node <SKILL_ROOT>/scripts/visual-check-swiss.mjs <SKILL_ROOT>/assets/swiss-golden.html --output ./visual-check
+node {baseDir}/scripts/build-swiss-golden.mjs --check
+node {baseDir}/scripts/verify-swiss-contract.mjs
+node {baseDir}/scripts/visual-check-swiss.mjs {baseDir}/assets/swiss-golden.html --output ./visual-check
 ```
 
 ### 0-F. 视觉 + 代码双核对:不要只看 HTML

@@ -237,7 +237,7 @@ dist/
 
 # Conversation exports
 *.txt
-!openclaw-skills/volc-search/requirements.txt
+!**/requirements.txt
 !openclaw-skills/ppt-master/requirements.txt
 !openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-APACHE-2.0.txt
 !openclaw-skills/ppt-master/scripts/pptx_shapes/data/LICENSE-OPEN-XML-SDK-MIT.txt

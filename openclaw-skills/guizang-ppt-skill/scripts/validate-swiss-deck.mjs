@@ -73,13 +73,23 @@ export function validateSwissHtml({ html, filePath = '', allowExperimental = fal
 
   const slides = parseSlides(html);
   if (!slides.length) errors.push('No <section class="slide"> pages found.');
+  const slideIds = [];
 
   slides.forEach((slide) => {
     const label = `Slide ${slide.index}`;
     const layout = attr(slide.tag, 'data-layout');
     const recipe = attr(slide.tag, 'data-animate');
+    const slideId = attr(slide.tag, 'data-slide-id');
     const stable = layout ? contract.layouts[layout] : undefined;
     const experimental = layout ? contract.experimentalLayouts[layout] : undefined;
+
+    if (!slideId) {
+      errors.push(`${label}: missing data-slide-id.`);
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slideId)) {
+      errors.push(`${label}: data-slide-id="${slideId}" must be a lowercase semantic slug.`);
+    } else {
+      slideIds.push(slideId);
+    }
 
     if (!layout) {
       errors.push(`${label}: missing data-layout.`);
@@ -153,6 +163,9 @@ export function validateSwissHtml({ html, filePath = '', allowExperimental = fal
       warnings.push(`${label}: positioned text may enter the bottom 8vh navigation safety zone.`);
     }
   });
+
+  const duplicateSlideIds = slideIds.filter((id, index) => slideIds.indexOf(id) !== index);
+  if (duplicateSlideIds.length) errors.push(`Duplicate data-slide-id: ${[...new Set(duplicateSlideIds)].join(', ')}.`);
 
   return { slides: slides.length, errors, warnings };
 }
