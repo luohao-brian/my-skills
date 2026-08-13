@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/JimLiu/baoyu-skills.git",
+  "commit": "6b7a2e417500561a5ecdd0b168332f4142584617",
+  "source_path": "skills/baoyu-article-illustrator",
+  "skill_version": "1.117.4",
+  "package_version": "2.5.2",
+  "package_manifest": ".claude-plugin/marketplace.json",
+  "license_path": "LICENSE",
+  "synced_at": "2026-08-13"
+}

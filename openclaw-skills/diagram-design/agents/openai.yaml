@@ -1,0 +1,4 @@
+interface:
+  display_name: "Diagram Design"
+  short_description: "Create precise vector diagrams and static data reports"
+  default_prompt: "Use $diagram-design to create a clear editorial diagram or statistical report."

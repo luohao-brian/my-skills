@@ -1,0 +1,4 @@
+interface:
+  display_name: "Baoyu Article Illustrator"
+  short_description: "Analyze long-form articles and generate consistent illustrations"
+  default_prompt: "Use $baoyu-article-illustrator to analyze and illustrate this article."

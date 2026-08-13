@@ -1,0 +1,4 @@
+interface:
+  display_name: "Baoyu Infographic"
+  short_description: "Turn structured content into publication-ready infographics"
+  default_prompt: "Use $baoyu-infographic to turn this content into a publication-ready infographic."
