@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "verified_at": "2026-08-02",
+  "version": 7,
+  "verified_at": "2026-08-15",
   "families": [
     {"id": "qwen", "owner": "Qwen", "openness": "weights-only", "evidence": ["https://huggingface.co/Qwen/Qwen3.6-35B-A3B"]},
     {"id": "glm", "owner": "zai-org", "openness": "weights-only", "evidence": ["https://huggingface.co/zai-org/GLM-5.2"]},
@@ -28,7 +28,8 @@
     {"id": "microsoft-open", "owner": "microsoft", "openness": "weights-only", "evidence": ["https://huggingface.co/microsoft/Fara1.5-27B"]},
     {"id": "baidu-open", "owner": "baidu", "openness": "weights-only", "evidence": ["https://huggingface.co/baidu/Unlimited-OCR"]},
     {"id": "cohere-open", "owner": "CohereLabs", "openness": "weights-only", "evidence": ["https://huggingface.co/CohereLabs/command-a-03-2025"]},
-    {"id": "smollm", "owner": "HuggingFaceTB", "openness": "reproducible", "evidence": ["https://huggingface.co/HuggingFaceTB/SmolLM3-3B"]}
+    {"id": "smollm", "owner": "HuggingFaceTB", "openness": "reproducible", "evidence": ["https://huggingface.co/HuggingFaceTB/SmolLM3-3B"]},
+    {"id": "ltx", "owner": "Lightricks", "openness": "weights-only", "evidence": ["https://huggingface.co/Lightricks/LTX-2.5", "https://github.com/Lightricks/LTX-2"]}
   ],
   "flagship_models": {
     "llm": [
@@ -86,6 +87,7 @@
       {"id": "deepreinforce-ai/Ornith-1.0-35B", "family": "ornith"}
     ],
     "vlm": [
+      {"id": "Qwen/Qwen3.8-27B", "family": "qwen"},
       {"id": "Qwen/Qwen3.6-35B-A3B", "family": "qwen"},
       {"id": "Qwen/Qwen3.6-27B", "family": "qwen"},
       {"id": "InternScience/Agents-A1-4B", "family": "agents-a1"},
@@ -118,6 +120,8 @@
       {"id": "nvidia/Cosmos3-Super-Text2Image-4Step", "family": "cosmos3"}
     ],
     "video-generation": [
+      {"id": "MiniMaxAI/MiniMax-H3", "family": "minimax"},
+      {"id": "Lightricks/LTX-2.5", "family": "ltx"},
       {"id": "tencent/HunyuanVideo-1.5", "family": "hunyuan"},
       {"id": "nvidia/Cosmos3-Super-Image2Video-4Step", "family": "cosmos3"}
     ],
@@ -155,6 +159,9 @@
     ]
   },
   "local_models": [
+    {"id": "Qwen/Qwen3.8-27B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.8-27B", "deployment": ["quantized"]},
+    {"id": "unsloth/Qwen3.8-27B-GGUF", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.8-27B", "deployment": ["gguf", "ollama-compatible", "quantized"]},
+    {"id": "lightx2v/Minimax-h3-Turbo", "family": "minimax", "role": "video-generation", "canonical": "MiniMaxAI/MiniMax-H3", "deployment": ["diffusers"]},
     {"id": "Qwen/Qwen3.6-35B-A3B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.6-35B-A3B", "deployment": ["quantized"]},
     {"id": "Qwen/Qwen3.6-27B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.6-27B", "deployment": ["quantized"]},
     {"id": "zai-org/GLM-5.2-FP8", "family": "glm", "role": "llm", "canonical": "zai-org/GLM-5.2", "deployment": ["quantized"]},
@@ -183,6 +190,9 @@
     "Qwen/Qwen3.5-27B",
     "Qwen/Qwen3.6-27B",
     "Qwen/Qwen3.6-35B-A3B",
+    "Qwen/Qwen3.8-27B",
+    "MiniMaxAI/MiniMax-H3",
+    "Lightricks/LTX-2.5",
     "google/gemma-4-12B-it",
     "google/gemma-4-31B-it",
     "Nanbeige/Nanbeige4.2-3B",

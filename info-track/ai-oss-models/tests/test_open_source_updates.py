@@ -230,6 +230,39 @@ class ArchitectureFacetTests(unittest.TestCase):
         row = model_row("community/voice-conversion", pipeline_tag="audio-to-audio")
         self.assertEqual(MODULE.model_role(row), "audio-generation")
 
+    def test_quantized_repo_inherits_vlm_modalities_from_structured_base_model(self):
+        base = model_row("Official/VLM", pipeline_tag="image-text-to-text")
+        derivative = model_row(
+            "community/VLM-GGUF",
+            pipeline_tag="",
+            tags=["gguf", "base_model:quantized:Official/VLM"],
+            cardData={"base_model": "Official/VLM"},
+        )
+        registry = {
+            "families": [],
+            "flagship_models": {},
+            "local_roots": [],
+            "local_publishers": [],
+            "model_overrides": {},
+        }
+        items = MODULE.local_discovery_items(
+            [derivative],
+            registry,
+            {base["id"]: base, derivative["id"]: derivative},
+            dt.date(2026, 7, 27),
+            dt.date(2026, 8, 2),
+            set(),
+        )
+        self.assertEqual(items[0]["metadata"]["role"], "vlm")
+        self.assertEqual(
+            items[0]["metadata"]["modalities"],
+            {"input": ["image", "text"], "output": ["text"]},
+        )
+        self.assertEqual(
+            items[0]["metadata"]["role_evidence"]["inherited_from"],
+            "Official/VLM",
+        )
+
     def test_lora_tag_is_normalized_to_adapter_derivation(self):
         row = model_row("community/image-lora", tags=["lora", "text-to-image"])
         self.assertEqual(MODULE.derivation_facets(row), ["adapter"])
@@ -527,6 +560,281 @@ class ModalityRadarTests(unittest.TestCase):
         self.assertNotIn("Install the package", excerpt)
 
 
+class MediaDeploymentProfileTests(unittest.TestCase):
+    def test_media_runtime_tags_are_preserved_as_deployment_facets(self):
+        row = model_row(
+            "community/media",
+            pipeline_tag="image-to-video",
+            tags=["comfyui", "diffusers", "diffusion-single-file"],
+        )
+        self.assertEqual(
+            MODULE.deployment_facets(row),
+            ["comfyui", "diffusers", "diffusion-single-file"],
+        )
+
+    def test_exact_customization_tags_do_not_use_model_name(self):
+        tagged = model_row(
+            "community/plain",
+            tags=["talking-head", "lip-sync", "person-replacement"],
+        )
+        named_only = model_row("community/FaceSwap-Talking-Head", tags=[])
+        self.assertEqual(
+            MODULE.media_customization_facet(tagged)["capabilities"],
+            ["lip-sync", "person-replacement", "talking-head"],
+        )
+        self.assertEqual(MODULE.media_customization_facet(named_only), {})
+        self.assertEqual(
+            MODULE.media_customization_facet(
+                model_row("community/video-transform", tags=["video-to-video"])
+            ),
+            {},
+        )
+
+    def test_comfyui_ecosystem_queries_trending_and_recent(self):
+        def fake_hf_api(path, retries=1):
+            parsed = MODULE.urllib.parse.parse_qs(MODULE.urllib.parse.urlparse(path).query)
+            return [
+                model_row(
+                    f"community/{parsed['filter'][0]}-{parsed['sort'][0]}",
+                    pipeline_tag="video-to-video",
+                    tags=["comfyui"],
+                )
+            ]
+
+        with mock.patch.object(MODULE, "hf_api", side_effect=fake_hf_api) as api:
+            rows, counts, errors = MODULE.query_media_ecosystem_candidates()
+
+        self.assertEqual(
+            api.call_count,
+            len(MODULE.MEDIA_ECOSYSTEM_FILTERS) * 2
+            + len(MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS),
+        )
+        self.assertEqual(len(rows), api.call_count)
+        self.assertEqual(counts["comfyui"], 2)
+        self.assertEqual(counts["face-swap"], 1)
+        self.assertEqual(errors, {})
+
+    def test_model_card_extracts_dependencies_steps_offload_and_customization(self):
+        card = """# Local deployment
+
+Use ComfyUI with 4-step or 8 NFE distilled inference and enable_model_cpu_offload.
+This talking-head workflow supports lip-sync and person replacement.
+Download the text encoder from https://huggingface.co/Example/Text-Encoder and
+the video VAE from https://huggingface.co/Example/Video-VAE.
+Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
+"""
+        evidence = MODULE.extract_media_deployment_evidence(card)
+        self.assertEqual(evidence["runtimes"], ["comfyui"])
+        self.assertEqual(evidence["steps"], [4, 8])
+        self.assertIn("distilled", evidence["acceleration_methods"])
+        self.assertIn("cpu-offload", evidence["offload"])
+        self.assertEqual(
+            evidence["customization"]["capabilities"],
+            ["lip-sync", "person-replacement", "talking-head"],
+        )
+        self.assertEqual(
+            {row["repo_id"] for row in evidence["dependencies"]},
+            {"Example/Text-Encoder", "Example/Video-VAE"},
+        )
+        self.assertEqual(
+            evidence["referenced_files"],
+            ["model_fp8.safetensors", "video_vae_bf16.safetensors"],
+        )
+
+    def test_hf_docs_url_is_not_treated_as_model_dependency(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "Required runtime docs: https://huggingface.co/docs/diffusers/main/en/index"
+        )
+        self.assertEqual(evidence["dependencies"], [])
+
+    def test_benchmark_source_model_is_not_treated_as_runtime_dependency(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "Source model for benchmark comparison: "
+            "https://huggingface.co/Example/Competitor"
+        )
+        self.assertEqual(evidence["dependencies"], [])
+
+    def test_repository_files_build_components_precision_and_complete_footprint(self):
+        metadata = {
+            "model_id": "Example/Media",
+            "role": "video-generation",
+            "deployment": ["comfyui"],
+            "base_model_dependencies": [],
+            "media_customization": {},
+        }
+        repository = {
+            "ok": True,
+            "files": [
+                {"path": "diffusion_models/model_fp8.safetensors", "size": 100},
+                {"path": "video_vae/video_vae_bf16.safetensors", "size": 20},
+                {"path": "workflows/example-comfy-workflow.json", "size": 3},
+                {"path": "README.md", "size": 5},
+            ],
+        }
+        card = {
+            "runtimes": ["comfyui"],
+            "precisions": ["fp8", "bf16"],
+            "acceleration_methods": ["distilled"],
+            "steps": [4],
+            "step_evidence": [],
+            "offload": ["cpu-offload"],
+            "dependencies": [],
+            "referenced_files": ["model_fp8.safetensors", "video_vae_bf16.safetensors"],
+            "customization": {},
+        }
+        profile = MODULE.build_media_deployment_profile(metadata, repository, card)
+        self.assertEqual(profile["footprint"]["repository_bytes"], 128)
+        self.assertEqual(profile["footprint"]["artifact_bytes"], 120)
+        self.assertIsNone(profile["footprint"]["complete_runtime_bytes"])
+        self.assertEqual(profile["footprint"]["complete_runtime_status"], "partial")
+        self.assertEqual(
+            profile["footprint"]["referenced_files"],
+            ["model_fp8.safetensors", "video_vae_bf16.safetensors"],
+        )
+        self.assertEqual(profile["precisions"], ["bf16", "fp8"])
+        self.assertEqual(
+            {row["type"] for row in profile["components"]},
+            {"transformer", "video-vae"},
+        )
+        self.assertEqual(
+            profile["workflow_files"], ["workflows/example-comfy-workflow.json"]
+        )
+        self.assertEqual(len(profile["artifact_options"]), 2)
+
+    def test_sharded_weights_form_one_required_artifact_bundle(self):
+        options = MODULE.build_artifact_options(
+            [
+                {"path": "model-00001-of-00002.safetensors", "size": 100},
+                {"path": "model-00002-of-00002.safetensors", "size": 120},
+            ]
+        )
+        self.assertEqual(len(options), 1)
+        self.assertEqual(options[0], {
+            "path_pattern": "model-{00001..00002}-of-00002.safetensors",
+            "bytes": 220,
+            "component": "model-weights",
+            "precisions": [],
+            "file_count": 2,
+            "shard_count": 2,
+            "required_all": True,
+            "complete": True,
+        })
+
+    def test_external_dependency_keeps_runtime_footprint_partial(self):
+        profile = MODULE.build_media_deployment_profile(
+            {
+                "model_id": "Example/Adapter",
+                "role": "video-generation",
+                "deployment": ["comfyui"],
+                "base_model_dependencies": [
+                    {
+                        "repo_id": "Example/Base",
+                        "relation": "adapter",
+                        "source": "hf-structured",
+                    }
+                ],
+                "media_customization": {},
+            },
+            {
+                "ok": True,
+                "files": [
+                    {"path": "adapter/turbo_4step_lora_fp8.safetensors", "size": 10}
+                ],
+            },
+            {
+                "runtimes": ["comfyui"],
+                "precisions": ["fp8"],
+                "acceleration_methods": ["turbo"],
+                "steps": [4],
+                "step_evidence": [],
+                "offload": [],
+                "dependencies": [],
+                "referenced_files": ["turbo_lora_fp8.safetensors"],
+                "customization": {},
+            },
+        )
+        self.assertEqual(profile["footprint"]["complete_runtime_status"], "partial")
+        self.assertIsNone(profile["footprint"]["complete_runtime_bytes"])
+        self.assertEqual(profile["dependencies"][0]["repo_id"], "Example/Base")
+        self.assertEqual(profile["acceleration"]["methods"], ["turbo"])
+        self.assertEqual(profile["acceleration"]["steps"], [4])
+        self.assertEqual(
+            profile["acceleration"]["step_evidence"][0]["source"],
+            "hf-repository-file",
+        )
+
+    def test_compact_report_keeps_media_deployment_fields(self):
+        item = {
+            "title": "Example/Media",
+            "url": "https://huggingface.co/Example/Media",
+            "date": "2026-08-15",
+            "event": "published",
+            "category": "video-generation",
+            "metadata": {
+                "media_customization": {"capabilities": ["talking-head"]},
+                "deployment_profile": {
+                    "runtimes": ["comfyui"],
+                    "footprint": {"complete_runtime_status": "partial"},
+                },
+            },
+        }
+        compact = MODULE.report_item(item)["metadata"]
+        self.assertIn("deployment_profile", compact)
+        self.assertIn("media_customization", compact)
+
+    def test_generic_llm_runtime_tag_does_not_trigger_media_profile(self):
+        self.assertFalse(
+            MODULE.needs_media_deployment_profile(
+                {
+                    "metadata": {
+                        "role": "llm",
+                        "deployment": ["vllm", "transformers"],
+                    }
+                }
+            )
+        )
+        self.assertTrue(
+            MODULE.needs_media_deployment_profile(
+                {"metadata": {"role": "llm", "deployment": ["comfyui"]}}
+            )
+        )
+
+    def test_media_customization_radar_uses_exact_tags(self):
+        rows = [
+            {
+                "id": "Example/FaceSwap",
+                "pipeline_tag": "image-to-image",
+                "tags": ["comfyui", "face-swap", "image-to-image"],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": 10,
+                "downloads": 1000,
+                "likes": 20,
+            },
+            {
+                "id": "Example/TalkingHeadByNameOnly",
+                "pipeline_tag": "image-to-video",
+                "tags": ["comfyui", "image-to-video"],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": 10,
+                "downloads": 1000,
+                "likes": 20,
+            },
+        ]
+        items = MODULE.media_customization_items(
+            rows,
+            {"families": [], "local_publishers": []},
+            dt.date(2026, 8, 9),
+            dt.date(2026, 8, 15),
+        )
+        self.assertEqual([item["title"] for item in items], ["Example/FaceSwap"])
+        self.assertEqual(
+            items[0]["metadata"]["media_customization"]["capabilities"],
+            ["face-swap"],
+        )
+
+
 class EvaluationEvidenceTests(unittest.TestCase):
     def test_benchmark_table_without_evaluation_heading_is_extracted(self):
         card = """# Model\n\n## Introduction\n\nThe release improves agentic performance on the benchmarks below.\n\n| Benchmark | New | Preview |\n| --- | ---: | ---: |\n| Terminal Bench | 82.7 | 61.8 |\n| Tool Use | 70.3 | 49.7 |\n\nNotes:\n1. The harness is not yet released.\n\n## Usage\n\nRun the model.\n"""
@@ -580,16 +888,24 @@ class PerformancePipelineTests(unittest.TestCase):
                 local,
                 datasets,
                 notable,
+                [],
                 dt.date(2026, 7, 28),
                 dt.date(2026, 8, 3),
             )
 
         enrichment.assert_called_once()
-        enriched_flagship, enriched_local, enriched_datasets, enriched_notable = result
+        (
+            enriched_flagship,
+            enriched_local,
+            enriched_datasets,
+            enriched_notable,
+            enriched_media_customization,
+        ) = result
         self.assertTrue(enriched_flagship["llm"][0]["enriched"])
         self.assertTrue(enriched_local[0]["enriched"])
         self.assertTrue(enriched_datasets[0]["enriched"])
         self.assertTrue(enriched_notable["models"][0]["enriched"])
+        self.assertEqual(enriched_media_customization, [])
 
     def test_report_payload_removes_audit_only_and_verbose_commit_fields(self):
         item = {
@@ -628,6 +944,7 @@ class PerformancePipelineTests(unittest.TestCase):
             "reproducible": [],
             "datasets": [],
             "notable_discoveries": {"models": [], "datasets": []},
+            "media_customization": [],
         }
         report = MODULE.build_report_payload(
             {
@@ -1118,6 +1435,16 @@ class HistoricalMainTests(unittest.TestCase):
         self.assertNotIn("likes", metadata)
         self.assertNotIn("trend", metadata)
         self.assertEqual(captured["diagnostics"]["local_hot_before_limit"], 0)
+        self.assertEqual(
+            captured["diagnostics"]["media_ecosystem_by_filter"],
+            {
+                value: 0
+                for value in (
+                    MODULE.MEDIA_ECOSYSTEM_FILTERS
+                    + MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS
+                )
+            },
+        )
 
 
 class LocalVariantTests(unittest.TestCase):

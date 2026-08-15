@@ -72,6 +72,51 @@ MODALITY_QUERY_FILTERS = {
     "audio-stt": ["automatic-speech-recognition"],
 }
 MODALITY_FOCUS_ROLES = tuple(MODALITY_QUERY_FILTERS)
+MEDIA_DEPLOYMENT_ROLES = {
+    "vlm",
+    "image-generation",
+    "video-generation",
+    "audio-generation",
+    "audio-tts",
+    "audio-stt",
+}
+MEDIA_ECOSYSTEM_FILTERS = ["comfyui"]
+MEDIA_CUSTOMIZATION_QUERY_FILTERS = [
+    "digital-human",
+    "face-swap",
+    "identity-consistency",
+    "lip-sync",
+    "person-replacement",
+    "talking-head",
+    "video-editing",
+]
+MEDIA_PROFILE_RUNTIME_TAGS = {"comfyui", "diffusers", "diffusion-single-file"}
+MEDIA_RUNTIME_TAGS = {
+    "comfyui": "comfyui",
+    "diffusers": "diffusers",
+    "diffusion-single-file": "diffusion-single-file",
+    "mlx": "mlx",
+    "onnx": "onnx",
+    "tensorrt": "tensorrt",
+    "transformers": "transformers",
+    "vllm": "vllm",
+}
+MEDIA_CUSTOMIZATION_TAGS = {
+    "avatar": "digital-human",
+    "character-consistency": "identity-consistency",
+    "character-replacement": "person-replacement",
+    "digital-human": "digital-human",
+    "face-swap": "face-swap",
+    "faceswap": "face-swap",
+    "identity-consistency": "identity-consistency",
+    "identity-preserving": "identity-consistency",
+    "lip-sync": "lip-sync",
+    "lipsync": "lip-sync",
+    "person-replacement": "person-replacement",
+    "subject-consistency": "identity-consistency",
+    "talking-head": "talking-head",
+    "video-editing": "video-editing",
+}
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
 DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
 LOCAL_QUERY_LIMIT = 200
@@ -93,6 +138,7 @@ MODALITY_HOT_TRENDING = 4
 MODALITY_HOT_DOWNLOADS = 500
 MODALITY_HOT_LIKES = 10
 MODALITY_QUERY_LIMIT = 200
+MEDIA_CUSTOMIZATION_LIMIT = 8
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
 DATASET_HOT_LIKES = 20
@@ -112,6 +158,19 @@ EVALUATION_CAVEAT_CHARS = 700
 CARD_FETCH_WORKERS = 8
 CHANGE_EVIDENCE_LIMIT = 5
 SNAPSHOT_VERSION = 2
+MODEL_ARTIFACT_SUFFIXES = (
+    ".bin",
+    ".ckpt",
+    ".gguf",
+    ".onnx",
+    ".pt",
+    ".pth",
+    ".safetensors",
+)
+SHARDED_ARTIFACT_RE = re.compile(
+    r"^(?P<prefix>.+)-(?P<index>\d{5})-of-(?P<count>\d{5})(?P<suffix>\.[^/]+)$",
+    re.IGNORECASE,
+)
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "text-generation": {"input": ["text"], "output": ["text"]},
@@ -701,7 +760,25 @@ def deployment_facets(row: dict[str, Any]) -> list[str]:
         values.add("quantized")
     if "gguf" in values:
         values.update({"quantized", "ollama-compatible"})
+    values.update(runtime for tag, runtime in MEDIA_RUNTIME_TAGS.items() if tag in tags)
     return sorted(values)
+
+
+def media_customization_facet(row: dict[str, Any]) -> dict[str, Any]:
+    signals = [
+        {
+            "capability": MEDIA_CUSTOMIZATION_TAGS[tag],
+            "source": "hf-tag",
+            "value": tag,
+        }
+        for tag in sorted(lower_tags(row) & set(MEDIA_CUSTOMIZATION_TAGS))
+    ]
+    if not signals:
+        return {}
+    return {
+        "capabilities": sorted({signal["capability"] for signal in signals}),
+        "signals": signals,
+    }
 
 
 def contains_config_key(value: Any, keys: set[str]) -> bool:
@@ -838,7 +915,28 @@ def model_metadata(
     if record.get("track") == "flagship":
         canonical = canonical or model_id
     modality_signals = modality_evidence(row)
+    modality_inherited_from: str | None = None
+    if (
+        inherited
+        and not modality_signals["input"]
+        and not modality_signals["output"]
+    ):
+        inherited_signals = modality_evidence(inherited)
+        if inherited_signals["input"] or inherited_signals["output"]:
+            modality_signals = {
+                "input": inherited_signals["input"],
+                "output": inherited_signals["output"],
+                "signals": [
+                    {
+                        **signal,
+                        "source": f"base_model.{signal.get('source') or 'structured'}",
+                    }
+                    for signal in inherited_signals["signals"]
+                ],
+            }
+            modality_inherited_from = str(inherited.get("id") or "") or None
     return {
+        "model_id": model_id,
         "track": record.get("track"),
         "role": record.get("role"),
         "family": family_id or None,
@@ -848,10 +946,14 @@ def model_metadata(
             "output": modality_signals["output"],
         },
         "role_evidence": {
-            "pipeline_tag": row.get("pipeline_tag") or "",
+            "pipeline_tag": row.get("pipeline_tag")
+            or ((inherited or {}).get("pipeline_tag") if modality_inherited_from else "")
+            or "",
             "task_signals": modality_signals["signals"],
+            "inherited_from": modality_inherited_from,
         },
         "capabilities": capability_facets(row, override),
+        "media_customization": media_customization_facet(row),
         "alignment": alignment_facet(row),
         "deployment": deployment,
         "stage": stage_facets(row),
@@ -865,6 +967,14 @@ def model_metadata(
             "evidence": family.get("evidence", []),
         },
         "base_models": [model for model, _ in base_model_links(row)],
+        "base_model_dependencies": [
+            {
+                "repo_id": model,
+                "relation": relation or "base_model",
+                "source": "hf-structured",
+            }
+            for model, relation in base_model_links(row)
+        ],
         "derivation": derivation_facets(row),
         "pipeline_tag": row.get("pipeline_tag") or "",
         "downloads": row.get("downloads") or 0,
@@ -1042,6 +1152,49 @@ def query_modality_candidates() -> tuple[
             for pipeline, pipeline_rows in trending_by_pipeline.items()
         },
     )
+
+
+def query_media_ecosystem_candidates() -> tuple[list[dict[str, Any]], dict[str, int], dict[str, str]]:
+    """Query local media runtimes whose repositories may omit a standard pipeline tag."""
+    rows: dict[str, dict[str, Any]] = {}
+    query_filters = MEDIA_ECOSYSTEM_FILTERS + MEDIA_CUSTOMIZATION_QUERY_FILTERS
+    counts = {value: 0 for value in query_filters}
+    errors: dict[str, str] = {}
+
+    def query(value: str, sort: str) -> tuple[str, str, list[dict[str, Any]], str | None]:
+        params = [
+            ("filter", value),
+            ("sort", sort),
+            ("direction", "-1"),
+            ("limit", str(MODALITY_QUERY_LIMIT)),
+        ]
+        try:
+            result = hf_api(expanded_model_query(params), retries=0)
+        except Exception as exc:
+            return value, sort, [], type(exc).__name__
+        return value, sort, result if isinstance(result, list) else [], None
+
+    queries = [
+        (value, sort)
+        for value in MEDIA_ECOSYSTEM_FILTERS
+        for sort in ("trendingScore", "lastModified")
+    ] + [
+        (value, "lastModified") for value in MEDIA_CUSTOMIZATION_QUERY_FILTERS
+    ]
+    seen_by_filter = {value: set() for value in query_filters}
+    with ThreadPoolExecutor(max_workers=min(12, len(queries) or 1)) as executor:
+        for value, sort, result, error in executor.map(lambda values: query(*values), queries):
+            if error:
+                errors[f"media-ecosystem:{value}:{sort}"] = error
+                continue
+            for row in result:
+                model_id = str(row.get("id") or "")
+                if not model_id:
+                    continue
+                rows.setdefault(model_id, row)
+                seen_by_filter[value].add(model_id)
+    counts.update({value: len(model_ids) for value, model_ids in seen_by_filter.items()})
+    return list(rows.values()), counts, errors
 
 
 def query_global_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
@@ -1238,6 +1391,15 @@ def local_discovery_items(
             continue
         matched = find_local_root(row, root_ids, model_rows)
         canonical, inherited = matched if matched else (None, None)
+        if inherited is None:
+            for base_id, relation in base_model_links(row):
+                base_row = model_rows.get(base_id)
+                if base_row is None:
+                    continue
+                inherited = base_row
+                if relation in DERIVATIVE_RELATIONS:
+                    canonical = base_id
+                break
         publisher = model_id.split("/", 1)[0]
         trusted_publisher = publisher in local_publishers
         breakout = is_breakout_local(row)
@@ -1265,7 +1427,10 @@ def local_discovery_items(
             selection.append("derivative")
         if low_refusal:
             selection.append("low-refusal")
-        role = base_record.get("role") or model_role(row, default="llm")
+        if media_customization_facet(row):
+            selection.append("media-customization")
+        inherited_role = model_role(inherited, default="llm") if inherited else "llm"
+        role = base_record.get("role") or model_role(row, default=inherited_role)
         if role in MODALITY_FOCUS_ROLES:
             selection.append("modality-radar")
         record = {
@@ -1364,6 +1529,8 @@ def model_discovery_items(
             selection.extend(["hot", "global-discovery"])
         if role in MODALITY_FOCUS_ROLES:
             selection.append("modality-radar")
+        if media_customization_facet(row):
+            selection.append("media-customization")
         record = {
             "id": model_id,
             "track": "discovery",
@@ -1377,6 +1544,84 @@ def model_discovery_items(
             model_item(row, record, registry, event)
         )
     return sorted(items, key=notable_model_sort_key, reverse=True)
+
+
+def media_customization_items(
+    rows: list[dict[str, Any]],
+    registry: dict[str, Any],
+    start: dt.date,
+    end: dt.date,
+    include_current_hot: bool = True,
+) -> list[dict[str, Any]]:
+    """Build a bounded ComfyUI/media customization radar from exact HF tags."""
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        facet = media_customization_facet(row)
+        model_id = str(row.get("id") or "")
+        if (
+            not model_id
+            or not facet
+            or "comfyui" not in set(deployment_facets(row))
+        ):
+            continue
+        event = event_in_window(row, start, end)
+        hot = include_current_hot and is_hot_discovery(row)
+        if not event and hot:
+            event = ("trending-observed", end.isoformat())
+        if not event:
+            continue
+        role = model_role(row)
+        selection = ["media-customization", "pending-registry"]
+        if hot:
+            selection.append("hot")
+        selection.append("comfyui-ecosystem")
+        record = {
+            "id": model_id,
+            "track": "discovery",
+            "role": role,
+            "selection": selection,
+            "pending_registry": True,
+            "publisher_tier": publisher_tier(model_id, registry),
+        }
+        items.append(model_item(row, record, registry, event))
+    items.sort(key=notable_model_sort_key, reverse=True)
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    capability_order = [
+        "digital-human",
+        "talking-head",
+        "lip-sync",
+        "face-swap",
+        "person-replacement",
+        "identity-consistency",
+        "video-editing",
+    ]
+    for capability in capability_order:
+        candidate = next(
+            (
+                item
+                for item in items
+                if item["title"] not in selected_ids
+                and capability
+                in set(
+                    ((item.get("metadata") or {}).get("media_customization") or {}).get(
+                        "capabilities", []
+                    )
+                )
+            ),
+            None,
+        )
+        if candidate is not None:
+            selected.append(candidate)
+            selected_ids.add(candidate["title"])
+    for item in items:
+        if len(selected) >= MEDIA_CUSTOMIZATION_LIMIT:
+            break
+        if item["title"] in selected_ids:
+            continue
+        selected.append(item)
+        selected_ids.add(item["title"])
+    return selected[:MEDIA_CUSTOMIZATION_LIMIT]
 
 
 def dataset_size(row: dict[str, Any]) -> str | None:
@@ -1864,6 +2109,510 @@ def extract_evaluation_evidence(text: str) -> dict[str, str]:
     return result
 
 
+def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
+    lower = text.lower()
+    runtimes = {
+        runtime
+        for token, runtime in {
+            "audio.cpp": "audio.cpp",
+            "comfyui": "comfyui",
+            "diffusers": "diffusers",
+            "llama.cpp": "llama.cpp",
+            "mlx": "mlx",
+            "onnx": "onnx",
+            "sglang": "sglang",
+            "tensorrt": "tensorrt",
+            "transformers": "transformers",
+            "vllm": "vllm",
+        }.items()
+        if token in lower
+    }
+    precision_patterns = {
+        "awq": r"\bawq\b",
+        "bf16": r"\bbf16\b|bfloat16",
+        "fp4": r"\b(?:fp4|mxfp4|nvfp4)\b",
+        "fp8": r"\b(?:fp8|mxfp8)\b",
+        "gptq": r"\bgptq\b",
+        "int4": r"\bint4\b|\b4-bit\b",
+        "int8": r"\bint8\b|\b8-bit\b",
+        "q3": r"\bq3(?:_[a-z0-9]+)?\b",
+        "q4": r"\bq4(?:_[a-z0-9]+)?\b",
+        "q5": r"\bq5(?:_[a-z0-9]+)?\b",
+        "q6": r"\bq6(?:_[a-z0-9]+)?\b",
+        "q8": r"\bq8(?:_[a-z0-9]+)?\b",
+    }
+    precisions = {
+        precision
+        for precision, pattern in precision_patterns.items()
+        if re.search(pattern, lower, flags=re.IGNORECASE)
+    }
+    acceleration_patterns = {
+        "distilled": r"\bdistill(?:ed|ation)?\b",
+        "lightning": r"\blightning\b",
+        "lcm": r"\blcm\b",
+        "turbo": r"\bturbo\b",
+    }
+    acceleration = {
+        value
+        for value, pattern in acceleration_patterns.items()
+        if re.search(pattern, lower, flags=re.IGNORECASE)
+    }
+    step_values: set[int] = set()
+    step_evidence: list[dict[str, Any]] = []
+    for raw_line in text.splitlines():
+        line = html.unescape(raw_line).strip()
+        if not re.search(r"\b(?:nfe|inference|sampling|denois|distill|turbo|lightning|steps?)\b", line, re.I):
+            continue
+        values = {
+            int(value)
+            for value in re.findall(r"\b(\d{1,2})\s*(?:-|\s)?(?:steps?|nfe)\b", line, re.I)
+            if 0 < int(value) <= 64
+        }
+        for value in sorted(values):
+            step_values.add(value)
+            if len(step_evidence) < 8:
+                step_evidence.append(
+                    {
+                        "value": value,
+                        "source": "model-card",
+                        "evidence": compact_markdown_evidence(line, 180),
+                    }
+                )
+    offload_patterns = {
+        "cpu-offload": r"\bcpu[ _-]?offload\b|enable_model_cpu_offload",
+        "device-map": r"\bdevice_map\b",
+        "low-vram": r"\blow[ _-]?vram\b",
+        "model-offload": r"\bmodel[ _-]?offload\b|offload_mode",
+        "sequential-cpu-offload": r"\bsequential[ _-]?cpu[ _-]?offload\b|enable_sequential_cpu_offload",
+    }
+    offload = {
+        value
+        for value, pattern in offload_patterns.items()
+        if re.search(pattern, lower, flags=re.IGNORECASE)
+    }
+    customization_patterns = {
+        "digital-human": r"\bdigital human\b|\bavatar generation\b",
+        "face-swap": r"\bface[ -]?swap(?:ping)?\b",
+        "identity-consistency": r"\b(?:identity|character|subject)[ -]?(?:preserv(?:ing|ation)|consisten(?:cy|t))\b",
+        "lip-sync": r"\blip[ -]?sync(?:hronization)?\b",
+        "person-replacement": r"\b(?:person|character|human)[ -]?replacement\b|\breplace (?:a |the )?(?:person|character|human)\b",
+        "talking-head": r"\btalking[ -]?head\b",
+        "video-editing": r"\bvideo editing\b",
+    }
+    customization_signals = [
+        {
+            "capability": capability,
+            "source": "model-card",
+            "value": match.group(0).lower(),
+        }
+        for capability, pattern in customization_patterns.items()
+        for match in [re.search(pattern, text, flags=re.IGNORECASE)]
+        if match
+    ]
+
+    dependency_cues = re.compile(
+        r"\b(?:base model|checkpoint|download|required?|requires?|need|text encoder|"
+        r"vision encoder|image encoder|vae|vocoder|upscaler|lora|model file|weights?)\b",
+        re.IGNORECASE,
+    )
+    dependencies: list[dict[str, str]] = []
+    seen_dependencies: set[str] = set()
+    reserved_hf_path_roots = {
+        "blog",
+        "blogs",
+        "collections",
+        "datasets",
+        "docs",
+        "models",
+        "papers",
+        "spaces",
+        "tasks",
+    }
+    for raw_line in text.splitlines():
+        if not dependency_cues.search(raw_line):
+            continue
+        for match in re.finditer(
+            r"https?://(?:www\.)?huggingface\.co/(?!datasets/|spaces/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
+            raw_line,
+        ):
+            repo_id = match.group(1).rstrip(".,;:)]}")
+            if repo_id.split("/", 1)[0].lower() in reserved_hf_path_roots:
+                continue
+            if repo_id in seen_dependencies:
+                continue
+            seen_dependencies.add(repo_id)
+            relation = "model-card-reference"
+            line_lower = raw_line.lower()
+            for token, candidate in [
+                ("text encoder", "text-encoder"),
+                ("vision encoder", "vision-encoder"),
+                ("image encoder", "vision-encoder"),
+                ("audio vae", "audio-vae"),
+                ("video vae", "video-vae"),
+                ("vae", "vae"),
+                ("vocoder", "vocoder"),
+                ("upscaler", "upscaler"),
+                ("lora", "adapter"),
+                ("base model", "base_model"),
+            ]:
+                if token in line_lower:
+                    relation = candidate
+                    break
+            dependencies.append(
+                {
+                    "repo_id": repo_id,
+                    "relation": relation,
+                    "source": "model-card",
+                }
+            )
+
+    referenced_files: set[str] = set()
+    for value in re.findall(
+        r"[A-Za-z0-9_.+/-]+\.(?:bin|ckpt|gguf|onnx|pt|pth|safetensors)",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        normalized = value.rstrip(".,;:)]}")
+        if "huggingface.co/" in normalized:
+            normalized = normalized.rsplit("/", 1)[-1]
+        normalized = normalized.removeprefix("./")
+        if not normalized or normalized.startswith(("-", "_")):
+            continue
+        referenced_files.add(normalized)
+    return {
+        "runtimes": sorted(runtimes),
+        "precisions": sorted(precisions),
+        "acceleration_methods": sorted(acceleration),
+        "steps": sorted(step_values),
+        "step_evidence": step_evidence,
+        "offload": sorted(offload),
+        "dependencies": dependencies,
+        "referenced_files": sorted(referenced_files)[:64],
+        "customization": {
+            "capabilities": sorted(
+                {signal["capability"] for signal in customization_signals}
+            ),
+            "signals": customization_signals,
+        }
+        if customization_signals
+        else {},
+    }
+
+
+def artifact_precision(path: str) -> list[str]:
+    lower = path.lower()
+    patterns = {
+        "awq": r"(?:^|[/_.-])awq(?:[/_.-]|$)",
+        "bf16": r"(?:^|[/_.-])(?:bf16|bfloat16)(?:[/_.-]|$)",
+        "fp4": r"(?:^|[/_.-])(?:fp4|mxfp4|nvfp4)(?:[/_.-]|$)",
+        "fp8": r"(?:^|[/_.-])(?:fp8|mxfp8)(?:[/_.-]|$)",
+        "gptq": r"(?:^|[/_.-])gptq(?:[/_.-]|$)",
+        "int4": r"(?:^|[/_.-])int4(?:[/_.-]|$)",
+        "int8": r"(?:^|[/_.-])int8(?:[/_.-]|$)",
+        "q3": r"(?:^|[/_.-])q3(?:_[a-z0-9]+)?(?:[/_.-]|$)",
+        "q4": r"(?:^|[/_.-])q4(?:_[a-z0-9]+)?(?:[/_.-]|$)",
+        "q5": r"(?:^|[/_.-])q5(?:_[a-z0-9]+)?(?:[/_.-]|$)",
+        "q6": r"(?:^|[/_.-])q6(?:_[a-z0-9]+)?(?:[/_.-]|$)",
+        "q8": r"(?:^|[/_.-])q8(?:_[a-z0-9]+)?(?:[/_.-]|$)",
+    }
+    return sorted(
+        precision for precision, pattern in patterns.items() if re.search(pattern, lower)
+    )
+
+
+def artifact_component(path: str) -> str:
+    lower = path.lower()
+    if "lora" in lower or "adapter" in lower:
+        return "adapter"
+    if "audio_vae" in lower or "audio-vae" in lower:
+        return "audio-vae"
+    if "video_vae" in lower or "video-vae" in lower:
+        return "video-vae"
+    if "vae" in lower:
+        return "vae"
+    if "vocoder" in lower:
+        return "vocoder"
+    if "text_encoder" in lower or "text-encoder" in lower:
+        return "text-encoder"
+    if any(value in lower for value in ("vision_encoder", "image_encoder", "visual_encoder")):
+        return "vision-encoder"
+    if "upscal" in lower:
+        return "upscaler"
+    if "projector" in lower or "mmproj" in lower:
+        return "projector"
+    if any(value in lower for value in ("diffusion_model", "transformer", "unet")):
+        return "transformer"
+    return "model-weights"
+
+
+def fetch_model_repository_files(repo_id: str) -> dict[str, Any]:
+    quoted_id = urllib.parse.quote(repo_id, safe="/")
+    query = urllib.parse.urlencode(
+        [("blobs", "true"), ("expand", "siblings"), ("expand", "usedStorage")]
+    )
+    try:
+        payload = hf_api(f"/api/models/{quoted_id}?{query}", retries=1)
+        if not isinstance(payload, dict):
+            raise TypeError("unexpected Hugging Face model detail response")
+    except Exception as exc:
+        return {"ok": False, "files": [], "error": type(exc).__name__}
+    files = [
+        {
+            "path": str(row.get("rfilename") or ""),
+            "size": int(row.get("size") or 0),
+        }
+        for row in payload.get("siblings", [])
+        if row.get("rfilename")
+    ]
+    return {
+        "ok": True,
+        "files": files,
+        "used_storage": int(payload.get("usedStorage") or 0),
+    }
+
+
+def merge_customization_signals(*values: dict[str, Any]) -> dict[str, Any]:
+    signals: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for value in values:
+        for signal in (value or {}).get("signals", []):
+            key = (
+                str(signal.get("capability") or ""),
+                str(signal.get("source") or ""),
+                str(signal.get("value") or ""),
+            )
+            if not key[0] or key in seen:
+                continue
+            seen.add(key)
+            signals.append({"capability": key[0], "source": key[1], "value": key[2]})
+    if not signals:
+        return {}
+    return {
+        "capabilities": sorted({signal["capability"] for signal in signals}),
+        "signals": signals,
+    }
+
+
+def build_artifact_options(
+    artifact_files: list[dict[str, Any]],
+    limit: int = 32,
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    order: list[tuple[str, ...]] = []
+    for row in artifact_files:
+        path = str(row.get("path") or "")
+        match = SHARDED_ARTIFACT_RE.match(path)
+        if match:
+            key = (
+                "sharded",
+                match.group("prefix"),
+                match.group("count"),
+                match.group("suffix"),
+            )
+        else:
+            key = ("file", path)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(row)
+
+    options: list[dict[str, Any]] = []
+    for key in order:
+        rows = grouped[key]
+        if key[0] == "file":
+            row = rows[0]
+            path = str(row.get("path") or "")
+            options.append(
+                {
+                    "path": path,
+                    "bytes": int(row.get("size") or 0),
+                    "component": artifact_component(path),
+                    "precisions": artifact_precision(path),
+                }
+            )
+        else:
+            _, prefix, raw_count, suffix = key
+            shard_count = int(raw_count)
+            indexed_rows = sorted(
+                rows,
+                key=lambda row: int(
+                    SHARDED_ARTIFACT_RE.match(str(row.get("path") or "")).group("index")
+                ),
+            )
+            present_indices = {
+                int(
+                    SHARDED_ARTIFACT_RE.match(str(row.get("path") or "")).group("index")
+                )
+                for row in indexed_rows
+            }
+            first_path = str(indexed_rows[0].get("path") or "")
+            options.append(
+                {
+                    "path_pattern": (
+                        f"{prefix}-{{00001..{shard_count:05d}}}-of-"
+                        f"{shard_count:05d}{suffix}"
+                    ),
+                    "bytes": sum(int(row.get("size") or 0) for row in indexed_rows),
+                    "component": artifact_component(first_path),
+                    "precisions": sorted(
+                        {
+                            precision
+                            for row in indexed_rows
+                            for precision in artifact_precision(str(row.get("path") or ""))
+                        }
+                    ),
+                    "file_count": len(indexed_rows),
+                    "shard_count": shard_count,
+                    "required_all": True,
+                    "complete": present_indices == set(range(1, shard_count + 1)),
+                }
+            )
+        if len(options) >= limit:
+            break
+    return options
+
+
+def build_media_deployment_profile(
+    metadata: dict[str, Any],
+    repository: dict[str, Any],
+    card_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    files = repository.get("files") or []
+    artifact_files = [
+        row
+        for row in files
+        if str(row.get("path") or "").lower().endswith(MODEL_ARTIFACT_SUFFIXES)
+    ]
+    workflow_files = sorted(
+        str(row.get("path") or "")
+        for row in files
+        if str(row.get("path") or "").lower().endswith(".json")
+        and re.search(r"(?:workflow|comfy)", str(row.get("path") or ""), re.I)
+    )
+    component_rows: dict[str, dict[str, Any]] = {}
+    file_precisions: set[str] = set()
+    file_acceleration: set[str] = set()
+    file_steps: set[int] = set()
+    file_step_evidence: list[dict[str, Any]] = []
+    for row in artifact_files:
+        path = str(row.get("path") or "")
+        lower_path = path.lower()
+        component = artifact_component(path)
+        precisions = artifact_precision(path)
+        file_precisions.update(precisions)
+        for token, method in {
+            "distill": "distilled",
+            "lightning": "lightning",
+            "lcm": "lcm",
+            "turbo": "turbo",
+        }.items():
+            if token in lower_path:
+                file_acceleration.add(method)
+        for value in re.findall(r"(?:^|[/_.-])(\d{1,2})[-_]?steps?(?:[/_.-]|$)", lower_path):
+            step = int(value)
+            if not 0 < step <= 64:
+                continue
+            file_steps.add(step)
+            if len(file_step_evidence) < 8:
+                file_step_evidence.append(
+                    {"value": step, "source": "hf-repository-file", "evidence": path}
+                )
+        summary = component_rows.setdefault(
+            component,
+            {"type": component, "file_count": 0, "bytes": 0, "precisions": set()},
+        )
+        summary["file_count"] += 1
+        summary["bytes"] += int(row.get("size") or 0)
+        summary["precisions"].update(precisions)
+    components = [
+        {
+            "type": row["type"],
+            "file_count": row["file_count"],
+            "bytes": row["bytes"],
+            "precisions": sorted(row["precisions"]),
+            "source": "hf-repository-files",
+        }
+        for row in component_rows.values()
+    ]
+    artifact_options = build_artifact_options(artifact_files)
+    dependencies: list[dict[str, str]] = []
+    seen_dependencies: set[tuple[str, str]] = set()
+    current_id = str(metadata.get("model_id") or "")
+    for dependency in list(metadata.get("base_model_dependencies") or []) + list(
+        card_evidence.get("dependencies") or []
+    ):
+        repo_id = str(dependency.get("repo_id") or "")
+        relation = str(dependency.get("relation") or "model-card-reference")
+        if not repo_id or repo_id == current_id or (repo_id, relation) in seen_dependencies:
+            continue
+        seen_dependencies.add((repo_id, relation))
+        dependencies.append(
+            {
+                "repo_id": repo_id,
+                "relation": relation,
+                "source": str(dependency.get("source") or "unknown"),
+            }
+        )
+    runtimes = sorted(
+        set(metadata.get("deployment") or [])
+        & (set(MEDIA_RUNTIME_TAGS.values()) | {"gguf", "ollama-compatible"})
+        | set(card_evidence.get("runtimes") or [])
+    )
+    # A model card may mention mutually exclusive precision variants. Treat these
+    # as references, not as a complete runtime manifest, unless a future registry
+    # entry explicitly declares a deployable bundle.
+    referenced_files = list(card_evidence.get("referenced_files") or [])
+    known_paths = {str(row.get("path") or "") for row in files}
+    matched_references = [
+        path
+        for path in referenced_files
+        if path in known_paths or any(candidate.endswith("/" + path) for candidate in known_paths)
+    ]
+    unresolved_references = [
+        path for path in referenced_files if path not in matched_references
+    ]
+    complete_runtime_status = "partial" if artifact_files or dependencies else "unknown"
+    profile = {
+        "runtimes": runtimes,
+        "components": sorted(components, key=lambda value: value["type"]),
+        "artifact_options": artifact_options,
+        "workflow_files": workflow_files,
+        "precisions": sorted(file_precisions | set(card_evidence.get("precisions") or [])),
+        "acceleration": {
+            "methods": sorted(
+                file_acceleration
+                | set(card_evidence.get("acceleration_methods") or [])
+            ),
+            "steps": sorted(file_steps | set(card_evidence.get("steps") or [])),
+            "step_evidence": (
+                list(card_evidence.get("step_evidence") or []) + file_step_evidence
+            )[:8],
+        },
+        "offload": list(card_evidence.get("offload") or []),
+        "dependencies": dependencies,
+        "footprint": {
+            "repository_bytes": sum(int(row.get("size") or 0) for row in files),
+            "artifact_bytes": sum(int(row.get("size") or 0) for row in artifact_files),
+            "artifact_file_count": len(artifact_files),
+            "complete_runtime_bytes": None,
+            "complete_runtime_status": complete_runtime_status,
+            "referenced_files": referenced_files,
+            "unresolved_referenced_files": unresolved_references,
+            "source": "hf-repository-files+model-card",
+        },
+        "customization": merge_customization_signals(
+            metadata.get("media_customization") or {},
+            card_evidence.get("customization") or {},
+        ),
+        "repository_files_ok": bool(repository.get("ok")),
+    }
+    return {
+        key: value
+        for key, value in profile.items()
+        if value not in (None, "", [], {})
+    }
+
+
 def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
     prefix = "datasets/" if repo_type == "dataset" else ""
     quoted_id = urllib.parse.quote(repo_id, safe="/")
@@ -1883,6 +2632,7 @@ def fetch_card(repo_id: str, repo_type: str) -> dict[str, Any]:
                     evaluation = extract_evaluation_evidence(text)
                     if evaluation.get("excerpt"):
                         result["evaluation"] = evaluation
+                    result["_deployment_evidence"] = extract_media_deployment_evidence(text)
                 return result
         except Exception as exc:
             last_error = exc
@@ -1934,6 +2684,19 @@ def fetch_hf_change_evidence(
     return {"source": "Hugging Face commit history", "ok": True, "commits": commits}
 
 
+def needs_media_deployment_profile(item: dict[str, Any]) -> bool:
+    if str(item.get("repo_type") or "model") != "model":
+        return False
+    metadata = item.get("metadata") or {}
+    return (
+        str(metadata.get("role") or "") in MEDIA_DEPLOYMENT_ROLES
+        or bool(metadata.get("media_customization"))
+        or bool(
+            set(metadata.get("deployment") or []) & MEDIA_PROFILE_RUNTIME_TAGS
+        )
+    )
+
+
 def enrich_items_with_cards(
     items: list[dict[str, Any]],
     start: dt.date | None = None,
@@ -1943,15 +2706,53 @@ def enrich_items_with_cards(
 
     def enrich(item: dict[str, Any]) -> dict[str, Any]:
         repo_type = str(item.get("repo_type") or "model")
-        item["metadata"]["card"] = fetch_card(str(item.get("title") or ""), repo_type)
+        repo_id = str(item.get("title") or "")
+        card = fetch_card(repo_id, repo_type)
+        deployment_evidence = card.pop("_deployment_evidence", {})
+        item["metadata"]["card"] = card
+        if needs_media_deployment_profile(item):
+            repository = fetch_model_repository_files(repo_id)
+            item["metadata"]["deployment_profile"] = build_media_deployment_profile(
+                item["metadata"], repository, deployment_evidence
+            )
+            merged_customization = (
+                item["metadata"]["deployment_profile"].get("customization") or {}
+            )
+            if merged_customization:
+                item["metadata"]["media_customization"] = merged_customization
         if item.get("event") == "repository-updated" and start and end:
             item["metadata"]["change_evidence"] = fetch_hf_change_evidence(
-                str(item.get("title") or ""), repo_type, start, end
+                repo_id, repo_type, start, end
             )
         return item
 
-    with ThreadPoolExecutor(max_workers=min(CARD_FETCH_WORKERS, len(copied) or 1)) as executor:
-        return list(executor.map(enrich, copied))
+    unique: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in copied:
+        key = (str(item.get("repo_type") or "model"), str(item.get("title") or ""))
+        unique.setdefault(key, item)
+    unique_items = list(unique.values())
+    with ThreadPoolExecutor(max_workers=min(CARD_FETCH_WORKERS, len(unique_items) or 1)) as executor:
+        enriched_unique = list(executor.map(enrich, unique_items))
+    enriched_by_key = {
+        (str(item.get("repo_type") or "model"), str(item.get("title") or "")): item
+        for item in enriched_unique
+    }
+    results: list[dict[str, Any]] = []
+    for item in copied:
+        key = (str(item.get("repo_type") or "model"), str(item.get("title") or ""))
+        evidence_metadata = (enriched_by_key[key].get("metadata") or {})
+        metadata = dict(item.get("metadata") or {})
+        for evidence_key in ("card", "deployment_profile", "change_evidence"):
+            if evidence_key in evidence_metadata:
+                metadata[evidence_key] = evidence_metadata[evidence_key]
+        merged_customization = merge_customization_signals(
+            metadata.get("media_customization") or {},
+            evidence_metadata.get("media_customization") or {},
+        )
+        if merged_customization:
+            metadata["media_customization"] = merged_customization
+        results.append({**item, "metadata": metadata})
+    return results
 
 
 def enrich_formal_groups(
@@ -1959,6 +2760,7 @@ def enrich_formal_groups(
     local_items: list[dict[str, Any]],
     dataset_items: list[dict[str, Any]],
     notable_discoveries: dict[str, list[dict[str, Any]]],
+    media_customization: list[dict[str, Any]],
     start: dt.date,
     end: dt.date,
 ) -> tuple[
@@ -1966,6 +2768,7 @@ def enrich_formal_groups(
     list[dict[str, Any]],
     list[dict[str, Any]],
     dict[str, list[dict[str, Any]]],
+    list[dict[str, Any]],
 ]:
     batches: list[tuple[str, str | None, list[dict[str, Any]]]] = [
         ("flagship", role, rows) for role, rows in flagship_groups.items()
@@ -1976,6 +2779,7 @@ def enrich_formal_groups(
             ("datasets", None, dataset_items),
             ("notable", "models", notable_discoveries["models"]),
             ("notable", "datasets", notable_discoveries["datasets"]),
+            ("media-customization", None, media_customization),
         ]
     )
     flattened = [item for _, _, rows in batches for item in rows]
@@ -1985,6 +2789,7 @@ def enrich_formal_groups(
     enriched_local: list[dict[str, Any]] = []
     enriched_datasets: list[dict[str, Any]] = []
     enriched_notable = {"models": [], "datasets": []}
+    enriched_media_customization: list[dict[str, Any]] = []
     cursor = 0
     for group, key, rows in batches:
         batch = enriched[cursor : cursor + len(rows)]
@@ -1997,7 +2802,15 @@ def enrich_formal_groups(
             enriched_datasets = batch
         elif group == "notable" and key is not None:
             enriched_notable[key] = batch
-    return enriched_flagship, enriched_local, enriched_datasets, enriched_notable
+        elif group == "media-customization":
+            enriched_media_customization = batch
+    return (
+        enriched_flagship,
+        enriched_local,
+        enriched_datasets,
+        enriched_notable,
+        enriched_media_customization,
+    )
 
 
 def huggingface_repo_from_url(value: str) -> tuple[str, str] | None:
@@ -2626,8 +3439,11 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
             "canonical_model",
             "modalities",
             "role_evidence",
+            "media_customization",
             "alignment",
             "deployment",
+            "deployment_profile",
+            "base_model_dependencies",
             "architecture",
             "architecture_classes",
             "scale",
@@ -2674,6 +3490,9 @@ def build_report_payload(payload: dict[str, Any]) -> dict[str, Any]:
                     report_item(item) for item in groups["notable_discoveries"]["datasets"]
                 ],
             },
+            "media_customization": [
+                report_item(item) for item in groups.get("media_customization", [])
+            ],
         },
     }
 
@@ -2758,10 +3577,13 @@ def main() -> int:
     )
 
     phase_started = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=7) as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
         local_future = executor.submit(query_local_candidates) if include_current_hot else None
         modality_future = executor.submit(query_modality_candidates) if include_current_hot else None
+        media_ecosystem_future = (
+            executor.submit(query_media_ecosystem_candidates) if include_current_hot else None
+        )
         global_future = executor.submit(query_global_models) if include_current_hot else None
         dataset_future = executor.submit(
             query_dataset_candidates,
@@ -2778,6 +3600,20 @@ def main() -> int:
             modality_future.result()
             if modality_future
             else ([], {role: 0 for role in MODALITY_FOCUS_ROLES}, {}, {})
+        )
+        media_ecosystem_candidates, media_ecosystem_counts, media_ecosystem_errors = (
+            media_ecosystem_future.result()
+            if media_ecosystem_future
+            else (
+                [],
+                {
+                    value: 0
+                    for value in (
+                        MEDIA_ECOSYSTEM_FILTERS + MEDIA_CUSTOMIZATION_QUERY_FILTERS
+                    )
+                },
+                {},
+            )
         )
         global_trending, global_recent, global_errors = (
             global_future.result() if global_future else ([], [], {})
@@ -2804,6 +3640,7 @@ def main() -> int:
             owner_rows_list
             + local_candidates
             + modality_candidates
+            + media_ecosystem_candidates
             + global_recent
             + global_trending
         )
@@ -2852,6 +3689,7 @@ def main() -> int:
     model_errors = {
         **owner_errors,
         **modality_errors,
+        **media_ecosystem_errors,
         **global_errors,
         **exact_model_errors,
     }
@@ -2961,6 +3799,13 @@ def main() -> int:
         model_discoveries,
         dataset_discoveries,
     )
+    media_customization = media_customization_items(
+        media_ecosystem_candidates,
+        model_registry,
+        start,
+        end,
+        include_current_hot,
+    )
     notable_model_ids = {
         str(item.get("title") or "") for item in notable_discoveries["models"]
     }
@@ -2978,11 +3823,13 @@ def main() -> int:
         local_items,
         dataset_items,
         notable_discoveries,
+        media_customization,
     ) = enrich_formal_groups(
         flagship_groups,
         local_items,
         dataset_items,
         notable_discoveries,
+        media_customization,
         start,
         end,
     )
@@ -2990,6 +3837,24 @@ def main() -> int:
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
     notable_model_count = len(notable_discoveries["models"])
     notable_dataset_count = len(notable_discoveries["datasets"])
+    profiled_model_items = [
+        item
+        for rows in list(flagship_groups.values())
+        + [local_items, notable_discoveries["models"], media_customization]
+        for item in rows
+        if (item.get("metadata") or {}).get("deployment_profile")
+    ]
+    profiled_model_items = list(
+        {str(item.get("title") or ""): item for item in profiled_model_items}.values()
+    )
+    deployment_profile_errors = sum(
+        not bool(
+            ((item.get("metadata") or {}).get("deployment_profile") or {}).get(
+                "repository_files_ok"
+            )
+        )
+        for item in profiled_model_items
+    )
 
     payload = {
         "kind": "ai-oss-models",
@@ -3021,6 +3886,8 @@ def main() -> int:
             "local_filter_candidates": len(local_candidates),
             "modality_query_candidates": len(modality_candidates),
             "modality_query_by_role": modality_query_counts,
+            "media_ecosystem_candidates": len(media_ecosystem_candidates),
+            "media_ecosystem_by_filter": media_ecosystem_counts,
             "global_trending_candidates": len(global_trending),
             "global_recent_candidates": len(global_recent),
             "open_candidate_union": len(open_candidates),
@@ -3038,12 +3905,15 @@ def main() -> int:
             ),
             "local_selected": len(local_items),
             "model_discoveries": len(model_discoveries),
+            "media_customization_selected": len(media_customization),
             "dataset_trending_candidates": dataset_query_counts.get("trending", 0),
             "dataset_recent_candidates": dataset_query_counts.get("recent", 0),
             "dataset_official_owner_candidates": dataset_query_counts.get("official_owner", 0),
             "dataset_candidate_union": dataset_query_counts.get("union", 0),
             "project_url_candidates": len(project_url_rows),
             "github_metric_repositories": len(github_metrics),
+            "deployment_profile_models": len(profiled_model_items),
+            "deployment_profile_repository_errors": deployment_profile_errors,
         },
         "groups": {
             "flagship": flagship_groups,
@@ -3051,6 +3921,7 @@ def main() -> int:
             "reproducible": reproducible_items,
             "datasets": dataset_items,
             "notable_discoveries": notable_discoveries,
+            "media_customization": media_customization,
         },
         "discoveries": discoveries,
     }

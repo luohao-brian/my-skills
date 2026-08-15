@@ -16,18 +16,32 @@
     "local_filter_candidates": 0,
     "modality_query_candidates": 0,
     "modality_query_by_role": {"image-generation": 0, "video-generation": 0, "audio-tts": 0},
+    "media_ecosystem_candidates": 0,
+    "media_ecosystem_by_filter": {
+      "comfyui": 0,
+      "digital-human": 0,
+      "face-swap": 0,
+      "identity-consistency": 0,
+      "lip-sync": 0,
+      "person-replacement": 0,
+      "talking-head": 0,
+      "video-editing": 0
+    },
     "global_trending_candidates": 0,
     "global_recent_candidates": 0,
     "open_candidate_union": 0,
     "local_hot_before_limit": 0,
     "local_selected": 0,
     "model_discoveries": 0,
+    "media_customization_selected": 0,
     "dataset_trending_candidates": 0,
     "dataset_recent_candidates": 0,
     "dataset_official_owner_candidates": 0,
     "dataset_candidate_union": 0,
     "project_url_candidates": 0,
-    "github_metric_repositories": 0
+    "github_metric_repositories": 0,
+    "deployment_profile_models": 0,
+    "deployment_profile_repository_errors": 0
   },
   "groups": {
     "flagship": {
@@ -49,7 +63,8 @@
     "notable_discoveries": {
       "models": [],
       "datasets": []
-    }
+    },
+    "media_customization": []
   },
   "discoveries": []
 }
@@ -191,6 +206,84 @@
   }
 }
 ```
+
+最终入选的媒体模型，以及命中 ComfyUI/diffusers 媒体运行时或媒体定制能力的模型，还可包含部署画像：
+
+```json
+{
+  "metadata": {
+    "media_customization": {
+      "capabilities": ["talking-head", "lip-sync", "face-swap", "person-replacement"],
+      "signals": [
+        {"capability": "face-swap", "source": "hf-tag", "value": "face-swap"}
+      ]
+    },
+    "deployment_profile": {
+      "runtimes": ["comfyui", "diffusers"],
+      "components": [
+        {
+          "type": "transformer",
+          "file_count": 4,
+          "bytes": 123,
+          "precisions": ["bf16", "fp8"],
+          "source": "hf-repository-files"
+        }
+      ],
+      "artifact_options": [
+        {
+          "path": "distilled/model-Q4_K_M.gguf",
+          "bytes": 15687639424,
+          "component": "transformer",
+          "precisions": ["q4"]
+        },
+        {
+          "path_pattern": "model-{00001..00018}-of-00018.safetensors",
+          "bytes": 54000000000,
+          "component": "model-weights",
+          "precisions": ["bf16"],
+          "file_count": 18,
+          "shard_count": 18,
+          "required_all": true,
+          "complete": true
+        }
+      ],
+      "workflow_files": ["workflows/example-comfy-workflow.json"],
+      "precisions": ["bf16", "fp8"],
+      "acceleration": {
+        "methods": ["distilled", "turbo"],
+        "steps": [4, 8],
+        "step_evidence": [
+          {"value": 4, "source": "model-card", "evidence": "..."}
+        ]
+      },
+      "offload": ["cpu-offload"],
+      "dependencies": [
+        {"repo_id": "owner/component", "relation": "text-encoder", "source": "model-card"}
+      ],
+      "footprint": {
+        "repository_bytes": 123,
+        "artifact_bytes": 120,
+        "artifact_file_count": 4,
+        "complete_runtime_bytes": null,
+        "complete_runtime_status": "partial",
+        "referenced_files": ["model_fp8.safetensors"],
+        "unresolved_referenced_files": [],
+        "source": "hf-repository-files+model-card"
+      },
+      "repository_files_ok": true
+    },
+    "base_model_dependencies": [
+      {"repo_id": "owner/base", "relation": "adapter", "source": "hf-structured"}
+    ]
+  }
+}
+```
+
+- `components` 和 `repository_bytes` 汇总当前 HF 仓库全部权重文件，可能同时包含多个可选精度或工作流，不能直接视为单次部署占用。
+- `artifact_options` 保留最多 32 个独立权重选项；索引分片先合并为一个 `required_all=true` 的 bundle，并用 `complete` 标记仓库是否包含全部分片。`workflow_files` 保留仓库内名称明确包含 workflow/ComfyUI 的 JSON 工作流。这些字段复用同一次 model detail，不增加调用。
+- model card 中出现的权重文件只记为 `referenced_files`，不擅自认定为全部必需文件。因此没有显式部署 bundle manifest 时，`complete_runtime_bytes` 为 `null`，`complete_runtime_status` 为 `partial` 或 `unknown`。
+- `dependencies` 合并 HF 结构化 `base_model` 关系和 model card 中带依赖语境的 HF 模型链接；它描述部署组件依赖，不做许可证判断，也不递归推算依赖仓库占用。
+- `media_customization` 只接受精确 HF tags，或最终入选模型的 model card 明确措辞；不从仓库名猜测换脸、换人、数字人等能力。
 
 方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。`text-to-speech` 归入 TTS，其他音频输出归入音频生成，避免把 voice conversion 或音乐生成误写成 TTS。无法得到完整输入和输出时保留空数组并使用“待确认”。
 

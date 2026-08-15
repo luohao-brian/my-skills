@@ -5,12 +5,16 @@
 - 精确查询模型、数据集和可复现项目注册表中的 Hugging Face 仓库。
 - 当前运行查询 HF 全局 Trending Top 500 和最近更新 Top 1000，召回未登记 owner 的热门社区模型和未被过滤器覆盖的完整权重仓库；历史运行不查询这两个实时池。
 - 当前运行额外按结构化任务查询图像生成、视频生成和 TTS 的 Trending 与最近更新池，并保留 HF 官方任务内排名；这是模态级召回漏斗，不依赖模型名或发布者。历史运行不查询这些实时池。
+- 当前运行查询 ComfyUI filter 的 Trending 与最近更新池，并对 digital-human、talking-head、lip-sync、face-swap、person-replacement、identity-consistency、video-editing 精确 tags 各查询一次最近更新池，用于补回 ComfyUI 大池 Top 200 之外的稀疏能力。共 9 个列表请求并行执行；历史运行不查询该实时池。
 - 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选，并查询 uncensored、abliterated、heretic、decensored 精确 tags 形成低拒绝候选池。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
 - 使用已认证的 `gh api` 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
 - 当前运行通过 `gh api` 读取已登记 GitHub 工程的 star/fork，并在提供状态目录时计算增量；不从模型卡任意发现或猜测 GitHub 仓库。star/fork 只表达工程关注和采用信号，不证明模型质量或本窗口技术变化。
 - 只为最终入选的重点旗舰、本地热门、正式数据集和重点新发现读取对应 model card 或 dataset card。
+- 对最终入选的媒体模型及 ComfyUI 媒体定制雷达条目，在同一次 formal enrichment 中额外调用一次 HF model detail（`blobs=true&expand=siblings&expand=usedStorage`），一次取得仓库文件路径与尺寸，用于组件、精度和仓库占用汇总；不逐文件请求。
+- 运行时、NFE/步数、蒸馏/Turbo/Lightning/LCM、offload、外部模型链接和媒体定制措辞复用上述 model card 请求，不增加请求次数。
+- 默认不递归读取依赖仓库文件列表。基础模型、VAE、编码器、vocoder、LoRA 等依赖链会被保留，但精确完整运行占用需要显式部署 bundle manifest；没有 manifest 时不得把仓库中的可选权重全部相加。
 - 所有正式候选合并后共用一个 enrichment 任务池，不按报告分节串行抓取 model card 和提交历史；同一次 run 不重复采集同一正式候选。
 - 从最终入选模型的 model card 提取 Evaluation、Benchmark、Leaderboard 等评测小节和以 `Benchmark` 为表头的结果表，同时提取 Limitations / Caveats 作为评测边界。
 - 对最终入选的 HF `repository-updated` 候选读取本窗口提交历史；对可复现项目的已更新 HF/GitHub 交付件读取提交标题和链接，供成稿解释具体变化。
@@ -62,7 +66,11 @@ HF 热门条件：
 - 模态：优先解析 `pipeline_tag`，再合并可解析为完整输入/输出的任务 tags；标准固定任务使用已知 I/O，组合任务按 `<输入模态>-to-<输出模态>` 泛化解析。
 - 能力：精确 tags 和模型注册表覆盖项。
 - 部署：精确 tags、量化配置和模型注册表。
-- 依赖：`cardData.base_model`、`base_model_relation` 和 `base_model:*` tags。
+- 媒体运行时：精确 `comfyui`、`diffusers`、`diffusion-single-file`、`mlx`、`onnx`、`tensorrt`、`transformers`、`vllm` tags，并用最终入选模型的 model card 补充明确运行方式。
+- 媒体组件与精度：最终入选模型的 HF sibling 文件路径、文件尺寸和 model card；文件路径按 transformer/UNet、VAE、文本/视觉编码器、vocoder、adapter、projector、upscaler 等部署组件归类。
+- NFE 与加速：从 model card 中同时含 inference/sampling/denoise/distill/turbo/lightning/NFE 语境的步数，以及明确的 distilled、turbo、lightning、LCM 表述提取；最终媒体仓库的权重文件名若精确包含 `4step`、`8step`、`distilled`、`turbo`、`lightning` 或 `lcm`，也保留文件路径作为结构化证据，不依赖仓库名。
+- 媒体定制：候选召回只接受精确 HF tags；最终候选可用 model card 的 digital human、talking head、lip sync、face swap、person/character replacement、identity consistency、video editing 明确措辞补充。不得从模型名推断。
+- 依赖：`cardData.base_model`、`base_model_relation`、`base_model:*` tags，以及最终媒体模型卡中带 required/checkpoint/encoder/VAE/vocoder/LoRA 等依赖语境的 HF 模型链接。排除 docs、collections、datasets、spaces 等非模型页面。
 - 衍生关系：只接受 HF 结构化 `adapter`、`finetune`、`merge` 和 `quantized` 关系。
 - 对齐信号：只接受 HF 精确 `uncensored`、`abliterated`、`heretic`、`decensored` tags，归一为 `alignment.profile=low-refusal` 并保留原 tag 证据；不从模型 ID 或自然语言介绍推断，也不作为质量或安全结论。
 - 架构：只在 config 含明确 expert 字段或精确 tags 支持时标记 MoE，在精确 `diffusers` tag 支持时标记 Diffusion；普通 config 的存在不足以证明 Dense，其余情况使用 `unknown`。
