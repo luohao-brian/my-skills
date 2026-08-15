@@ -1,17 +1,17 @@
 ---
 name: ark-video-gen
-description: 使用 Ark Agent Plan Seedance 视频生成接口创建文生视频或图生视频任务。适用于短视频生成、分镜草稿、图片转视频、视频任务轮询和返回生成视频 URL 的任务。
+description: 使用 Ark Agent Plan（默认）或 Ark API 的 Seedance 模型创建视频。适用于文生视频、图片转视频、短视频草稿、任务轮询和返回视频 URL 的任务。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-video-gen
-metadata: {"openclaw":{"skillKey":"ark-video-gen","emoji":"🎬","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-video-gen","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"volcengine-python-sdk[ark]>=5.0.5,<6"}]}}
+metadata: {"openclaw":{"skillKey":"ark-video-gen","emoji":"🎬","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-video-gen","requires":{"anyBins":["python3","python"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"volcengine-python-sdk[ark]>=5.0.5,<6"}]}}
 ---
 
-# Ark Agent Plan Video Generation
+# Ark Video Generation
 
 Use this skill to submit and poll Ark video generation tasks.
 
-## Required Reads
+## Optional Reads
 
-- Read [references/ark-video-gen.md](references/ark-video-gen.md) before generation.
+- Read [references/ark-video-gen.md](references/ark-video-gen.md) for backend details or generation settings.
 - Read `scripts/volc_video_gen.py --help` only when exact flags are needed.
 
 ## Command
@@ -28,8 +28,8 @@ python3 {baseDir}/scripts/volc_video_gen.py "镜头缓慢推进，人物转身" 
 
 ## Contract
 
-1. The script reads only `ARK_AGENT_PLAN_API_KEY`.
-2. Use the fixed Agent Plan endpoint and `doubao-seedance-2.0-fast` model.
+1. Use Agent Plan by default. Map explicit user wording `ARK-API` or `方舟 API` to `--backend ark-api`; map `ARK-AGENT-PLAN` or `方舟 Agent Plan` to `--backend ark-agent-plan`. Never switch or retry across backends automatically. See [references/ark-video-gen.md](references/ark-video-gen.md) for credentials and models.
+2. Use the fixed endpoint and model selected by the backend.
 3. Submit one task, poll until success, failure, cancellation, expiry, or timeout.
-4. Expect stdout JSON containing `success`, `task_id`, `status`, `video_url`, `model`, and generation settings.
+4. Expect stdout JSON containing `success`, `backend`, `task_id`, `status`, `video_url`, `model`, and generation settings.
 5. On timeout, use the last known task status and task id from the script output.

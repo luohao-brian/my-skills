@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import threading
 import unittest
 from pathlib import Path
@@ -25,10 +26,86 @@ IMAGE = load_script("ark_image_gen_protocol", "openclaw-skills/ark-image-gen/scr
 VIDEO = load_script("ark_video_gen_protocol", "openclaw-skills/ark-video-gen/scripts/volc_video_gen.py")
 STT = load_script("ark_stt_protocol", "openclaw-skills/ark-stt/scripts/volc_stt.py")
 TTS = load_script("ark_tts_protocol", "openclaw-skills/ark-tts/scripts/volc_tts.py")
+VISION = load_script("ark_vision_protocol", "openclaw-skills/ark-vision/scripts/vision_analyze.py")
 SEARCH = load_script("ark_search_protocol", "openclaw-skills/ark-search/scripts/web_search.py")
 
 
 class ArkSkillProtocolTests(unittest.TestCase):
+    def test_skill_instructions_map_user_backend_wording(self) -> None:
+        for skill_name in ("ark-image-gen", "ark-video-gen", "ark-tts", "ark-stt", "ark-vision"):
+            text = (ROOT / "openclaw-skills" / skill_name / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("`ARK-API` or `方舟 API` to `--backend ark-api`", text)
+            self.assertIn("`ARK-AGENT-PLAN` or `方舟 Agent Plan` to `--backend ark-agent-plan`", text)
+
+    def test_backend_defaults_models_and_credentials(self) -> None:
+        modules = (IMAGE, VIDEO, TTS, STT, VISION)
+        self.assertTrue(all(module.DEFAULT_BACKEND == "ark-agent-plan" for module in modules))
+
+        self.assertEqual(IMAGE.BACKENDS["ark-agent-plan"], {
+            "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
+            "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+            "model": "doubao-seedream-5.0-lite",
+        })
+        self.assertEqual(IMAGE.BACKENDS["ark-api"], {
+            "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+            "api_key_env": "ARK_API_KEY",
+            "model": "doubao-seedream-5-0-pro-260628",
+        })
+        self.assertEqual(VIDEO.BACKENDS["ark-agent-plan"]["model"], "doubao-seedance-2.0")
+        self.assertEqual(VIDEO.BACKENDS["ark-api"]["model"], "doubao-seedance-2-5-260628")
+        self.assertEqual(VISION.BACKENDS["ark-agent-plan"]["model"], "doubao-seed-2-0-lite")
+        self.assertEqual(VISION.BACKENDS["ark-api"]["model"], "doubao-seed-2-0-lite-260428")
+        self.assertEqual(VIDEO.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
+        self.assertEqual(VISION.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
+        self.assertEqual(TTS.RESOURCE_ID, "seed-tts-2.0")
+        self.assertEqual(STT.RESOURCE_ID, "volc.seedasr.sauc.duration")
+        self.assertEqual(TTS.BACKENDS["ark-api"]["api_key_env"], "ARK_TTS_X_API_KEY")
+        self.assertEqual(STT.BACKENDS["ark-api"]["api_key_env"], "ARK_TTS_X_API_KEY")
+        self.assertEqual(
+            TTS.BACKENDS["ark-api"]["endpoint"],
+            "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+        )
+        self.assertEqual(
+            STT.BACKENDS["ark-api"]["endpoint"],
+            "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
+        )
+
+        with patch.dict(os.environ, {
+            "ARK_AGENT_PLAN_API_KEY": "plan-key",
+            "ARK_API_KEY": "ark-key",
+            "ARK_TTS_X_API_KEY": "speech-key",
+        }, clear=True):
+            for module in modules:
+                _, plan_key = module.resolve_backend("ark-agent-plan")
+                _, api_key = module.resolve_backend("ark-api")
+                self.assertEqual(plan_key, "plan-key")
+                expected_api_key = "speech-key" if module in (TTS, STT) else "ark-key"
+                self.assertEqual(api_key, expected_api_key)
+
+    def test_backend_selection_never_falls_back_to_another_credential(self) -> None:
+        with patch.dict(os.environ, {"ARK_API_KEY": "ark-key"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "ARK_AGENT_PLAN_API_KEY"):
+                IMAGE.resolve_backend("ark-agent-plan")
+        with patch.dict(os.environ, {"ARK_AGENT_PLAN_API_KEY": "plan-key"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "ARK_API_KEY"):
+                VISION.resolve_backend("ark-api")
+            with self.assertRaisesRegex(ValueError, "ARK_TTS_X_API_KEY"):
+                TTS.resolve_backend("ark-api")
+
+    def test_vision_routes_remote_videos_to_input_video(self) -> None:
+        video, video_type = VISION.build_media_content("https://example.com/clip.mp4?token=x")
+        self.assertEqual(video_type, "video")
+        self.assertEqual(video, {
+            "type": "input_video",
+            "video_url": "https://example.com/clip.mp4?token=x",
+        })
+        image, image_type = VISION.build_media_content("https://example.com/frame.png")
+        self.assertEqual(image_type, "image")
+        self.assertEqual(image, {
+            "type": "input_image",
+            "image_url": "https://example.com/frame.png",
+        })
+
     def test_image_size_uses_provider_native_casing(self) -> None:
         self.assertEqual(IMAGE.normalize_size("2k"), "2K")
         self.assertEqual(IMAGE.normalize_size("4K"), "4K")

@@ -14,14 +14,31 @@ FINISH_CODE = 20_000_000
 # Official V3 HTTP chunked protocol and payload fields:
 # https://www.volcengine.com/docs/6561/1598757?lang=zh
 # Agent Plan exposes the same protocol through the fixed /api/v3/plan route.
-BASE_URL = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
+DEFAULT_BACKEND = "ark-agent-plan"
+BACKENDS = {
+    "ark-agent-plan": {
+        "endpoint": "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional",
+        "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+    },
+    "ark-api": {
+        "endpoint": "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+        "api_key_env": "ARK_TTS_X_API_KEY",
+    },
+}
 RESOURCE_ID = "seed-tts-2.0"
 DEFAULT_VOICE = "zh_female_vv_uranus_bigtts"
 REQUEST_TIMEOUT_SECONDS = 120
 
 
-def api_key_value() -> str:
-    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+def resolve_backend(name: str) -> tuple[dict[str, str], str]:
+    profile = BACKENDS.get(name)
+    if profile is None:
+        raise ValueError(f"Unsupported backend: {name}")
+    api_key_env = profile["api_key_env"]
+    api_key = os.getenv(api_key_env, "").strip()
+    if not api_key:
+        raise ValueError(f"Missing {api_key_env} for backend {name}")
+    return profile, api_key
 
 
 def default_output(fmt: str) -> Path:
@@ -124,6 +141,7 @@ def parse_stream(response: Any) -> tuple[bytes, list[dict[str, Any]]]:
 def synthesize(
     *,
     requests: Any,
+    endpoint: str,
     api_key: str,
     text: str,
     voice: str,
@@ -131,7 +149,7 @@ def synthesize(
     sample_rate: int,
 ) -> tuple[bytes, list[dict[str, Any]]]:
     response = requests.post(
-        BASE_URL,
+        endpoint,
         headers={
             "X-Api-Key": api_key,
             "X-Api-Resource-Id": RESOURCE_ID,
@@ -153,11 +171,12 @@ def synthesize(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate speech with Ark Agent Plan TTS")
+    parser = argparse.ArgumentParser(description="Generate speech with Ark TTS")
     parser.add_argument("text", help="Text to synthesize")
     parser.add_argument("--output", help="Output audio path")
     parser.add_argument("--voice", default=DEFAULT_VOICE)
     parser.add_argument("--format", choices=["mp3", "ogg_opus", "pcm"], default="mp3")
+    parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     parser.add_argument(
         "--sample-rate",
         type=int,
@@ -166,10 +185,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    api_key = api_key_value()
-    if not api_key:
+    try:
+        profile, api_key = resolve_backend(args.backend)
+    except ValueError as exc:
         print(
-            json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False),
+            json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False),
             file=sys.stderr,
         )
         return 2
@@ -183,6 +203,7 @@ def main() -> int:
     try:
         audio, transcript = synthesize(
             requests=requests,
+            endpoint=profile["endpoint"],
             api_key=api_key,
             text=text,
             voice=args.voice,
@@ -201,6 +222,8 @@ def main() -> int:
         print(json.dumps({
             "success": True,
             "type": "audio",
+            "backend": args.backend,
+            "resource_id": RESOURCE_ID,
             "local_path": str(output_path),
             "transcript_path": str(transcript_path) if transcript else None,
             "transcript_segments": len(transcript),
@@ -211,7 +234,12 @@ def main() -> int:
         }, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        print(json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({
+            "success": False,
+            "backend": args.backend,
+            "resource_id": RESOURCE_ID,
+            "error": str(exc),
+        }, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

@@ -1,18 +1,17 @@
 # Ark STT Reference
 
-## Environment
+## Backends
 
-Required:
+| `--backend` | Credential | Endpoint |
+| --- | --- | --- |
+| `ark-agent-plan` (default) | `ARK_AGENT_PLAN_API_KEY` | `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream` |
+| `ark-api` | `ARK_TTS_X_API_KEY` | `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream` |
 
-- `ARK_AGENT_PLAN_API_KEY`
-
-The script reads only `ARK_AGENT_PLAN_API_KEY`. No optional environment variable
-is used.
+Both backends use resource `volc.seedasr.sauc.duration`. Endpoints are fixed,
+and the script does not fall back between backends.
 
 ## Request
 
-- Endpoint: `wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream`
-- Header `X-Api-Key`: `ARK_AGENT_PLAN_API_KEY`
 - Header `X-Api-Resource-Id`: `volc.seedasr.sauc.duration`
 - Header `X-Api-Request-Id`: a fresh UUID for each connection
 - Header `X-Api-Sequence`: `-1`
@@ -25,6 +24,7 @@ is used.
 
 ```bash
 python3 {baseDir}/scripts/volc_stt.py ./meeting.wav
+python3 {baseDir}/scripts/volc_stt.py ./meeting.wav --backend ark-api
 python3 {baseDir}/scripts/volc_stt.py ./voice.ogg --format ogg --codec opus
 python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --raw
 ```
@@ -44,7 +44,7 @@ python3 {baseDir}/scripts/volc_stt.py ./clip.mp3 --raw
 
 Report:
 
-- Missing `ARK_AGENT_PLAN_API_KEY`.
+- The credential missing for the selected backend.
 - Empty input file.
 - WebSocket connection errors.
 - Non-zero ASR response codes.

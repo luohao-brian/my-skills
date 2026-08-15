@@ -9,17 +9,30 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 # Official Responses API quick start and response object:
 # https://www.volcengine.com/docs/82379/1795150?lang=zh
 # https://www.volcengine.com/docs/82379/1783703?lang=zh
 # Agent Plan exposes the same request shape under the fixed /api/plan/v3 base.
-BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
-MODEL_ID = "doubao-seed-2.0-lite"
+DEFAULT_BACKEND = "ark-agent-plan"
+BACKENDS = {
+    "ark-agent-plan": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
+        "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+        "model": "doubao-seed-2-0-lite",
+    },
+    "ark-api": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key_env": "ARK_API_KEY",
+        "model": "doubao-seed-2-0-lite-260428",
+    },
+}
 MAX_OUTPUT_TOKENS = 2000
 TEMPERATURE = 0.1
 REQUEST_TIMEOUT_SECONDS = 120
+VIDEO_EXTENSIONS = {".avi", ".mkv", ".mov", ".mp4", ".webm"}
 
 
 def _require_requests():
@@ -31,8 +44,15 @@ def _require_requests():
     return requests
 
 
-def api_key_value() -> str:
-    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+def resolve_backend(name: str) -> tuple[dict[str, str], str]:
+    profile = BACKENDS.get(name)
+    if profile is None:
+        raise ValueError(f"Unsupported backend: {name}")
+    api_key_env = profile["api_key_env"]
+    api_key = os.getenv(api_key_env, "").strip()
+    if not api_key:
+        raise ValueError(f"Missing {api_key_env} for backend {name}")
+    return profile, api_key
 
 
 def file_to_data_url(path_text: str) -> str:
@@ -49,6 +69,21 @@ def normalize_image(image: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"image file not found: {image}")
     return file_to_data_url(str(path))
+
+
+def media_type(reference: str) -> str:
+    if reference.startswith("data:video/"):
+        return "video"
+    path = urlparse(reference).path if reference.startswith(("http://", "https://")) else reference
+    return "video" if Path(path).suffix.lower() in VIDEO_EXTENSIONS else "image"
+
+
+def build_media_content(reference: str) -> tuple[dict[str, str], str]:
+    normalized = normalize_image(reference)
+    kind = media_type(reference)
+    if kind == "video":
+        return {"type": "input_video", "video_url": normalized}, kind
+    return {"type": "input_image", "image_url": normalized}, kind
 
 
 def extract_responses_text(payload: dict[str, Any]) -> str:
@@ -84,19 +119,17 @@ def response_error(response: Any) -> str:
 
 def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
     requests = _require_requests()
-    api_key = api_key_value()
-    if not api_key:
-        raise ValueError("Missing ARK_AGENT_PLAN_API_KEY")
+    profile, api_key = resolve_backend(args.backend)
 
-    image_url = normalize_image(args.image)
+    media_content, input_type = build_media_content(args.image)
     payload = {
-        "model": MODEL_ID,
+        "model": profile["model"],
         "input": [
             {
                 "type": "message",
                 "role": "user",
                 "content": [
-                    {"type": "input_image", "image_url": image_url},
+                    media_content,
                     {"type": "input_text", "text": args.question},
                 ],
             }
@@ -105,7 +138,7 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
         "max_output_tokens": MAX_OUTPUT_TOKENS,
     }
     response = requests.post(
-        f"{BASE_URL}/responses",
+        f"{profile['base_url']}/responses",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
         timeout=REQUEST_TIMEOUT_SECONDS,
@@ -120,8 +153,10 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
     result: dict[str, Any] = {
         "success": True,
         "type": "vision",
+        "backend": args.backend,
+        "media_type": input_type,
         "analysis": analysis,
-        "model": MODEL_ID,
+        "model": profile["model"],
         "image": args.image,
     }
     if args.raw:
@@ -130,17 +165,26 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Analyze images with Ark Agent Plan vision models")
-    parser.add_argument("image", help="Local image path, remote URL, or data URL")
-    parser.add_argument("question", help="Question or extraction instruction about the image")
+    parser = argparse.ArgumentParser(description="Analyze images or remote video URLs with Ark vision models")
+    parser.add_argument("image", help="Local image path, remote image/video URL, or data URL")
+    parser.add_argument("question", help="Question or extraction instruction about the media")
     parser.add_argument("--json", action="store_true", help="Print structured JSON instead of plain analysis text")
     parser.add_argument("--raw", action="store_true", help="Include raw provider response in JSON output")
+    parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
     try:
         result = analyze_image(args)
     except Exception as exc:
-        error = {"success": False, "type": "vision", "error": str(exc), "model": MODEL_ID, "image": args.image}
+        error = {
+            "success": False,
+            "type": "vision",
+            "backend": args.backend,
+            "media_type": media_type(args.image),
+            "error": str(exc),
+            "model": BACKENDS[args.backend]["model"],
+            "image": args.image,
+        }
         print(json.dumps(error, ensure_ascii=False), file=sys.stderr)
         return 1
 

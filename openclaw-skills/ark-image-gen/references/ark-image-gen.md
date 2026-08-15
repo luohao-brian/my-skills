@@ -1,18 +1,20 @@
 # Ark Image Generation Reference
 
-## API Boundary
+## Backends
 
-- Environment: `ARK_AGENT_PLAN_API_KEY`
-- Endpoint: `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations`
-- Model: `doubao-seedream-5.0-lite`
-- Official request contract: https://www.volcengine.com/docs/82379/1541523?lang=zh
+| `--backend` | Credential | Endpoint | Model |
+| --- | --- | --- | --- |
+| `ark-agent-plan` (default) | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations` | `doubao-seedream-5.0-lite` |
+| `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3/images/generations` | `doubao-seedream-5-0-pro-260628` |
 
-The script reads no other environment variable.
+Endpoints and models are fixed. The script does not fall back between backends.
+Official request contract: https://www.volcengine.com/docs/82379/1541523?lang=zh
 
 ## Usage
 
 ```bash
 python3 {baseDir}/scripts/volc_image_gen.py "极简产品海报" --size 1:1
+python3 {baseDir}/scripts/volc_image_gen.py "极简产品海报" --backend ark-api
 python3 {baseDir}/scripts/volc_image_gen.py "赛博朋克街景" --size 16:9 --output ./outputs/city.png
 python3 {baseDir}/scripts/volc_image_gen.py "改成油画风格" --image ./source.png --size 4:3
 ```
@@ -44,6 +46,7 @@ The script prints JSON:
 {
   "success": true,
   "type": "image",
+  "backend": "ark-agent-plan",
   "local_path": "outputs/images/ark_image_20260615_120000.png",
   "remote_url": "https://...",
   "model": "doubao-seedream-5.0-lite",

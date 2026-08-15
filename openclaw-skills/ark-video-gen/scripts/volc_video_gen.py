@@ -16,22 +16,39 @@ from typing import Any
 # https://api.volcengine.com/api-docs/view?action=CreateContentsGenerationsTasks&serviceCode=ark&version=2024-01-01
 # https://api.volcengine.com/api-docs/view?action=GetContentsGenerationsTask&serviceCode=ark&version=2024-01-01
 # Agent Plan exposes the same task resources under the fixed /api/plan/v3 base.
-BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
-MODEL_ID = "doubao-seedance-2.0-fast"
+DEFAULT_BACKEND = "ark-agent-plan"
+BACKENDS = {
+    "ark-agent-plan": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
+        "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+        "model": "doubao-seedance-2.0",
+    },
+    "ark-api": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key_env": "ARK_API_KEY",
+        "model": "doubao-seedance-2-5-260628",
+    },
+}
 DEFAULT_DURATION_SECONDS = 5
 DEFAULT_ASPECT_RATIO = "16:9"
 DEFAULT_RESOLUTION = "720p"
 SUPPORTED_DURATIONS = (-1, *range(4, 16))
 SUPPORTED_ASPECT_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
-# The fixed doubao-seedance-2.0-fast model does not support 1080p.
 SUPPORTED_RESOLUTIONS = ("480p", "720p")
 TASK_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 5
 TERMINAL_FAILURE_STATUSES = {"failed", "cancelled", "expired"}
 
 
-def api_key_value() -> str:
-    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+def resolve_backend(name: str) -> tuple[dict[str, str], str]:
+    profile = BACKENDS.get(name)
+    if profile is None:
+        raise ValueError(f"Unsupported backend: {name}")
+    api_key_env = profile["api_key_env"]
+    api_key = os.getenv(api_key_env, "").strip()
+    if not api_key:
+        raise ValueError(f"Missing {api_key_env} for backend {name}")
+    return profile, api_key
 
 
 def file_to_data_url(path: str) -> str:
@@ -63,18 +80,20 @@ def build_generation_settings(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate video with Ark Agent Plan")
+    parser = argparse.ArgumentParser(description="Generate video with Ark")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional first-frame image path, data URL, or remote URL")
     parser.add_argument("--duration", type=int, choices=SUPPORTED_DURATIONS, default=DEFAULT_DURATION_SECONDS)
     parser.add_argument("--aspect-ratio", choices=SUPPORTED_ASPECT_RATIOS, default=DEFAULT_ASPECT_RATIO)
     parser.add_argument("--resolution", choices=SUPPORTED_RESOLUTIONS, default=DEFAULT_RESOLUTION)
     parser.add_argument("--audio", action="store_true")
+    parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
-    api_key = api_key_value()
-    if not api_key:
-        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+    try:
+        profile, api_key = resolve_backend(args.backend)
+    except ValueError as exc:
+        print(json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
     from volcenginesdkarkruntime import Ark
@@ -90,7 +109,7 @@ def main() -> int:
     task_id: str | None = None
     last_status = "not_submitted"
     try:
-        client = Ark(base_url=BASE_URL, api_key=api_key)
+        client = Ark(base_url=profile["base_url"], api_key=api_key)
         content: list[dict[str, Any]] = [{"type": "text", "text": args.prompt.strip()}]
         if args.image:
             image_url = args.image
@@ -99,7 +118,7 @@ def main() -> int:
             content.append({"type": "image_url", "image_url": {"url": image_url}})
 
         created = client.content_generation.tasks.create(
-            model=MODEL_ID,
+            model=profile["model"],
             content=content,
             extra_body=generation_settings,
         )
@@ -117,10 +136,11 @@ def main() -> int:
                 print(json.dumps({
                     "success": True,
                     "type": "video",
+                    "backend": args.backend,
                     "task_id": task_id,
                     "status": last_status,
                     "video_url": video_url,
-                    "model": MODEL_ID,
+                    "model": profile["model"],
                     "prompt": args.prompt,
                     "duration": getattr(task, "duration", None) or duration,
                     "aspect_ratio": getattr(task, "ratio", None) or args.aspect_ratio,
@@ -139,7 +159,8 @@ def main() -> int:
             "error": "task timed out",
             "task_id": task_id,
             "status": last_status,
-            "model": MODEL_ID,
+            "backend": args.backend,
+            "model": profile["model"],
         }, ensure_ascii=False), file=sys.stderr)
         return 1
     except Exception as exc:
@@ -148,7 +169,8 @@ def main() -> int:
             "error": str(exc),
             "task_id": task_id,
             "status": last_status,
-            "model": MODEL_ID,
+            "backend": args.backend,
+            "model": profile["model"],
         }, ensure_ascii=False), file=sys.stderr)
         return 1
 

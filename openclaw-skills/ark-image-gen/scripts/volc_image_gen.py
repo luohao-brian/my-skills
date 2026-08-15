@@ -24,14 +24,32 @@ SIZE_ALIASES = {
 # Official image generation request contract:
 # https://www.volcengine.com/docs/82379/1541523?lang=zh
 # Agent Plan exposes the same resource under the fixed /api/plan/v3 base.
-BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
-MODEL_ID = "doubao-seedream-5.0-lite"
+DEFAULT_BACKEND = "ark-agent-plan"
+BACKENDS = {
+    "ark-agent-plan": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
+        "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+        "model": "doubao-seedream-5.0-lite",
+    },
+    "ark-api": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key_env": "ARK_API_KEY",
+        "model": "doubao-seedream-5-0-pro-260628",
+    },
+}
 DEFAULT_SIZE = "2K"
 REQUEST_TIMEOUT_SECONDS = 180
 
 
-def api_key_value() -> str:
-    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+def resolve_backend(name: str) -> tuple[dict[str, str], str]:
+    profile = BACKENDS.get(name)
+    if profile is None:
+        raise ValueError(f"Unsupported backend: {name}")
+    api_key_env = profile["api_key_env"]
+    api_key = os.getenv(api_key_env, "").strip()
+    if not api_key:
+        raise ValueError(f"Missing {api_key_env} for backend {name}")
+    return profile, api_key
 
 
 def require_requests():
@@ -105,22 +123,24 @@ def save_url(url: str, output: str | None) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate images with Ark Agent Plan")
+    parser = argparse.ArgumentParser(description="Generate images with Ark")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional local reference image path or data URL")
     parser.add_argument("--size", default=DEFAULT_SIZE)
     parser.add_argument("--output", help="Output image path")
+    parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
-    api_key = api_key_value()
-    if not api_key:
-        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+    try:
+        profile, api_key = resolve_backend(args.backend)
+    except ValueError as exc:
+        print(json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
     requests = require_requests()
 
     payload: dict[str, Any] = {
-        "model": MODEL_ID,
+        "model": profile["model"],
         "prompt": args.prompt,
         "size": normalize_size(args.size),
         "response_format": "b64_json",
@@ -132,7 +152,7 @@ def main() -> int:
 
     try:
         response = requests.post(
-            f"{BASE_URL}/images/generations",
+            f"{profile['base_url']}/images/generations",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=payload,
             timeout=REQUEST_TIMEOUT_SECONDS,
@@ -151,16 +171,22 @@ def main() -> int:
         print(json.dumps({
             "success": True,
             "type": "image",
+            "backend": args.backend,
             "local_path": str(path),
             "remote_url": remote_url,
-            "model": MODEL_ID,
+            "model": profile["model"],
             "prompt": args.prompt,
             "size": normalize_size(args.size),
             "used_reference_image": bool(args.image),
         }, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        print(json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({
+            "success": False,
+            "backend": args.backend,
+            "model": profile["model"],
+            "error": str(exc),
+        }, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

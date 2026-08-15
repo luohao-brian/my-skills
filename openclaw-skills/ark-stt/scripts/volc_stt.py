@@ -27,7 +27,17 @@ COMPRESSION_GZIP = 0b0001
 # Official binary protocol and streaming-input lifecycle:
 # https://www.volcengine.com/docs/6561/1354869?lang=zh
 # Agent Plan exposes the same protocol through the fixed /api/v3/plan route.
-BASE_URL = "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream"
+DEFAULT_BACKEND = "ark-agent-plan"
+BACKENDS = {
+    "ark-agent-plan": {
+        "endpoint": "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream",
+        "api_key_env": "ARK_AGENT_PLAN_API_KEY",
+    },
+    "ark-api": {
+        "endpoint": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
+        "api_key_env": "ARK_TTS_X_API_KEY",
+    },
+}
 RESOURCE_ID = "volc.seedasr.sauc.duration"
 DEFAULT_SAMPLE_RATE = 16000
 DEFAULT_SEG_DURATION_MS = 200
@@ -36,8 +46,15 @@ MAX_SEG_DURATION_MS = 200
 REQUEST_TIMEOUT_SECONDS = 180
 
 
-def api_key_value() -> str:
-    return os.getenv("ARK_AGENT_PLAN_API_KEY", "").strip()
+def resolve_backend(name: str) -> tuple[dict[str, str], str]:
+    profile = BACKENDS.get(name)
+    if profile is None:
+        raise ValueError(f"Unsupported backend: {name}")
+    api_key_env = profile["api_key_env"]
+    api_key = os.getenv(api_key_env, "").strip()
+    if not api_key:
+        raise ValueError(f"Missing {api_key_env} for backend {name}")
+    return profile, api_key
 
 
 def build_connection_headers(api_key: str, request_id: str | None = None) -> list[str]:
@@ -442,17 +459,19 @@ def transcribe_stream(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Transcribe local audio with Ark Agent Plan STT")
+    parser = argparse.ArgumentParser(description="Transcribe local audio with Ark STT")
     parser.add_argument("audio_path")
     parser.add_argument("--format", choices=["wav", "pcm", "mp3", "ogg", "opus"])
     parser.add_argument("--codec", choices=["raw", "opus"])
     parser.add_argument("--sample-rate", type=int, choices=[DEFAULT_SAMPLE_RATE], default=DEFAULT_SAMPLE_RATE)
     parser.add_argument("--raw", action="store_true", help="Include the final provider payload")
+    parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
-    api_key = api_key_value()
-    if not api_key:
-        print(json.dumps({"success": False, "error": "Missing ARK_AGENT_PLAN_API_KEY"}, ensure_ascii=False), file=sys.stderr)
+    try:
+        profile, api_key = resolve_backend(args.backend)
+    except ValueError as exc:
+        print(json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
     import websocket
@@ -472,7 +491,7 @@ def main() -> int:
     try:
         validate_audio_options(audio_format, codec, args.sample_rate)
         audio_duration_ms(data, audio_format=audio_format, sample_rate=args.sample_rate)
-        ws = websocket.create_connection(BASE_URL, header=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+        ws = websocket.create_connection(profile["endpoint"], header=headers, timeout=REQUEST_TIMEOUT_SECONDS)
         final_text, final_payload = transcribe_stream(
             ws,
             data,
@@ -483,6 +502,7 @@ def main() -> int:
         result = {
             "success": True,
             "type": "transcript",
+            "backend": args.backend,
             "audio_path": str(audio_path),
             "transcript": final_text,
             "duration_ms": (final_payload or {}).get("audio_info", {}).get("duration"),
@@ -493,7 +513,13 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        print(json.dumps({"success": False, "error": str(exc), "audio_path": str(audio_path)}, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps({
+            "success": False,
+            "backend": args.backend,
+            "resource_id": RESOURCE_ID,
+            "error": str(exc),
+            "audio_path": str(audio_path),
+        }, ensure_ascii=False), file=sys.stderr)
         return 1
     finally:
         if ws is not None:
