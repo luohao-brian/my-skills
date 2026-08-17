@@ -4,48 +4,56 @@
     {
       "id": "theverge-ai",
       "name": "The Verge AI",
+      "role": "media",
       "kind": "rss",
       "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"
     },
     {
       "id": "wired-ai",
       "name": "Wired AI",
+      "role": "media",
       "kind": "rss",
       "url": "https://www.wired.com/feed/tag/ai/latest/rss"
     },
     {
       "id": "technologyreview",
       "name": "MIT Technology Review",
+      "role": "media",
       "kind": "rss",
       "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/"
     },
     {
       "id": "techcrunch-ai",
       "name": "TechCrunch AI",
+      "role": "media",
       "kind": "rss",
       "url": "https://techcrunch.com/category/artificial-intelligence/feed/"
     },
     {
       "id": "tensorfeed",
       "name": "TensorFeed",
+      "role": "aggregator",
       "kind": "json",
       "url": "https://tensorfeed.ai/api/news"
     },
     {
       "id": "tmtpost-edge-ai-daily",
       "name": "TMTPost Edge AI Daily",
+      "role": "aggregator",
       "kind": "html_index",
       "url": "https://www.tmtpost.com/user/7944025"
     },
     {
       "id": "maomu-news",
       "name": "猫目 AI 快讯",
+      "role": "aggregator",
       "kind": "html_index",
       "url": "https://maomu.com/news"
     },
     {
       "id": "hex2077",
       "name": "Hex 2077",
+      "role": "aggregator",
       "kind": "html_daily",
       "url": "https://hex2077.dev/docs/",
       "date_url": "https://hex2077.dev/docs/{YYYY-MM}/{YYYY-MM-DD}/",
@@ -54,24 +62,28 @@
     {
       "id": "openai-news",
       "name": "OpenAI News",
+      "role": "official",
       "kind": "rss",
       "url": "https://openai.com/news/rss.xml"
     },
     {
       "id": "anthropic-news",
       "name": "Anthropic News",
+      "role": "official",
       "kind": "html_index",
       "url": "https://www.anthropic.com/news"
     },
     {
       "id": "google-ai-blog",
       "name": "Google AI Blog",
+      "role": "official",
       "kind": "rss",
       "url": "https://blog.google/innovation-and-ai/technology/ai/rss/"
     },
     {
       "id": "deepmind-blog",
       "name": "Google DeepMind Blog",
+      "role": "official",
       "kind": "rss",
       "url": "https://deepmind.google/blog/rss.xml"
     }

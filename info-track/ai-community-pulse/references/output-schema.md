@@ -6,7 +6,16 @@
 {
   "window": {"start": "ISO-8601", "end": "ISO-8601", "hours": 72},
   "sources": {
-    "hackernews": {"ok": true, "count": 12, "selected": 5, "error": null}
+    "hackernews": {
+      "ok": true,
+      "count": 12,
+      "selected": 5,
+      "channels_configured": 5,
+      "deduplicated": 4,
+      "topics": {"models": 2, "agents": 1, "systems": 1, "semiconductors": 0},
+      "channels_with_candidates": 3,
+      "error": null
+    }
   },
   "candidates": []
 }
@@ -31,7 +40,8 @@
 约束：
 
 - `sources` 必须记录所有尝试的平台；失败不能静默丢弃。
-- `count` 是读取到的原始条数，`selected` 是主题过滤后的候选数。
+- `count` 是读取到的原始条数，`selected` 是主题及适用时间窗口或固定快照过滤后的去重前候选数。
+- `channels_configured` 是去重后的固定入口数；`deduplicated` 是按原始 URL 去重后的候选数；`topics` 是这些去重候选的主题分布；`channels_with_candidates` 是实际产生候选的固定频道数。
 - `date: null` 表示平台榜单未提供可用发布时间。
 - `prediction_market` 的 `metrics` 可包含 `probability`、`volume24hr`，但概率不得转述为事实。
 - 不输出跨平台绝对分数、RRF、热度状态或可信度状态。

@@ -42,6 +42,40 @@ from zoneinfo import ZoneInfo
 
 USER_AGENT = "my-skills-info-track/1.0"
 
+LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
+
+
+def proxy_url(value: str) -> str:
+    cleaned = value.strip()
+    parsed = urllib.parse.urlsplit(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise argparse.ArgumentTypeError("proxy must be an http:// or https:// URL")
+    return cleaned
+
+
+def configure_proxy(
+    http_proxy: str | None,
+    https_proxy: str | None,
+    no_proxy: str | None,
+) -> None:
+    """Apply explicit proxy settings only to this collection process."""
+    if not any((http_proxy, https_proxy, no_proxy)):
+        return
+
+    for scheme, value in (("http", http_proxy), ("https", https_proxy)):
+        for key in (f"{scheme}_proxy", f"{scheme.upper()}_PROXY"):
+            if value:
+                os.environ[key] = value
+            elif http_proxy or https_proxy:
+                os.environ.pop(key, None)
+
+    bypass = [*LOCAL_NO_PROXY]
+    bypass.extend(part.strip() for part in (no_proxy or "").split(",") if part.strip())
+    bypass_value = ",".join(dict.fromkeys(bypass))
+    os.environ["no_proxy"] = bypass_value
+    os.environ["NO_PROXY"] = bypass_value
+    urllib.request.install_opener(urllib.request.build_opener())
+
 @dataclass
 class Item:
     title: str
@@ -303,8 +337,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Collect Hubwiz and QingkeAI technical blog posts.")
     parser.add_argument("--date", help="Window start date, YYYY-MM-DD; omit for the recent period ending today")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
+    parser.add_argument("--http-proxy", type=proxy_url, help="HTTP proxy URL for this collection process only")
+    parser.add_argument("--https-proxy", type=proxy_url, help="HTTPS proxy URL for this collection process only")
+    parser.add_argument(
+        "--no-proxy",
+        help="Comma-separated hosts that bypass the explicit proxy; localhost is always included",
+    )
     parser.add_argument("--stats", action="store_true", help="Print source statuses to stderr")
     args = parser.parse_args()
+    configure_proxy(args.http_proxy, args.https_proxy, args.no_proxy)
     try:
         if args.date:
             anchor = dt.date.fromisoformat(args.date)

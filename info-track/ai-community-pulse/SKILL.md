@@ -24,8 +24,19 @@ python3 {baseDir}/scripts/community_pulse.py collect \
   --output ./outputs/community-pulse.json
 ```
 
+目标网络需要代理时，在同一次采集命令中显式传入：
+
+```bash
+python3 {baseDir}/scripts/community_pulse.py collect \
+  --hours 72 \
+  --http-proxy <proxy-url> \
+  --https-proxy <proxy-url> \
+  --no-proxy <comma-separated-hosts> \
+  --output ./outputs/community-pulse.json
+```
+
 3. 检查 JSON 中的 `sources`。`ok: false` 的登录态来源必须如实保留；不得用泛搜索结果伪装为固定频道数据。
-4. 从 `candidates` 中合并同一事件或话题的重复项。保留相互独立的社区链接；不要做跨平台互动量比较、复杂打分或趋势状态推断。
+4. 从 `candidates` 中合并同一事件或话题的重复项。保留相互独立的社区链接；不要做跨平台互动量比较、复杂打分或趋势状态推断。分析来源覆盖或生成热力图时，必须按 [references/source-diagnostics.md](references/source-diagnostics.md) 区分采样量、主题覆盖与独立话题数。
 5. 按 [references/brief-format.md](references/brief-format.md) 生成报告：
 
 ```bash
@@ -48,7 +59,8 @@ python3 {baseDir}/scripts/community_pulse.py run \
 
 - X、Reddit、知乎、Linux.do、B站依赖 Chrome 登录态与 OpenCLI Browser Bridge。桥接不可用时继续采集公开来源，并在来源状态中记录失败原因。
 - HN、Bluesky、V2EX、Lobsters、LessWrong、Product Hunt 和 Polymarket 使用公开读取能力，不要求登录。
-- 公开 HTTP 来源使用调用方进程的标准网络配置；失败时在来源状态中记录错误，不读取 Agent 专属代理配置。
+- `collect` 和 `run` 支持显式 `--http-proxy`、`--https-proxy` 与 `--no-proxy`。代理只作用于本次 Python 采集进程及其 OpenCLI 子进程，不持久化、不写入产物，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理，避免 Browser Bridge 本地连接绕路。
+- 代理参数覆盖 Python 公开 HTTP 请求和 OpenCLI 公共适配器；Chrome 登录态来源仍使用 Chrome 自身的网络配置。需要代理时必须在唯一一次采集命令中传入，不得在失败后另起 `curl` 补采。
 - 采集器会输出来源进度并在 `--max-seconds` 预算内结束。启动后等待同一进程完成，不要因暂时没有新输出而重复运行。
 - X 只采固定账号；Reddit 只采固定 subreddit；Bluesky 只采固定 Custom Feed；V2EX 只采固定节点；不得用通用 Web 搜索代替。
 - Polymarket 只表达市场问题、当前概率和市场链接，标题加“预测市场”；概率不能写成事实。
@@ -56,7 +68,7 @@ python3 {baseDir}/scripts/community_pulse.py run \
 
 ## 时间窗口
 
-默认窗口为运行时刻向前连续 72 小时。固定日榜或周榜没有可用发布时间时可以保留，但必须在候选中标记 `date: null`；不得伪造发布时间。
+默认窗口为运行时刻向前连续 72 小时。只有配置中显式标记 `allow_undated` 的固定榜单快照可以在没有可用发布时间时保留，并在候选中标记 `date: null`；其他入口缺少可解析时间时不进入 72 小时候选。不得伪造发布时间。
 
 ## 输出合同
 

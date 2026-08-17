@@ -23,6 +23,7 @@ from typing import Any, Callable, Iterable
 
 USER_AGENT = "my-skills-ai-oss-models/2.0"
 WINDOW_DAYS = 7
+LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_REGISTRY_PATH = BASE_DIR / "references" / "model-registry.json"
 PROJECT_REGISTRY_PATH = BASE_DIR / "references" / "reproducible-projects.json"
@@ -82,10 +83,14 @@ MEDIA_DEPLOYMENT_ROLES = {
 }
 MEDIA_ECOSYSTEM_FILTERS = ["comfyui"]
 MEDIA_CUSTOMIZATION_QUERY_FILTERS = [
+    "avatar",
+    "character-consistency",
     "digital-human",
     "face-swap",
+    "faceswap",
     "identity-consistency",
     "lip-sync",
+    "lipsync",
     "person-replacement",
     "talking-head",
     "video-editing",
@@ -525,6 +530,38 @@ def hf_api_bases() -> list[str]:
     raw = os.getenv("AI_OSS_HF_API_BASES") or os.getenv("HF_API_BASES") or ""
     values = [value.strip().rstrip("/") for value in raw.split(",") if value.strip()]
     return values or DEFAULT_HF_API_BASES
+
+
+def proxy_url(value: str) -> str:
+    cleaned = value.strip()
+    parsed = urllib.parse.urlsplit(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise argparse.ArgumentTypeError("proxy must be an http:// or https:// URL")
+    return cleaned
+
+
+def configure_proxy(
+    http_proxy: str | None,
+    https_proxy: str | None,
+    no_proxy: str | None,
+) -> None:
+    """Apply explicit proxy settings only to this process and gh children."""
+    if not any((http_proxy, https_proxy, no_proxy)):
+        return
+
+    for scheme, value in (("http", http_proxy), ("https", https_proxy)):
+        for key in (f"{scheme}_proxy", f"{scheme.upper()}_PROXY"):
+            if value:
+                os.environ[key] = value
+            elif http_proxy or https_proxy:
+                os.environ.pop(key, None)
+
+    bypass = [*LOCAL_NO_PROXY]
+    bypass.extend(part.strip() for part in (no_proxy or "").split(",") if part.strip())
+    bypass_value = ",".join(dict.fromkeys(bypass))
+    os.environ["no_proxy"] = bypass_value
+    os.environ["NO_PROXY"] = bypass_value
+    urllib.request.install_opener(urllib.request.build_opener())
 
 
 def huggingface_token() -> str:
@@ -3370,6 +3407,91 @@ def source_status(rows: dict[str, Any], errors: dict[str, str], selected: int) -
     }
 
 
+def report_model_role(item: dict[str, Any]) -> str:
+    category = str(item.get("category") or "")
+    if category in FLAGSHIP_ROLES:
+        return category
+    metadata = item.get("metadata") or {}
+    role = str(metadata.get("role") or "")
+    if role in FLAGSHIP_ROLES:
+        return role
+    role_evidence = metadata.get("role_evidence") or {}
+    pipeline_tag = metadata.get("pipeline_tag") or role_evidence.get("pipeline_tag") or ""
+    return model_role({"pipeline_tag": pipeline_tag}, default="unknown")
+
+
+def count_by_model_role(items: Iterable[dict[str, Any]]) -> dict[str, int]:
+    counts = {role: 0 for role in FLAGSHIP_ROLES}
+    counts["unknown"] = 0
+    for item in items:
+        role = report_model_role(item)
+        counts[role if role in counts else "unknown"] += 1
+    return counts
+
+
+def count_metadata_values(items: Iterable[dict[str, Any]], *path: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value: Any = item.get("metadata") or {}
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        for entry in value if isinstance(value, list) else []:
+            label = str(entry)
+            counts[label] = counts.get(label, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def coverage_diagnostics(groups: dict[str, Any]) -> dict[str, Any]:
+    flagship_items = [item for rows in groups["flagship"].values() for item in rows]
+    local_items = groups["local"]
+    notable_models = groups["notable_discoveries"]["models"]
+    media_items = groups.get("media_customization", [])
+    model_groups = {
+        "flagship": flagship_items,
+        "local": local_items,
+        "notable_discoveries": notable_models,
+        "media_customization": media_items,
+    }
+    model_titles = {
+        str(item.get("title") or "")
+        for items in model_groups.values()
+        for item in items
+        if item.get("title")
+    }
+    dataset_items = groups["datasets"]
+    notable_datasets = groups["notable_discoveries"]["datasets"]
+    dataset_titles = {
+        str(item.get("title") or "")
+        for item in dataset_items + notable_datasets
+        if item.get("title")
+    }
+    reproducible = groups["reproducible"]
+    coverage_keys = ("data", "training", "model", "evaluation", "deployment")
+    return {
+        "models_by_group_and_role": {
+            name: count_by_model_role(items) for name, items in model_groups.items()
+        },
+        "unique_model_repositories": len(model_titles),
+        "local_by_deployment": count_metadata_values(local_items, "deployment"),
+        "media_customization_by_capability": count_metadata_values(
+            media_items, "media_customization", "capabilities"
+        ),
+        "reproducible_projects": len({item.get("title") for item in reproducible}),
+        "reproducible_by_component": {
+            key: sum(
+                bool(((item.get("metadata") or {}).get("coverage") or {}).get(key))
+                for item in reproducible
+            )
+            for key in coverage_keys
+        },
+        "datasets_by_group": {
+            "registered": len(dataset_items),
+            "notable_discoveries": len(notable_datasets),
+            "unique_repositories": len(dataset_titles),
+        },
+    }
+
+
 def compact_change_evidence(value: dict[str, Any] | None) -> dict[str, Any] | None:
     if not value:
         return None
@@ -3531,8 +3653,24 @@ def main() -> int:
         "--state-dir",
         help="Optional caller-owned directory for the current trending snapshot",
     )
+    parser.add_argument(
+        "--http-proxy",
+        type=proxy_url,
+        help="HTTP proxy URL for this collection process only",
+    )
+    parser.add_argument(
+        "--https-proxy",
+        type=proxy_url,
+        help="HTTPS proxy URL for this collection process only",
+    )
+    parser.add_argument(
+        "--no-proxy",
+        help="Comma-separated hosts that bypass the explicit proxy; localhost is always included",
+    )
     parser.add_argument("--stats", action="store_true", help="Print group counts to stderr")
     args = parser.parse_args()
+
+    configure_proxy(args.http_proxy, args.https_proxy, args.no_proxy)
 
     if args.output and args.report_output:
         output_path = Path(args.output).expanduser().resolve()
@@ -3856,6 +3994,14 @@ def main() -> int:
         for item in profiled_model_items
     )
 
+    selected_groups = {
+        "flagship": flagship_groups,
+        "local": local_items,
+        "reproducible": reproducible_items,
+        "datasets": dataset_items,
+        "notable_discoveries": notable_discoveries,
+        "media_customization": media_customization,
+    }
     payload = {
         "kind": "ai-oss-models",
         "window": {"start": start.isoformat(), "end": end.isoformat()},
@@ -3914,15 +4060,9 @@ def main() -> int:
             "github_metric_repositories": len(github_metrics),
             "deployment_profile_models": len(profiled_model_items),
             "deployment_profile_repository_errors": deployment_profile_errors,
+            "coverage": coverage_diagnostics(selected_groups),
         },
-        "groups": {
-            "flagship": flagship_groups,
-            "local": local_items,
-            "reproducible": reproducible_items,
-            "datasets": dataset_items,
-            "notable_discoveries": notable_discoveries,
-            "media_customization": media_customization,
-        },
+        "groups": selected_groups,
         "discoveries": discoveries,
     }
     emit_payload(payload, args.output)

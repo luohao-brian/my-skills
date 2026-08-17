@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,41 @@ REQUIRED_CANDIDATE_FIELDS = [
     "url",
     "summary",
 ]
+PROVENANCE_FIELDS = ["source_id", "source", "source_role", "published_at"]
+SOURCE_ROLES = {"media", "aggregator", "official"}
+LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
+
+
+def proxy_url(value: str) -> str:
+    cleaned = value.strip()
+    parsed = urllib.parse.urlsplit(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise argparse.ArgumentTypeError("proxy must be an http:// or https:// URL")
+    return cleaned
+
+
+def configure_proxy(
+    http_proxy: str | None,
+    https_proxy: str | None,
+    no_proxy: str | None,
+) -> None:
+    """Apply explicit proxy settings only to this collection process."""
+    if not any((http_proxy, https_proxy, no_proxy)):
+        return
+
+    for scheme, value in (("http", http_proxy), ("https", https_proxy)):
+        for key in (f"{scheme}_proxy", f"{scheme.upper()}_PROXY"):
+            if value:
+                os.environ[key] = value
+            elif http_proxy or https_proxy:
+                os.environ.pop(key, None)
+
+    bypass = [*LOCAL_NO_PROXY]
+    bypass.extend(part.strip() for part in (no_proxy or "").split(",") if part.strip())
+    bypass_value = ",".join(dict.fromkeys(bypass))
+    os.environ["no_proxy"] = bypass_value
+    os.environ["NO_PROXY"] = bypass_value
+    urllib.request.install_opener(urllib.request.build_opener())
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -106,6 +144,26 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.replace("&#8217;", "'")).strip()
 
 
+def canonical_url(value: str) -> str:
+    parsed = urllib.parse.urlsplit(value)
+    query = urllib.parse.urlencode(
+        sorted(
+            (key, item)
+            for key, item in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+            if not key.casefold().startswith(("utm_", "ref"))
+        )
+    )
+    return urllib.parse.urlunsplit(
+        (parsed.scheme.casefold(), parsed.netloc.casefold(), parsed.path.rstrip("/"), query, "")
+    )
+
+
+def article_key(item: dict[str, Any]) -> tuple[str, str]:
+    return canonical_url(str(item.get("url") or "")), clean_text(
+        str(item.get("title") or "")
+    ).casefold()
+
+
 def is_noisy_summary(text: str) -> bool:
     lowered = text.lower()
     return any(marker in lowered for marker in ("article url:", "comments url:", "points:"))
@@ -176,6 +234,8 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
     for source in sources:
         source_id = str(source["id"])
         source_name = str(source["name"])
+        source_kind = str(source["kind"])
+        source_role = str(source["role"])
         fetcher = resolve_fetcher(source)
 
         try:
@@ -185,15 +245,20 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                 {
                     "source_id": source_id,
                     "name": source_name,
+                    "kind": source_kind,
+                    "role": source_role,
                     "ok": False,
                     "raw": 0,
                     "candidates": 0,
+                    "exact_duplicates": 0,
                     "error": str(exc),
                 }
             )
             continue
 
         source_candidate_count = 0
+        source_exact_duplicates = 0
+        source_article_keys: set[tuple[str, str]] = set()
         for raw in raw_items:
             item = {key: clean_text(str(raw.get(key, "") or "")) for key in ["title", "source_url", "published_at", "summary_basis"]}
             required_missing = [key for key in ["title", "source_url", "published_at", "summary_basis"] if not item[key]]
@@ -210,22 +275,33 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
             if published < window["start"] or published > window["end"]:
                 continue
 
-            candidates.append(
-                {
-                    "title": item["title"],
-                    "url": item["source_url"],
-                    "summary": item["summary_basis"],
-                }
-            )
+            selected_item = {
+                "title": item["title"],
+                "url": item["source_url"],
+                "summary": item["summary_basis"],
+                "source_id": source_id,
+                "source": source_name,
+                "source_role": source_role,
+                "published_at": published.isoformat(timespec="seconds"),
+            }
+            key = article_key(selected_item)
+            if key in source_article_keys:
+                source_exact_duplicates += 1
+                continue
+            source_article_keys.add(key)
+            candidates.append(selected_item)
             source_candidate_count += 1
 
         source_rows.append(
             {
                 "source_id": source_id,
                 "name": source_name,
+                "kind": source_kind,
+                "role": source_role,
                 "ok": True,
                 "raw": len(raw_items),
                 "candidates": source_candidate_count,
+                "exact_duplicates": source_exact_duplicates,
                 "error": None,
             }
         )
@@ -238,17 +314,50 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def public_document(data: dict[str, Any]) -> dict[str, Any]:
+    candidates = data["candidates"]
+    urls_by_source: dict[str, set[str]] = {}
+    articles_by_source: dict[str, set[tuple[str, str]]] = {}
+    for item in candidates:
+        source_id = str(item.get("source_id") or "")
+        urls_by_source.setdefault(source_id, set()).add(canonical_url(str(item["url"])))
+        articles_by_source.setdefault(source_id, set()).add(article_key(item))
+    unique_urls = {canonical_url(str(item["url"])) for item in candidates}
+    unique_articles = {article_key(item) for item in candidates}
+    role_rows: dict[str, dict[str, int]] = {}
+    for row in data["_sources"]:
+        role = str(row["role"])
+        aggregate = role_rows.setdefault(role, {"sources": 0, "selected": 0})
+        aggregate["sources"] += 1
+        aggregate["selected"] += int(row["candidates"])
     return {
         "window": data["window"],
         "sources": {
             row["source_id"]: {
                 "ok": row["ok"],
                 "count": row["candidates"],
+                "raw": row["raw"],
+                "selected": row["candidates"],
+                "unique_urls": len(urls_by_source.get(row["source_id"], set())),
+                "unique_articles": len(articles_by_source.get(row["source_id"], set())),
+                "exact_duplicate_rows": row["exact_duplicates"],
+                "name": row["name"],
+                "kind": row["kind"],
+                "role": row["role"],
                 "error": row["error"],
             }
             for row in data["_sources"]
         },
-        "candidates": data["candidates"],
+        "diagnostics": {
+            "sources_configured": len(data["_sources"]),
+            "sources_ok": sum(row["ok"] is True for row in data["_sources"]),
+            "candidate_rows": len(candidates),
+            "unique_articles": len(unique_articles),
+            "unique_urls": len(unique_urls),
+            "exact_duplicate_rows": len(candidates) - len(unique_articles),
+            "shared_url_rows": len(candidates) - len(unique_urls),
+            "by_source_role": role_rows,
+        },
+        "candidates": candidates,
     }
 
 
@@ -280,6 +389,15 @@ def validate_document(data: dict[str, Any]) -> list[str]:
             errors.append(f"candidates[{index}] has invalid url")
         if is_noisy_summary(str(candidate.get("summary", ""))):
             errors.append(f"candidates[{index}] contains uncleaned aggregator summary")
+        provenance_present = any(candidate.get(field) for field in PROVENANCE_FIELDS)
+        if provenance_present:
+            for field in PROVENANCE_FIELDS:
+                if not candidate.get(field):
+                    errors.append(f"candidates[{index}] missing provenance field {field}")
+            if candidate.get("source_role") not in SOURCE_ROLES:
+                errors.append(f"candidates[{index}] has invalid source_role")
+            if candidate.get("published_at") and parse_datetime(str(candidate["published_at"])) is None:
+                errors.append(f"candidates[{index}] has invalid published_at")
 
     return errors
 
@@ -292,10 +410,12 @@ def validate_sources() -> list[str]:
         return ["sources.json must contain sources[]"]
     seen: set[str] = set()
     for index, source in enumerate(sources):
-        for field in ["id", "name", "kind", "url"]:
+        for field in ["id", "name", "kind", "role", "url"]:
             if field not in source:
                 errors.append(f"sources[{index}] missing {field}")
         source_id = str(source.get("id", ""))
+        if source.get("role") not in SOURCE_ROLES:
+            errors.append(f"sources[{index}] has invalid role")
         if source_id in seen:
             errors.append(f"repeated source id: {source_id}")
         seen.add(source_id)
@@ -404,6 +524,23 @@ def add_hidden_subparser(subparsers: argparse._SubParsersAction, name: str) -> a
     return parser
 
 
+def add_proxy_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--http-proxy",
+        type=proxy_url,
+        help="HTTP proxy URL for this collection process only.",
+    )
+    parser.add_argument(
+        "--https-proxy",
+        type=proxy_url,
+        help="HTTPS proxy URL for this collection process only.",
+    )
+    parser.add_argument(
+        "--no-proxy",
+        help="Comma-separated hosts that bypass the explicit proxy; localhost is always included.",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collect and render AI news candidates.")
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="{collect,render}")
@@ -411,6 +548,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect = subparsers.add_parser("collect", help="Collect candidate news into JSON.")
     collect.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
     collect.add_argument("--out", type=Path, help="Write JSON to this path instead of stdout.")
+    add_proxy_args(collect)
     collect.set_defaults(func=cmd_collect)
 
     validate = add_hidden_subparser(subparsers, "validate")
@@ -423,12 +561,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = add_hidden_subparser(subparsers, "run")
     run.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
+    add_proxy_args(run)
     run.set_defaults(func=cmd_run)
 
     verify_sources = add_hidden_subparser(subparsers, "verify-sources")
     verify_sources.add_argument("--date", help="Target local natural day, YYYY-MM-DD.")
     verify_sources.add_argument("--min-raw", type=int, default=0, help="Default minimum raw items required per source.")
     verify_sources.add_argument("--out", type=Path, help="Write collected JSON to this path.")
+    add_proxy_args(verify_sources)
     verify_sources.set_defaults(func=cmd_verify_sources)
 
     return parser
@@ -438,6 +578,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if hasattr(args, "http_proxy"):
+            configure_proxy(args.http_proxy, args.https_proxy, args.no_proxy)
         return int(args.func(args))
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

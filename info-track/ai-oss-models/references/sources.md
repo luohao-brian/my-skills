@@ -5,7 +5,7 @@
 - 精确查询模型、数据集和可复现项目注册表中的 Hugging Face 仓库。
 - 当前运行查询 HF 全局 Trending Top 500 和最近更新 Top 1000，召回未登记 owner 的热门社区模型和未被过滤器覆盖的完整权重仓库；历史运行不查询这两个实时池。
 - 当前运行额外按结构化任务查询图像生成、视频生成和 TTS 的 Trending 与最近更新池，并保留 HF 官方任务内排名；这是模态级召回漏斗，不依赖模型名或发布者。历史运行不查询这些实时池。
-- 当前运行查询 ComfyUI filter 的 Trending 与最近更新池，并对 digital-human、talking-head、lip-sync、face-swap、person-replacement、identity-consistency、video-editing 精确 tags 各查询一次最近更新池，用于补回 ComfyUI 大池 Top 200 之外的稀疏能力。共 9 个列表请求并行执行；历史运行不查询该实时池。
+- 当前运行查询 ComfyUI filter 的 Trending 与最近更新池，并对 digital-human、avatar、talking-head、lip-sync、lipsync、face-swap、faceswap、person-replacement、identity-consistency、character-consistency、video-editing 精确 tags 各查询一次最近更新池，用于补回 ComfyUI 大池 Top 200 之外的稀疏能力。共 13 个列表请求并行执行；历史运行不查询该实时池。
 - 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选，并查询 uncensored、abliterated、heretic、decensored 精确 tags 形成低拒绝候选池。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。

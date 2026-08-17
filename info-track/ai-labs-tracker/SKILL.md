@@ -17,11 +17,23 @@ metadata: {"openclaw":{"skillKey":"ai-labs-tracker","emoji":"🧪","homepage":"h
 python3 {baseDir}/scripts/vendor_updates.py --output vendor-candidates.json --stats
 ```
 
+目标网络需要代理时，在同一次采集命令中显式传入：
+
+```bash
+python3 {baseDir}/scripts/vendor_updates.py \
+  --http-proxy <proxy-url> \
+  --https-proxy <proxy-url> \
+  --no-proxy <comma-separated-hosts> \
+  --output vendor-candidates.json \
+  --stats
+```
+
 调用合同：
 
-1. 仅使用可选的 `--date YYYY-MM-DD`、`--output` 和 `--stats`；未指定绝对日期时不传 `--date`。
+1. 仅使用可选的 `--date YYYY-MM-DD`、`--output`、`--stats`、`--http-proxy`、`--https-proxy` 和 `--no-proxy`；未指定绝对日期时不传 `--date`。
 2. 候选 JSON 遵循 [references/output-schema.md](references/output-schema.md)，报告遵循 [references/template.md](references/template.md)。
 3. 采集器不调用语言模型，也不读取任何通用 LLM key、endpoint 或模型配置。使用当前 Agent 已有的语言能力，根据候选原文生成中文标题、摘要和报告。
+4. 代理参数只作用于本次采集进程，不持久化、不写入候选 JSON，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理。需要代理时必须在唯一一次采集调用中显式传入。
 
 ## 时间窗口
 

@@ -19,10 +19,14 @@
     "media_ecosystem_candidates": 0,
     "media_ecosystem_by_filter": {
       "comfyui": 0,
+      "avatar": 0,
+      "character-consistency": 0,
       "digital-human": 0,
       "face-swap": 0,
+      "faceswap": 0,
       "identity-consistency": 0,
       "lip-sync": 0,
+      "lipsync": 0,
       "person-replacement": 0,
       "talking-head": 0,
       "video-editing": 0
@@ -41,7 +45,31 @@
     "project_url_candidates": 0,
     "github_metric_repositories": 0,
     "deployment_profile_models": 0,
-    "deployment_profile_repository_errors": 0
+    "deployment_profile_repository_errors": 0,
+    "coverage": {
+      "models_by_group_and_role": {
+        "flagship": {"llm": 0, "vlm": 0, "unknown": 0},
+        "local": {"llm": 0, "vlm": 0, "unknown": 0},
+        "notable_discoveries": {"llm": 0, "vlm": 0, "unknown": 0},
+        "media_customization": {"llm": 0, "vlm": 0, "unknown": 0}
+      },
+      "unique_model_repositories": 0,
+      "local_by_deployment": {"gguf": 0, "mlx": 0},
+      "media_customization_by_capability": {"lip-sync": 0},
+      "reproducible_projects": 0,
+      "reproducible_by_component": {
+        "data": 0,
+        "training": 0,
+        "model": 0,
+        "evaluation": 0,
+        "deployment": 0
+      },
+      "datasets_by_group": {
+        "registered": 0,
+        "notable_discoveries": 0,
+        "unique_repositories": 0
+      }
+    }
   },
   "groups": {
     "flagship": {
@@ -119,6 +147,8 @@
 ```
 
 `rank_delta > 0` 表示 `rank_scope` 对应的官方榜单排名上升；`rankings` 分别保留全局或 `task:<pipeline_tag>` 榜单。首次观察、上次快照没有该仓库，或两次运行仍在同一 UTC 自然日时，各增量为 `null`。`signals` 是可核验的来源标签，不是综合分或质量结论。`diagnostics` 只用于检查召回漏斗，不进入最终报告。
+
+`diagnostics.coverage` 是正式入选结果的热力图投影：模型按展示分组和结构化方向计数，本地模型另按部署格式计数，媒体定制按精确能力信号计数，可复现项目按交付链组件计数。一个模型可能同时进入媒体定制与其他展示分组，因此分组单元格不可相加；使用 `unique_model_repositories` 读取跨分组去重总数。
 
 热门衍生/本地部署模型还包含 `derivation` 和 `deployment`：
 

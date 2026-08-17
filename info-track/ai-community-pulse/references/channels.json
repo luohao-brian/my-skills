@@ -6,11 +6,11 @@
     },
     "agents": {
       "label": "Agent 与开发工具",
-      "keywords": ["agent", "agentic", "mcp", "model context protocol", "codex", "claude code", "openclaw", "hermes", "langgraph", "llamaindex", "crewai", "autogen", "dspy", "cline", "aider", "cursor", "opencode", "browser agent", "browser use", "computer use", "coding agent", "智能体", "代码助手", "编程助手"]
+      "keywords": ["agent", "agentic", "agent harness", "coding harness", "deepseek harness", "harness", "dsh", "mcp", "model context protocol", "codex", "claude code", "openclaw", "hermes", "langgraph", "llamaindex", "crewai", "autogen", "dspy", "cline", "aider", "cursor", "opencode", "browser agent", "browser use", "computer use", "coding agent", "智能体", "代码助手", "编程助手"]
     },
     "systems": {
       "label": "AI 系统与本地推理",
-      "keywords": ["inference", "serving", "quantization", "gguf", "ollama", "vllm", "sglang", "mlx", "triton", "tensorrt", "llama.cpp", "local llm", "self-host", "self hosted", "homelab", "distributed inference", "local inference", "本地部署", "量化", "推理服务", "显存", "私有部署"]
+      "keywords": ["inference", "inference engine", "serving", "model serving", "quantization", "speculative decoding", "kv cache", "gguf", "ollama", "openwebui", "open webui", "localai", "vllm", "sglang", "mlx", "triton", "tensorrt", "llama.cpp", "local llm", "llm runtime", "self-host", "self hosted", "homelab", "distributed inference", "local inference", "本地部署", "本地运行", "量化", "推理引擎", "推理框架", "推理服务", "模型服务", "显存", "私有部署"]
     },
     "semiconductors": {
       "label": "芯片、半导体与算力",
@@ -36,12 +36,16 @@
     {"command": "tag", "channel": "scaling", "args": ["scaling"]}
   ],
   "lesswrong": [
-    {"command": "frontpage", "channel": "frontpage"},
-    {"command": "new", "channel": "new"},
-    {"command": "curated", "channel": "curated"},
-    {"command": "top-week", "channel": "top-week"}
+    {"channel": "new", "url": "https://www.lesswrong.com/feed.xml"},
+    {"channel": "frontpage", "url": "https://www.lesswrong.com/feed.xml?view=frontpage"},
+    {"channel": "curated", "url": "https://www.lesswrong.com/feed.xml?view=curated"}
   ],
-  "producthunt": [{"command": "today", "channel": "today"}],
+  "producthunt": [
+    {"command": "today", "channel": "today", "allow_undated": true},
+    {"command": "posts", "channel": "llms", "args": ["--category", "llms"], "topic": "models"},
+    {"command": "posts", "channel": "ai-agents", "args": ["--category", "ai-agents"], "topic": "agents"},
+    {"command": "posts", "channel": "ai-coding-agents", "args": ["--category", "ai-coding-agents"], "topic": "agents"}
+  ],
   "v2ex_nodes": {
     "models": ["aigc", "ml"],
     "agents": ["aigc", "programmer"],
@@ -56,22 +60,23 @@
   },
   "twitter_accounts": {
     "models": ["ArtificialAnlys", "lmarena_ai", "karpathy", "simonw"],
-    "agents": ["openclaw", "NousResearch", "claude_code", "LangChainAI", "llama_index", "crewAIInc", "pyautogen", "DSPyOSS", "browser_use", "skyvernai"],
-    "systems": ["vllm_project", "ggerganov", "ollama", "SGLangRuntime"],
+    "agents": ["openclaw", "NousResearch", "claude_code", "LangChain", "llama_index", "crewAIInc", "pyautogen", "DSPyOSS", "browser_use", "skyvernai"],
+    "systems": ["vllm_project", "ggerganov", "ollama", "sgl_project"],
     "semiconductors": ["ServeTheHome", "IanCutress", "anshelsag", "SemiAnalysis_"]
   },
   "zhihu": [
-    {"command": "hot", "channel": "hot"},
-    {"command": "recommend", "channel": "recommend"}
+    {"command": "hot", "channel": "hot", "allow_undated": true}
   ],
   "linux_do": [
     {"command": "feed", "channel": "latest", "args": ["--view", "latest"]},
-    {"command": "feed", "channel": "hot", "args": ["--view", "hot"]}
+    {"command": "feed", "channel": "hot", "args": ["--view", "hot"]},
+    {"command": "feed", "channel": "tag:Agent", "args": ["--view", "latest", "--tag", "1836-tag"], "topic": "agents"},
+    {"command": "feed", "channel": "tag:MCP", "args": ["--view", "latest", "--tag", "mcp"], "topic": "agents"},
+    {"command": "feed", "channel": "tag:Ollama", "args": ["--view", "latest", "--tag", "ollama"], "topic": "systems"}
   ],
   "bilibili": [
-    {"command": "dynamic", "channel": "following"},
-    {"command": "hot", "channel": "hot"},
-    {"command": "ranking", "channel": "ranking"}
+    {"command": "hot", "channel": "hot", "allow_undated": true},
+    {"command": "ranking", "channel": "ranking", "allow_undated": true}
   ],
   "polymarket": {
     "tag_ids": [537, 103303],

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import email.utils
 import json
+import os
 import re
 import subprocess
 import sys
@@ -14,6 +16,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -38,6 +41,46 @@ HTTP_TIMEOUT_SECONDS = 6
 OPENCLI_TIMEOUT_SECONDS = 12
 OPENCLI_WORKERS = 3
 OPENCLI_SEMAPHORE = threading.BoundedSemaphore(2)
+LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
+
+
+def proxy_url(value: str) -> str:
+    cleaned = value.strip()
+    parsed = urllib.parse.urlsplit(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise argparse.ArgumentTypeError("proxy must be an http:// or https:// URL")
+    return cleaned
+
+
+def configure_proxy(
+    http_proxy: str | None,
+    https_proxy: str | None,
+    no_proxy: str | None,
+) -> None:
+    """Apply explicit proxy settings only to this process and its children."""
+    if not any((http_proxy, https_proxy, no_proxy)):
+        return
+
+    for scheme, value in (("http", http_proxy), ("https", https_proxy)):
+        for key in (f"{scheme}_proxy", f"{scheme.upper()}_PROXY"):
+            if value:
+                os.environ[key] = value
+            elif http_proxy or https_proxy:
+                os.environ.pop(key, None)
+
+    bypass = [*LOCAL_NO_PROXY]
+    bypass.extend(part.strip() for part in (no_proxy or "").split(",") if part.strip())
+    bypass_value = ",".join(dict.fromkeys(bypass))
+    os.environ["no_proxy"] = bypass_value
+    os.environ["NO_PROXY"] = bypass_value
+
+    node_options = os.environ.get("NODE_OPTIONS", "").strip()
+    if (http_proxy or https_proxy) and "--use-env-proxy" not in node_options.split():
+        os.environ["NODE_OPTIONS"] = f"{node_options} --use-env-proxy".strip()
+    if http_proxy or https_proxy:
+        os.environ["NODE_NO_WARNINGS"] = "1"
+
+    urllib.request.install_opener(urllib.request.build_opener())
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -111,6 +154,21 @@ def http_json(url: str, timeout: int = HTTP_TIMEOUT_SECONDS, deadline: float | N
         raise RuntimeError(f"request failed: {describe_error(exc)}") from exc
 
 
+def http_bytes(url: str, timeout: int = HTTP_TIMEOUT_SECONDS, deadline: float | None = None) -> bytes:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml,application/xml,text/xml"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=remaining_timeout(deadline, timeout)) as response:
+            payload = response.read()
+    except Exception as exc:
+        raise RuntimeError(f"request failed: {describe_error(exc)}") from exc
+    if not payload:
+        raise RuntimeError("request failed: empty response body")
+    return payload
+
+
 def parse_date(value: Any) -> datetime | None:
     if value is None or value == "":
         return None
@@ -120,11 +178,20 @@ def parse_date(value: Any) -> datetime | None:
     try:
         result = datetime.fromisoformat(text)
     except ValueError:
-        try:
-            result = datetime.strptime(text, "%a %b %d %H:%M:%S %z %Y")
-        except ValueError:
+        result = None
+        for pattern in (
+            "%a %b %d %H:%M:%S %z %Y",
+            "%m/%d/%Y, %I:%M:%S %p",
+            "%m/%d/%Y, %H:%M:%S",
+        ):
+            try:
+                result = datetime.strptime(text, pattern)
+                break
+            except ValueError:
+                continue
+        if result is None:
             return None
-    return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result
+    return result.replace(tzinfo=LOCAL_TZ) if result.tzinfo is None else result
 
 
 def iso_or_none(value: Any) -> str | None:
@@ -134,7 +201,7 @@ def iso_or_none(value: Any) -> str | None:
 
 def within_window(value: Any, start: datetime, end: datetime) -> bool:
     parsed = parse_date(value)
-    return parsed is None or start <= parsed <= end
+    return parsed is not None and start <= parsed <= end
 
 
 def normalized_url(url: str) -> str:
@@ -168,8 +235,6 @@ def keyword_matches(text: str, keywords: Iterable[str]) -> bool:
 
 def classify(text: str, registry: dict[str, Any], preferred: str | None = None) -> str | None:
     topics = registry["topics"]
-    if preferred and keyword_matches(text, topics[preferred]["keywords"]):
-        return preferred
     matches: list[tuple[int, str]] = []
     for topic in TOPIC_ORDER:
         count = sum(1 for word in topics[topic]["keywords"] if keyword_matches(text, [word]))
@@ -177,8 +242,25 @@ def classify(text: str, registry: dict[str, Any], preferred: str | None = None) 
             matches.append((count, topic))
     if not matches:
         return None
-    matches.sort(key=lambda row: (-row[0], TOPIC_ORDER.index(row[1])))
+    matches.sort(
+        key=lambda row: (
+            -row[0],
+            row[1] != preferred if preferred else False,
+            TOPIC_ORDER.index(row[1]),
+        )
+    )
     return matches[0][1]
+
+
+def date_allowed(
+    value: Any, start: datetime | None, end: datetime | None, allow_undated: bool = False,
+) -> bool:
+    if start is None or end is None:
+        return True
+    parsed = parse_date(value)
+    if parsed is None:
+        return allow_undated
+    return start <= parsed <= end
 
 
 def candidate(
@@ -366,48 +448,53 @@ def collect_v2ex(
     raw_count = 0
     successes = 0
     errors: list[str] = []
-    for preferred, nodes in registry["v2ex_nodes"].items():
+    preferences: dict[str, set[str]] = defaultdict(set)
+    for topic, nodes in registry["v2ex_nodes"].items():
         for node in nodes:
-            try:
-                rows = http_json(
-                    "https://www.v2ex.com/api/topics/show.json?"
-                    + urllib.parse.urlencode({"node_name": node}),
-                    deadline=deadline,
-                )
-                successes += 1
-            except Exception as exc:
-                errors.append(f"{node}: {describe_error(exc)}")
+            preferences[node].add(topic)
+    for node, topics in preferences.items():
+        preferred = next(iter(topics)) if len(topics) == 1 else None
+        try:
+            rows = http_json(
+                "https://www.v2ex.com/api/topics/show.json?"
+                + urllib.parse.urlencode({"node_name": node}),
+                deadline=deadline,
+            )
+            successes += 1
+        except Exception as exc:
+            errors.append(f"{node}: {describe_error(exc)}")
+            continue
+        if not isinstance(rows, list):
+            continue
+        raw_count += len(rows)
+        for row in rows[:25]:
+            title = clean_text(row.get("title", ""))
+            body = clean_text(row.get("content", ""))
+            if not within_window(row.get("created"), start, end):
                 continue
-            if not isinstance(rows, list):
+            topic = classify(f"{title} {body}", registry, preferred)
+            if topic is None:
                 continue
-            raw_count += len(rows)
-            for row in rows[:25]:
-                title = clean_text(row.get("title", ""))
-                body = clean_text(row.get("content", ""))
-                if not within_window(row.get("created"), start, end):
-                    continue
-                topic = classify(f"{title} {body}", registry, preferred)
-                if topic is None:
-                    continue
-                item = candidate(
-                    title=title,
-                    url=row.get("url") or f"https://www.v2ex.com/t/{row.get('id')}",
-                    summary=body or title,
-                    date=row.get("created"),
-                    source="v2ex",
-                    channel=node,
-                    topic=topic,
-                    metrics={"replies": row.get("replies")},
-                )
-                if item:
-                    output.append(item)
+            item = candidate(
+                title=title,
+                url=row.get("url") or f"https://www.v2ex.com/t/{row.get('id')}",
+                summary=body or title,
+                date=row.get("created"),
+                source="v2ex",
+                channel=node,
+                topic=topic,
+                metrics={"replies": row.get("replies")},
+            )
+            if item:
+                output.append(item)
     if successes == 0 and errors:
         raise RuntimeError("; ".join(errors))
     return output, raw_count
 
 
 def collect_opencli_public(
-    registry: dict[str, Any], source: str, deadline: float | None = None,
+    registry: dict[str, Any], source: str, start: datetime, end: datetime,
+    deadline: float | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     output: list[dict[str, Any]] = []
     raw_count = 0
@@ -439,19 +526,72 @@ def collect_opencli_public(
         for row in rows:
             title = row.get("title") or row.get("name") or row.get("topic")
             summary = row.get("summary") or row.get("tagline") or row.get("description") or title
-            topic = classify(f"{title or ''} {summary or ''} {row.get('tags', '')}", registry)
+            topic = classify(
+                f"{title or ''} {summary or ''} {row.get('tags', '')}",
+                registry,
+                spec.get("topic"),
+            )
             if topic is None:
+                continue
+            date = row.get("created_at") or row.get("date") or row.get("published_at")
+            if not date_allowed(date, start, end, bool(spec.get("allow_undated"))):
                 continue
             item = candidate(
                 title=title,
                 url=row.get("url") or row.get("link"),
                 summary=summary,
-                date=row.get("created_at") or row.get("date") or row.get("published_at"),
+                date=date,
                 source=source,
                 channel=spec["channel"],
                 topic=topic,
                 kind="product" if source == "producthunt" else "community",
                 metrics={key: row.get(key) for key in ("score", "comments", "karma", "rank") if row.get(key) is not None},
+            )
+            if item:
+                output.append(item)
+    if successes == 0 and errors:
+        raise RuntimeError("; ".join(errors))
+    return output, raw_count
+
+
+def collect_lesswrong(
+    registry: dict[str, Any], start: datetime, end: datetime, deadline: float | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    output: list[dict[str, Any]] = []
+    raw_count = 0
+    successes = 0
+    errors: list[str] = []
+    for spec in registry["lesswrong"]:
+        try:
+            root = ET.fromstring(http_bytes(spec["url"], timeout=15, deadline=deadline))
+            successes += 1
+        except Exception as exc:
+            errors.append(f"{spec['channel']}: {describe_error(exc)}")
+            continue
+        rows = root.findall("./channel/item")
+        raw_count += len(rows)
+        for row in rows:
+            title = clean_text(row.findtext("title") or "")
+            summary = clean_text(row.findtext("description") or title)
+            url = clean_text(row.findtext("link") or row.findtext("guid") or "")
+            published_text = row.findtext("pubDate") or ""
+            try:
+                published = email.utils.parsedate_to_datetime(published_text)
+            except (TypeError, ValueError):
+                published = None
+            if not date_allowed(published, start, end):
+                continue
+            topic = classify(f"{title} {summary}", registry)
+            if topic is None:
+                continue
+            item = candidate(
+                title=title,
+                url=url,
+                summary=summary,
+                date=published,
+                source="lesswrong",
+                channel=spec["channel"],
+                topic=topic,
             )
             if item:
                 output.append(item)
@@ -546,7 +686,10 @@ def row_to_generic_candidate(
         url = bases.get(source, "") + url
     return candidate(
         title=title, url=url, summary=summary,
-        date=row.get("created_at") or row.get("created_utc") or row.get("date") or row.get("time") or row.get("published_at"),
+        date=(
+            row.get("created_at") or row.get("created_utc") or row.get("created")
+            or row.get("date") or row.get("time") or row.get("published_at")
+        ),
         source=source, channel=channel, topic=topic,
         metrics={key: row.get(key) for key in ("score", "comments", "likes", "replies", "rank") if row.get(key) is not None},
     )
@@ -565,16 +708,20 @@ def collect_browser_sources(
     errors: dict[str, str] = {}
     warnings: dict[str, str] = {}
 
-    tasks: list[tuple[str, str, str | None, list[str]]] = []
+    tasks: list[tuple[str, str, str | None, bool, list[str]]] = []
     for source, config_key in (("twitter", "twitter_accounts"), ("reddit", "reddit_subreddits")):
+        preferences: dict[str, set[str]] = defaultdict(set)
         for preferred, channels in registry[config_key].items():
             for channel in channels:
-                args = (
-                    [source, "tweets", channel, "--limit", "12"]
-                    if source == "twitter"
-                    else [source, "subreddit", channel, "--sort", "hot", "--limit", "12"]
-                )
-                tasks.append((source, channel, preferred, args))
+                preferences[channel].add(preferred)
+        for channel, topics in preferences.items():
+            preferred = next(iter(topics)) if len(topics) == 1 else None
+            args = (
+                [source, "tweets", channel, "--limit", "12"]
+                if source == "twitter"
+                else [source, "subreddit", channel, "--sort", "hot", "--limit", "12"]
+            )
+            tasks.append((source, channel, preferred, False, args))
 
     for source, config_key in (("zhihu", "zhihu"), ("linux-do", "linux_do"), ("bilibili", "bilibili")):
         for spec in registry[config_key]:
@@ -582,21 +729,22 @@ def collect_browser_sources(
                 (
                     source,
                     spec["channel"],
-                    None,
+                    spec.get("topic"),
+                    bool(spec.get("allow_undated")),
                     [source, spec["command"], *spec.get("args", []), "--limit", "25"],
                 )
             )
 
     def fetch_channel(
-        task: tuple[str, str, str | None, list[str]],
-    ) -> tuple[str, str, str | None, list[dict[str, Any]] | None, str | None]:
-        source, channel, preferred, command = task
+        task: tuple[str, str, str | None, bool, list[str]],
+    ) -> tuple[str, str, str | None, bool, list[dict[str, Any]] | None, str | None]:
+        source, channel, preferred, allow_undated, command = task
         try:
             timeout = 20 if source == "bilibili" else OPENCLI_TIMEOUT_SECONDS
             rows = opencli(command, timeout=timeout, deadline=deadline)
-            return source, channel, preferred, rows, None
+            return source, channel, preferred, allow_undated, rows, None
         except Exception as exc:
-            return source, channel, preferred, None, describe_error(exc)
+            return source, channel, preferred, allow_undated, None, describe_error(exc)
 
     workers = min(OPENCLI_WORKERS, len(tasks))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
@@ -605,7 +753,7 @@ def collect_browser_sources(
             for index, task in enumerate(tasks)
         }
         fetched: list[
-            tuple[str, str, str | None, list[dict[str, Any]] | None, str | None] | None
+            tuple[str, str, str | None, bool, list[dict[str, Any]] | None, str | None] | None
         ] = [None] * len(tasks)
         completed = 0
         for future in concurrent.futures.as_completed(futures):
@@ -620,7 +768,7 @@ def collect_browser_sources(
     errors_by_source: dict[str, list[str]] = defaultdict(list)
     for result in fetched:
         assert result is not None
-        source, channel, preferred, rows, error = result
+        source, channel, preferred, allow_undated, rows, error = result
         if error is not None:
             errors_by_source[source].append(f"{channel}: {error}")
             continue
@@ -629,7 +777,7 @@ def collect_browser_sources(
         raw_by_source[source] += len(rows)
         for row in rows:
             item = row_to_generic_candidate(row, registry, source, channel, preferred)
-            if item and (start is None or end is None or within_window(item.get("date"), start, end)):
+            if item and date_allowed(item.get("date"), start, end, allow_undated):
                 collected[source].append(item)
                 selected_by_source[source] += 1
 
@@ -656,6 +804,46 @@ def deduplicate(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def configured_channel_count(registry: dict[str, Any], source: str) -> int:
+    direct_keys = {
+        "bluesky": "bluesky_feeds",
+        "hackernews": "hackernews_feeds",
+        "lobsters": "lobsters",
+        "lesswrong": "lesswrong",
+        "producthunt": "producthunt",
+        "zhihu": "zhihu",
+        "linux-do": "linux_do",
+        "bilibili": "bilibili",
+    }
+    if source in direct_keys:
+        return len(registry[direct_keys[source]])
+    if source == "v2ex":
+        return len({channel for channels in registry["v2ex_nodes"].values() for channel in channels})
+    if source in ("twitter", "reddit"):
+        key = "twitter_accounts" if source == "twitter" else "reddit_subreddits"
+        return len({channel for channels in registry[key].values() for channel in channels})
+    if source == "polymarket":
+        return 1
+    return 0
+
+
+def add_source_diagnostics(
+    statuses: dict[str, Any], items: list[dict[str, Any]], registry: dict[str, Any],
+) -> None:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in items:
+        grouped[item["source"]].append(item)
+    for source, status in statuses.items():
+        source_items = grouped.get(source, [])
+        status["channels_configured"] = configured_channel_count(registry, source)
+        status["deduplicated"] = len(source_items)
+        status["topics"] = {
+            topic: sum(item["topic"] == topic for item in source_items)
+            for topic in TOPIC_ORDER
+        }
+        status["channels_with_candidates"] = len({item["channel"] for item in source_items})
+
+
 def collect_document(args: argparse.Namespace) -> dict[str, Any]:
     registry = load_json(args.channels)
     end = datetime.now(timezone.utc)
@@ -668,9 +856,9 @@ def collect_document(args: argparse.Namespace) -> dict[str, Any]:
         "bluesky": lambda: collect_bluesky(registry, start, end, deadline),
         "hackernews": lambda: collect_hackernews(registry, start, end, deadline),
         "v2ex": lambda: collect_v2ex(registry, start, end, deadline),
-        "lobsters": lambda: collect_opencli_public(registry, "lobsters", deadline),
-        "lesswrong": lambda: collect_opencli_public(registry, "lesswrong", deadline),
-        "producthunt": lambda: collect_opencli_public(registry, "producthunt", deadline),
+        "lobsters": lambda: collect_opencli_public(registry, "lobsters", start, end, deadline),
+        "lesswrong": lambda: collect_lesswrong(registry, start, end, deadline),
+        "producthunt": lambda: collect_opencli_public(registry, "producthunt", start, end, deadline),
         "polymarket": lambda: collect_polymarket(registry, deadline),
     }
     log_progress(
@@ -737,11 +925,13 @@ def collect_document(args: argparse.Namespace) -> dict[str, Any]:
                         add_source_status(statuses, source, False, 0, 0, message)
                 log_progress(f"browser collection failed error={message}")
 
-    log_progress(f"collection complete candidates={len(candidates)}")
+    deduplicated = deduplicate(candidates)
+    add_source_diagnostics(statuses, deduplicated, registry)
+    log_progress(f"collection complete candidates={len(deduplicated)}")
     return {
         "window": {"start": start.isoformat(), "end": end.isoformat(), "hours": args.hours},
         "sources": statuses,
-        "candidates": deduplicate(candidates),
+        "candidates": deduplicated,
     }
 
 
@@ -842,6 +1032,20 @@ def add_collection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--channels", type=Path, default=CHANNELS_PATH, help="Fixed channel registry JSON.")
     parser.add_argument("--skip-browser", action="store_true", help="Skip browser/login-backed sources.")
     parser.add_argument(
+        "--http-proxy",
+        type=proxy_url,
+        help="HTTP proxy URL for this collection process only.",
+    )
+    parser.add_argument(
+        "--https-proxy",
+        type=proxy_url,
+        help="HTTPS proxy URL for this collection process only.",
+    )
+    parser.add_argument(
+        "--no-proxy",
+        help="Comma-separated hosts that bypass the explicit proxy; local bridge hosts are always included.",
+    )
+    parser.add_argument(
         "--max-seconds",
         type=int,
         default=DEFAULT_MAX_SECONDS,
@@ -877,6 +1081,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if hasattr(args, "max_seconds") and args.max_seconds <= 0:
             raise ValueError("--max-seconds must be greater than zero")
+        if hasattr(args, "http_proxy"):
+            configure_proxy(args.http_proxy, args.https_proxy, args.no_proxy)
         return int(args.func(args))
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

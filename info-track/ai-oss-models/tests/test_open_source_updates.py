@@ -591,6 +591,11 @@ class MediaDeploymentProfileTests(unittest.TestCase):
         )
 
     def test_comfyui_ecosystem_queries_trending_and_recent(self):
+        self.assertTrue(
+            {"faceswap", "lipsync", "avatar", "character-consistency"}
+            <= set(MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS)
+        )
+
         def fake_hf_api(path, retries=1):
             parsed = MODULE.urllib.parse.parse_qs(MODULE.urllib.parse.urlparse(path).query)
             return [
@@ -857,6 +862,24 @@ class EvaluationEvidenceTests(unittest.TestCase):
 
 
 class PerformancePipelineTests(unittest.TestCase):
+    def test_explicit_proxy_configures_urllib_and_gh_environment(self):
+        with (
+            mock.patch.dict(MODULE.os.environ, {}, clear=True),
+            mock.patch.object(MODULE.urllib.request, "install_opener") as install_opener,
+        ):
+            MODULE.configure_proxy(
+                "http://proxy.example:8080",
+                "http://proxy.example:8080",
+                "huggingface.co",
+            )
+            self.assertEqual(MODULE.os.environ["http_proxy"], "http://proxy.example:8080")
+            self.assertEqual(MODULE.os.environ["https_proxy"], "http://proxy.example:8080")
+            self.assertEqual(
+                MODULE.os.environ["NO_PROXY"],
+                "localhost,127.0.0.1,::1,huggingface.co",
+            )
+            install_opener.assert_called_once()
+
     def test_non_retryable_http_error_stops_immediately(self):
         url = "https://huggingface.co/missing/raw/main/README.md"
         error = MODULE.urllib.error.HTTPError(url, 404, "Not Found", {}, None)
@@ -1436,6 +1459,10 @@ class HistoricalMainTests(unittest.TestCase):
         self.assertNotIn("trend", metadata)
         self.assertEqual(captured["diagnostics"]["local_hot_before_limit"], 0)
         self.assertEqual(
+            captured["diagnostics"]["coverage"]["unique_model_repositories"],
+            1,
+        )
+        self.assertEqual(
             captured["diagnostics"]["media_ecosystem_by_filter"],
             {
                 value: 0
@@ -1547,6 +1574,59 @@ class LocalVariantTests(unittest.TestCase):
         selected_titles = {entry["title"] for entry in selected}
         self.assertEqual(len(selected), MODULE.LOCAL_REPORT_MAX)
         self.assertTrue({entry["title"] for entry in diverse} <= selected_titles)
+
+
+class CoverageDiagnosticsTests(unittest.TestCase):
+    def test_coverage_keeps_group_overlap_separate_from_unique_models(self):
+        shared = {
+            "title": "Community/video-model",
+            "category": "local",
+            "metadata": {
+                "pipeline_tag": "text-to-video",
+                "deployment": ["gguf", "comfyui"],
+                "media_customization": {"capabilities": ["video-editing", "lip-sync"]},
+            },
+        }
+        groups = {
+            "flagship": {
+                role: ([{"title": "Official/llm", "category": "llm", "metadata": {}}] if role == "llm" else [])
+                for role in MODULE.FLAGSHIP_ROLES
+            },
+            "local": [shared],
+            "reproducible": [
+                {
+                    "title": "Project A",
+                    "metadata": {
+                        "coverage": {
+                            "data": True,
+                            "training": True,
+                            "model": True,
+                            "evaluation": False,
+                            "deployment": False,
+                        }
+                    },
+                }
+            ],
+            "datasets": [{"title": "Official/data"}],
+            "notable_discoveries": {
+                "models": [{"title": "New/audio", "category": "audio-tts", "metadata": {}}],
+                "datasets": [{"title": "Community/data"}],
+            },
+            "media_customization": [shared],
+        }
+
+        coverage = MODULE.coverage_diagnostics(groups)
+        self.assertEqual(coverage["models_by_group_and_role"]["local"]["video-generation"], 1)
+        self.assertEqual(coverage["models_by_group_and_role"]["media_customization"]["video-generation"], 1)
+        self.assertEqual(coverage["unique_model_repositories"], 3)
+        self.assertEqual(coverage["local_by_deployment"], {"comfyui": 1, "gguf": 1})
+        self.assertEqual(
+            coverage["media_customization_by_capability"],
+            {"lip-sync": 1, "video-editing": 1},
+        )
+        self.assertEqual(coverage["reproducible_by_component"]["training"], 1)
+        self.assertEqual(coverage["reproducible_by_component"]["deployment"], 0)
+        self.assertEqual(coverage["datasets_by_group"]["unique_repositories"], 2)
 
 
 if __name__ == "__main__":

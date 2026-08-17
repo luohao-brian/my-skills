@@ -25,19 +25,34 @@ metadata: {"openclaw":{"skillKey":"ai-oss-models","emoji":"🧩","homepage":"htt
 - 读取候选 JSON 前读取 [references/output-schema.md](references/output-schema.md)。
 - 生成报告前读取 [references/format.md](references/format.md)。
 - 需要确认分类字段时读取 [references/sources.md](references/sources.md)。
+- 分析召回覆盖或生成热力图时读取 [references/heatmap-diagnostics.md](references/heatmap-diagnostics.md)。
 
 ```bash
 python3 {baseDir}/scripts/open_source_updates.py --output oss-candidates.json --report-output oss-report-input.json --stats
 ```
 
+目标网络需要代理时，在同一次采集命令中显式传入：
+
+```bash
+python3 {baseDir}/scripts/open_source_updates.py \
+  --http-proxy <proxy-url> \
+  --https-proxy <proxy-url> \
+  --no-proxy <comma-separated-hosts> \
+  --output oss-candidates.json \
+  --report-output oss-report-input.json \
+  --stats
+```
+
 调用合同：
 
-1. 仅使用可选的 `--date YYYY-MM-DD`、`--output`、`--report-output`、`--state-dir` 和 `--stats`；未指定日期时不传 `--date`。
+1. 仅使用可选的 `--date YYYY-MM-DD`、`--output`、`--report-output`、`--state-dir`、`--stats`、`--http-proxy`、`--https-proxy` 和 `--no-proxy`；未指定日期时不传 `--date`。
 2. 候选 JSON 遵循 [references/output-schema.md](references/output-schema.md)，最终报告遵循 [references/format.md](references/format.md)。
 3. 成稿时只读取 `--report-output` 生成的紧凑 JSON，不读取 `--output` 的完整审计 JSON；报告必须覆盖 `groups` 中的全部候选，只从 `groups.notable_discoveries` 生成“本周重点新发现”，从 `groups.media_customization` 生成独立的 ComfyUI 媒体定制雷达。
 4. 只有调用方明确提供 `--state-dir` 或 `AI_OSS_MODELS_STATE_DIR` 时才读写趋势快照；快照覆盖 HF 全局与任务内排名、TrendingScore、下载、点赞，以及已登记 GitHub 工程的 star/fork。目录由调用方负责选择和管理。
 5. 模型方向、规模、架构与论文只使用候选中的结构化字段，方向不按模型名推断；评测必须同时保留 model card 的测试条件和限制；解释“仓库更新”时只使用本窗口 `change_evidence`，把 model/dataset card 限定为当前状态背景。
 6. `--stats` 会输出各采集阶段耗时和紧凑成稿输入字节数；性能排查以 `timings_seconds` 为准，不通过重复运行采集命令猜测进度。
+7. 覆盖诊断和热力图只读取 `--output` 的完整审计 JSON 中的 `diagnostics` 与 `groups`；`--report-output` 仍只用于生成正式报告正文。
+8. 代理参数只作用于本次采集进程及其 `gh api` 子进程，不持久化、不写入候选或报告 JSON，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理。需要代理时必须在唯一一次采集调用中显式传入。
 
 ## 时间窗口
 
