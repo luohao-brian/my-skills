@@ -83,17 +83,37 @@ MEDIA_DEPLOYMENT_ROLES = {
 }
 MEDIA_ECOSYSTEM_FILTERS = ["comfyui"]
 MEDIA_CUSTOMIZATION_QUERY_FILTERS = [
+    "audio-driven-video",
+    "audio-to-video",
     "avatar",
+    "camera-control",
+    "character-animation",
     "character-consistency",
     "digital-human",
     "face-swap",
     "faceswap",
+    "first-last-frame-to-video",
     "identity-consistency",
+    "image-to-video",
+    "image-text-to-video",
     "lip-sync",
     "lipsync",
+    "motion-control",
+    "motion-transfer",
+    "multi-shot-video",
+    "pose-control",
     "person-replacement",
+    "reference-to-video",
+    "speech-to-video",
     "talking-head",
     "video-editing",
+    "video-effects",
+    "video-inpainting",
+    "video-outpainting",
+    "video-relighting",
+    "video-to-video",
+    "frame-interpolation",
+    "video-upscaling",
 ]
 MEDIA_PROFILE_RUNTIME_TAGS = {"comfyui", "diffusers", "diffusion-single-file"}
 MEDIA_RUNTIME_TAGS = {
@@ -107,20 +127,72 @@ MEDIA_RUNTIME_TAGS = {
     "vllm": "vllm",
 }
 MEDIA_CUSTOMIZATION_TAGS = {
-    "avatar": "digital-human",
+    "audio-driven": "audio-driven-video",
+    "audio-driven-avatar": "audio-driven-video",
+    "audio-to-video": "audio-driven-video",
+    "camera-control": "motion-control",
+    "character-animation": "character-animation",
     "character-consistency": "identity-consistency",
     "character-replacement": "person-replacement",
-    "digital-human": "digital-human",
     "face-swap": "face-swap",
     "faceswap": "face-swap",
+    "first-last-frame-to-video": "keyframe-control",
     "identity-consistency": "identity-consistency",
     "identity-preserving": "identity-consistency",
+    "image-text-to-video": "image-to-video",
+    "image-to-video": "image-to-video",
     "lip-sync": "lip-sync",
     "lipsync": "lip-sync",
+    "motion-control": "motion-control",
+    "motion-transfer": "motion-transfer",
+    "multi-shot-video": "multi-shot-video",
+    "pose-control": "motion-control",
     "person-replacement": "person-replacement",
+    "reference-to-video": "reference-to-video",
+    "speech-to-video": "audio-driven-video",
     "subject-consistency": "identity-consistency",
     "talking-head": "talking-head",
     "video-editing": "video-editing",
+    "video-effects": "video-effects",
+    "video-inpainting": "video-effects",
+    "video-outpainting": "video-effects",
+    "video-relighting": "video-effects",
+    "video-to-video": "video-editing",
+    "frame-interpolation": "video-enhancement",
+    "video-upscaling": "video-enhancement",
+}
+MEDIA_CUSTOMIZATION_LANES = {
+    "image-to-video": "image-to-video",
+    "reference-to-video": "image-to-video",
+    "keyframe-control": "image-to-video",
+    "multi-shot-video": "image-to-video",
+    "character-animation": "character-animation",
+    "motion-control": "character-animation",
+    "motion-transfer": "character-animation",
+    "identity-consistency": "character-animation",
+    "audio-driven-video": "audio-driven-avatar",
+    "lip-sync": "audio-driven-avatar",
+    "talking-head": "audio-driven-avatar",
+    "video-editing": "video-editing-effects",
+    "video-effects": "video-editing-effects",
+    "video-enhancement": "video-editing-effects",
+    "face-swap": "video-editing-effects",
+    "person-replacement": "video-editing-effects",
+}
+MEDIA_POST_IMAGE_PRIMARY_CAPABILITIES = {
+    "image-to-video",
+    "reference-to-video",
+    "keyframe-control",
+    "multi-shot-video",
+    "character-animation",
+    "motion-control",
+    "motion-transfer",
+    "audio-driven-video",
+    "lip-sync",
+    "talking-head",
+    "video-editing",
+    "video-effects",
+    "video-enhancement",
 }
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
 DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
@@ -144,6 +216,9 @@ MODALITY_HOT_DOWNLOADS = 500
 MODALITY_HOT_LIKES = 10
 MODALITY_QUERY_LIMIT = 200
 MEDIA_CUSTOMIZATION_LIMIT = 8
+MEDIA_OPEN_ACTIVITY_MIN = 3
+MEDIA_CUSTOMIZATION_PREFETCH_LIMIT = 24
+MEDIA_CUSTOMIZATION_UNKNOWN_PREFETCH_LIMIT = 12
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
 DATASET_HOT_LIKES = 20
@@ -191,6 +266,11 @@ PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "image-to-image": {"input": ["image"], "output": ["image"]},
     "text-to-video": {"input": ["text"], "output": ["video"]},
     "image-to-video": {"input": ["image"], "output": ["video"]},
+    "image-text-to-video": {"input": ["image", "text"], "output": ["video"]},
+    "first-last-frame-to-video": {"input": ["image"], "output": ["video"]},
+    "reference-to-video": {"input": ["image"], "output": ["video"]},
+    "audio-to-video": {"input": ["audio"], "output": ["video"]},
+    "speech-to-video": {"input": ["audio"], "output": ["video"]},
     "video-to-video": {"input": ["video"], "output": ["video"]},
     "automatic-speech-recognition": {"input": ["audio"], "output": ["text"]},
     "text-to-speech": {"input": ["text"], "output": ["audio"]},
@@ -802,7 +882,7 @@ def deployment_facets(row: dict[str, Any]) -> list[str]:
 
 
 def media_customization_facet(row: dict[str, Any]) -> dict[str, Any]:
-    signals = [
+    signals: list[dict[str, str]] = [
         {
             "capability": MEDIA_CUSTOMIZATION_TAGS[tag],
             "source": "hf-tag",
@@ -810,12 +890,28 @@ def media_customization_facet(row: dict[str, Any]) -> dict[str, Any]:
         }
         for tag in sorted(lower_tags(row) & set(MEDIA_CUSTOMIZATION_TAGS))
     ]
+    for signal in modality_evidence(row)["signals"]:
+        modalities = pipeline_modalities(str(signal["value"]))
+        inputs = set(modalities["input"])
+        outputs = set(modalities["output"])
+        capability = ""
+        if "video" in outputs and "image" in inputs:
+            capability = "image-to-video"
+        elif "video" in outputs and "audio" in inputs:
+            capability = "audio-driven-video"
+        elif "video" in outputs and "video" in inputs:
+            capability = "video-editing"
+        if capability:
+            signals.append(
+                {
+                    "capability": capability,
+                    "source": f"hf-{signal['source']}",
+                    "value": str(signal["value"]),
+                }
+            )
     if not signals:
         return {}
-    return {
-        "capabilities": sorted({signal["capability"] for signal in signals}),
-        "signals": signals,
-    }
+    return merge_customization_signals({"signals": signals})
 
 
 def contains_config_key(value: Any, keys: set[str]) -> bool:
@@ -1213,10 +1309,8 @@ def query_media_ecosystem_candidates() -> tuple[list[dict[str, Any]], dict[str, 
 
     queries = [
         (value, sort)
-        for value in MEDIA_ECOSYSTEM_FILTERS
+        for value in query_filters
         for sort in ("trendingScore", "lastModified")
-    ] + [
-        (value, "lastModified") for value in MEDIA_CUSTOMIZATION_QUERY_FILTERS
     ]
     seen_by_filter = {value: set() for value in query_filters}
     with ThreadPoolExecutor(max_workers=min(12, len(queries) or 1)) as executor:
@@ -1300,6 +1394,51 @@ def is_hot_discovery(row: dict[str, Any]) -> bool:
     return trending >= DISCOVERY_HOT_TRENDING and (
         downloads >= DISCOVERY_HOT_DOWNLOADS or likes >= DISCOVERY_HOT_LIKES
     )
+
+
+def is_hot_media_discovery(row: dict[str, Any]) -> bool:
+    trending, downloads, likes = popularity_values(row)
+    return trending >= MODALITY_HOT_TRENDING and (
+        downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES
+    )
+
+
+def media_activity_density(
+    row: dict[str, Any],
+    event: tuple[str, str] | None,
+    observed_on: dt.date,
+) -> dict[str, Any]:
+    """Expose transparent activity signals instead of an opaque composite score."""
+    trending, downloads, likes = popularity_values(row)
+    created = iso_date(row.get("createdAt"))
+    age_days = max(1, (observed_on - created).days + 1) if created else None
+    downloads_per_day = round(downloads / age_days, 1) if age_days and age_days <= 120 else None
+    likes_per_day = round(likes / age_days, 2) if age_days and age_days <= 120 else None
+    trend = row.get("_trend") or {}
+    signals: list[str] = []
+    if trending >= DISCOVERY_HOT_TRENDING:
+        signals.append("high-trending")
+    if event and trending >= MODALITY_HOT_TRENDING and (
+        downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES
+    ):
+        signals.append("recent-repository-activity")
+    if downloads_per_day is not None and downloads_per_day >= 1_000:
+        signals.append("high-download-velocity")
+    if likes_per_day is not None and likes_per_day >= 5:
+        signals.append("high-like-velocity")
+    if int(trend.get("downloads_delta") or 0) >= 1_000:
+        signals.append("downloads-growing")
+    if int(trend.get("likes_delta") or 0) >= 10:
+        signals.append("likes-growing")
+    if int(trend.get("rank_delta") or 0) >= 10:
+        signals.append("rank-rising")
+    return {
+        "high_activity": bool(signals),
+        "signals": signals,
+        "repository_age_days": age_days,
+        "downloads_per_day": downloads_per_day,
+        "likes_per_day": likes_per_day,
+    }
 
 
 def local_signal(
@@ -1590,27 +1729,44 @@ def media_customization_items(
     end: dt.date,
     include_current_hot: bool = True,
 ) -> list[dict[str, Any]]:
-    """Build a bounded ComfyUI/media customization radar from exact HF tags."""
+    """Build a bounded prefetch pool for the ComfyUI post-image media radar."""
     items: list[dict[str, Any]] = []
     for row in rows:
         facet = media_customization_facet(row)
+        modalities = modality_evidence(row)
+        structured_inputs = set(modalities["input"])
+        structured_outputs = set(modalities["output"])
         model_id = str(row.get("id") or "")
         if (
             not model_id
-            or not facet
             or "comfyui" not in set(deployment_facets(row))
         ):
             continue
+        # Pure image generation/editing and text-only video generation belong to
+        # the general modality radar. Unknown pipelines remain eligible for a
+        # bounded model-card verification pass because many ComfyUI repositories
+        # omit HF's standard pipeline tag.
+        if structured_outputs and "video" not in structured_outputs:
+            continue
+        if structured_outputs and not (structured_inputs & {"image", "audio", "video"}):
+            continue
+        if structured_outputs and not facet:
+            continue
         event = event_in_window(row, start, end)
-        hot = include_current_hot and is_hot_discovery(row)
+        activity = media_activity_density(row, event, end)
+        hot = include_current_hot and (
+            is_hot_media_discovery(row) or bool(activity.get("high_activity"))
+        )
         if not event and hot:
             event = ("trending-observed", end.isoformat())
         if not event:
             continue
         role = model_role(row)
-        selection = ["media-customization", "pending-registry"]
+        selection = ["post-image-media", "pending-registry"]
         if hot:
             selection.append("hot")
+        if activity.get("high_activity"):
+            selection.append("open-activity")
         selection.append("comfyui-ecosystem")
         record = {
             "id": model_id,
@@ -1620,44 +1776,233 @@ def media_customization_items(
             "pending_registry": True,
             "publisher_tier": publisher_tier(model_id, registry),
         }
-        items.append(model_item(row, record, registry, event))
+        item = model_item(row, record, registry, event)
+        item["metadata"]["activity_density"] = activity
+        items.append(item)
     items.sort(key=notable_model_sort_key, reverse=True)
-    selected: list[dict[str, Any]] = []
-    selected_ids: set[str] = set()
-    capability_order = [
-        "digital-human",
-        "talking-head",
-        "lip-sync",
-        "face-swap",
-        "person-replacement",
-        "identity-consistency",
-        "video-editing",
+    confirmed = [
+        item
+        for item in items
+        if ((item.get("metadata") or {}).get("media_customization") or {}).get(
+            "capabilities"
+        )
     ]
-    for capability in capability_order:
+    unknown = [
+        item
+        for item in items
+        if not ((item.get("metadata") or {}).get("modalities") or {}).get("signals")
+        and not ((item.get("metadata") or {}).get("media_customization") or {}).get(
+            "capabilities"
+        )
+    ][:MEDIA_CUSTOMIZATION_UNKNOWN_PREFETCH_LIMIT]
+    prefetched: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    confirmed_limit = MEDIA_CUSTOMIZATION_PREFETCH_LIMIT - len(unknown)
+    balanced_confirmed: list[dict[str, Any]] = []
+    balanced_ids: set[str] = set()
+    for lane in (
+        "image-to-video",
+        "character-animation",
+        "audio-driven-avatar",
+        "video-editing-effects",
+    ):
         candidate = next(
             (
                 item
-                for item in items
-                if item["title"] not in selected_ids
-                and capability
+                for item in confirmed
+                if item["title"] not in balanced_ids
+                and lane
                 in set(
                     ((item.get("metadata") or {}).get("media_customization") or {}).get(
-                        "capabilities", []
+                        "lanes", []
                     )
                 )
             ),
             None,
         )
         if candidate is not None:
-            selected.append(candidate)
-            selected_ids.add(candidate["title"])
+            balanced_confirmed.append(candidate)
+            balanced_ids.add(str(candidate["title"]))
+    for item in confirmed:
+        if len(balanced_confirmed) >= confirmed_limit:
+            break
+        if item["title"] in balanced_ids:
+            continue
+        balanced_confirmed.append(item)
+        balanced_ids.add(str(item["title"]))
+    for item in balanced_confirmed + unknown:
+        if item["title"] in seen_ids:
+            continue
+        prefetched.append(item)
+        seen_ids.add(item["title"])
+        if len(prefetched) >= MEDIA_CUSTOMIZATION_PREFETCH_LIMIT:
+            break
+    return sorted(prefetched, key=notable_model_sort_key, reverse=True)
+
+
+def build_comfyui_integration_guidance(item: dict[str, Any]) -> dict[str, Any]:
+    """Describe a capability-based ComfyUI topology without claiming validation."""
+    metadata = item.get("metadata") or {}
+    customization = metadata.get("media_customization") or {}
+    lanes = set(customization.get("lanes") or [])
+    modalities = metadata.get("modalities") or {}
+    profile = metadata.get("deployment_profile") or {}
+    upstream: list[str] = []
+    downstream: list[str] = []
+    if "image-to-video" in lanes:
+        upstream.extend(["source-image", "resize-crop-or-pad", "image-or-vision-encoder"])
+    if "character-animation" in lanes:
+        upstream.extend(["character-reference", "pose-motion-or-camera-control"])
+    if "audio-driven-avatar" in lanes:
+        upstream.extend(
+            [
+                "portrait-or-reference-video",
+                "audio-cleanup-and-model-required-resampling",
+            ]
+        )
+    if "video-editing-effects" in lanes:
+        upstream.extend(["source-video", "optional-mask-reference-or-control-signal"])
+    if lanes:
+        downstream.extend(
+            [
+                "frame-interpolation-if-needed",
+                "video-upscale-or-restoration",
+                "audio-mux",
+                "video-encode",
+            ]
+        )
+    return {
+        "input_modalities": list(modalities.get("input") or []),
+        "output_modalities": list(modalities.get("output") or []),
+        "upstream": list(dict.fromkeys(upstream)),
+        "core": {
+            "runtime": "comfyui",
+            "capabilities": list(customization.get("capabilities") or []),
+            "components": [
+                str(component.get("type") or "")
+                for component in profile.get("components") or []
+                if component.get("type")
+            ],
+            "dependencies": [
+                str(dependency.get("repo_id") or "")
+                for dependency in profile.get("dependencies") or []
+                if dependency.get("repo_id")
+            ],
+        },
+        "downstream": list(dict.fromkeys(downstream)),
+        "workflow_files": list(profile.get("workflow_files") or []),
+        "topology_source": "capability-template",
+        "workflow_status": (
+            "repository-workflow-present"
+            if profile.get("workflow_files")
+            else "recommended-topology-not-validated-workflow"
+        ),
+    }
+
+
+def attach_media_discovery_tracks(item: dict[str, Any]) -> dict[str, Any]:
+    """Expose independent community activity without comparing a consumer registry."""
+    metadata = dict(item.get("metadata") or {})
+    activity = metadata.get("activity_density") or {}
+    tracks = ["open-activity"] if activity.get("high_activity") else []
+    metadata["discovery_tracks"] = tracks
+    selection = list(metadata.get("selection") or [])
+    selection.extend(track for track in tracks if track not in selection)
+    metadata["selection"] = selection
+    return {**item, "metadata": metadata}
+
+
+def finalize_media_customization_items(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep verified ComfyUI post-image capabilities and balance activity and lanes."""
+    eligible: list[dict[str, Any]] = []
     for item in items:
+        metadata = item.get("metadata") or {}
+        customization = metadata.get("media_customization") or {}
+        capabilities = set(customization.get("capabilities") or [])
+        profile = metadata.get("deployment_profile") or {}
+        runtimes = set(profile.get("runtimes") or metadata.get("deployment") or [])
+        signals = customization.get("signals") or []
+        outputs = set((metadata.get("modalities") or {}).get("output") or [])
+        if "comfyui" not in runtimes or not capabilities:
+            continue
+        if outputs and "video" not in outputs:
+            continue
+        if not outputs and not (capabilities & MEDIA_POST_IMAGE_PRIMARY_CAPABILITIES):
+            continue
+        if not outputs and not any(
+            signal.get("source") in {"model-card", "upstream-model-card"}
+            for signal in signals
+        ):
+            continue
+        metadata["comfyui_integration"] = build_comfyui_integration_guidance(item)
+        eligible.append(
+            attach_media_discovery_tracks({**item, "metadata": metadata})
+        )
+
+    eligible.sort(key=notable_model_sort_key, reverse=True)
+    eligible.sort(
+        key=lambda item: (
+            -len(
+                ((item.get("metadata") or {}).get("activity_density") or {}).get(
+                    "signals", []
+                )
+            ),
+        )
+    )
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    covered_lanes: set[str] = set()
+    covered_capabilities: set[str] = set()
+
+    def add(item: dict[str, Any]) -> None:
+        customization = (item.get("metadata") or {}).get("media_customization") or {}
+        selected.append(item)
+        selected_ids.add(str(item["title"]))
+        covered_lanes.update(customization.get("lanes") or [])
+        covered_capabilities.update(customization.get("capabilities") or [])
+
+    # Reserve space for transparent high-activity discoveries. Remaining slots
+    # preserve capability-lane breadth without knowledge of any consumer system.
+    open_added = 0
+    for item in eligible:
+        if item["title"] in selected_ids:
+            continue
+        tracks = set((item.get("metadata") or {}).get("discovery_tracks") or [])
+        if "open-activity" not in tracks:
+            continue
+        add(item)
+        open_added += 1
+        if open_added >= MEDIA_OPEN_ACTIVITY_MIN or len(selected) >= MEDIA_CUSTOMIZATION_LIMIT:
+            break
+
+    for item in eligible:
+        if item["title"] in selected_ids:
+            continue
+        lanes = set(
+            ((item.get("metadata") or {}).get("media_customization") or {}).get(
+                "lanes", []
+            )
+        )
+        if lanes - covered_lanes:
+            add(item)
+        if len(selected) >= MEDIA_CUSTOMIZATION_LIMIT:
+            break
+
+    # Then add only models that contribute a capability not represented above.
+    for item in eligible:
         if len(selected) >= MEDIA_CUSTOMIZATION_LIMIT:
             break
         if item["title"] in selected_ids:
             continue
-        selected.append(item)
-        selected_ids.add(item["title"])
+        capabilities = set(
+            ((item.get("metadata") or {}).get("media_customization") or {}).get(
+                "capabilities", []
+            )
+        )
+        if capabilities - covered_capabilities:
+            add(item)
     return selected[:MEDIA_CUSTOMIZATION_LIMIT]
 
 
@@ -2228,13 +2573,21 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
         if re.search(pattern, lower, flags=re.IGNORECASE)
     }
     customization_patterns = {
-        "digital-human": r"\bdigital human\b|\bavatar generation\b",
+        "image-to-video": r"\bimage[ -]to[ -]video\b|\bi2v\b",
+        "reference-to-video": r"\breference[ -]to[ -]video\b|\breference image(?:s)?[^\n]{0,80}\bvideo\b",
+        "keyframe-control": r"\bfirst[ -](?:and|/)[ -]?last[ -]frame\b|\bstart[ -](?:and|/)[ -]?end[ -]frame\b",
+        "character-animation": r"\bcharacter animation\b|\bhuman animation\b|\banimat(?:e|ing)[^\n]{0,40}\bcharacter\b",
+        "motion-control": r"\b(?:camera|pose|trajectory|motion)[ -]control\b|\bcontrollable motion\b",
+        "motion-transfer": r"\bmotion transfer\b|\btransfer(?:s|ring)?[^\n]{0,40}\bmotion\b",
+        "audio-driven-video": r"\b(?:audio|speech)[ -](?:driven|to)[ -](?:avatar|video)\b|\bdriven by (?:the )?audio\b",
         "face-swap": r"\bface[ -]?swap(?:ping)?\b",
         "identity-consistency": r"\b(?:identity|character|subject)[ -]?(?:preserv(?:ing|ation)|consisten(?:cy|t))\b",
         "lip-sync": r"\blip[ -]?sync(?:hronization)?\b",
         "person-replacement": r"\b(?:person|character|human)[ -]?replacement\b|\breplace (?:a |the )?(?:person|character|human)\b",
         "talking-head": r"\btalking[ -]?head\b",
-        "video-editing": r"\bvideo editing\b",
+        "video-editing": r"\bvideo editing\b|\bvideo[ -]to[ -]video\b",
+        "video-effects": r"\bvideo effects?\b|\bvideo (?:inpainting|outpainting|relighting)\b|\b(?:video|frames?)[^\n]{0,40}(?:background|object) replacement\b|\b(?:background|object) replacement[^\n]{0,40}(?:video|frames?)\b",
+        "video-enhancement": r"\bframe interpolation\b|\bvideo upscal(?:e|ing)\b|\bvideo enhancement\b",
     }
     customization_signals = [
         {
@@ -2248,7 +2601,7 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
     ]
 
     dependency_cues = re.compile(
-        r"\b(?:base model|checkpoint|download|required?|requires?|need|text encoder|"
+        r"\b(?:base model|original model|checkpoint|download|required?|requires?|need|text encoder|"
         r"vision encoder|image encoder|vae|vocoder|upscaler|lora|model file|weights?)\b",
         re.IGNORECASE,
     )
@@ -2281,6 +2634,7 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
             relation = "model-card-reference"
             line_lower = raw_line.lower()
             for token, candidate in [
+                ("original model", "base_model"),
                 ("text encoder", "text-encoder"),
                 ("vision encoder", "vision-encoder"),
                 ("image encoder", "vision-encoder"),
@@ -2421,11 +2775,26 @@ def merge_customization_signals(*values: dict[str, Any]) -> dict[str, Any]:
             if not key[0] or key in seen:
                 continue
             seen.add(key)
-            signals.append({"capability": key[0], "source": key[1], "value": key[2]})
+            merged_signal = {
+                "capability": key[0],
+                "source": key[1],
+                "value": key[2],
+            }
+            if signal.get("repo_id"):
+                merged_signal["repo_id"] = str(signal["repo_id"])
+            signals.append(merged_signal)
     if not signals:
         return {}
+    capabilities = sorted({signal["capability"] for signal in signals})
     return {
-        "capabilities": sorted({signal["capability"] for signal in signals}),
+        "lanes": sorted(
+            {
+                MEDIA_CUSTOMIZATION_LANES[capability]
+                for capability in capabilities
+                if capability in MEDIA_CUSTOMIZATION_LANES
+            }
+        ),
+        "capabilities": capabilities,
         "signals": signals,
     }
 
@@ -2524,7 +2893,18 @@ def build_media_deployment_profile(
         str(row.get("path") or "")
         for row in files
         if str(row.get("path") or "").lower().endswith(".json")
-        and re.search(r"(?:workflow|comfy)", str(row.get("path") or ""), re.I)
+        and (
+            re.search(
+                r"(?:^|/)(?:workflows?|examples?)/",
+                str(row.get("path") or ""),
+                re.I,
+            )
+            or re.search(
+                r"(?:^|[/_.-])workflow(?:[/_.-]|$)",
+                str(row.get("path") or ""),
+                re.I,
+            )
+        )
     )
     component_rows: dict[str, dict[str, Any]] = {}
     file_precisions: set[str] = set()
@@ -2746,6 +3126,39 @@ def enrich_items_with_cards(
         repo_id = str(item.get("title") or "")
         card = fetch_card(repo_id, repo_type)
         deployment_evidence = card.pop("_deployment_evidence", {})
+        metadata = item.get("metadata") or {}
+        if (
+            repo_type == "model"
+            and "comfyui" in set(metadata.get("deployment") or [])
+            and not (metadata.get("media_customization") or {}).get("capabilities")
+            and not (deployment_evidence.get("customization") or {}).get("capabilities")
+        ):
+            # Some ComfyUI packaging repositories contain only an explicit link
+            # to the original model. Follow one declared base-model link so the
+            # capability comes from the upstream model card, never from names.
+            for dependency in deployment_evidence.get("dependencies") or []:
+                if dependency.get("relation") != "base_model":
+                    continue
+                upstream_id = str(dependency.get("repo_id") or "")
+                if not upstream_id:
+                    continue
+                upstream_card = fetch_card(upstream_id, "model")
+                upstream_evidence = upstream_card.get("_deployment_evidence") or {}
+                upstream_customization = upstream_evidence.get("customization") or {}
+                upstream_signals = [
+                    {
+                        **signal,
+                        "source": "upstream-model-card",
+                        "repo_id": upstream_id,
+                    }
+                    for signal in upstream_customization.get("signals") or []
+                ]
+                if upstream_signals:
+                    deployment_evidence["customization"] = merge_customization_signals(
+                        deployment_evidence.get("customization") or {},
+                        {"signals": upstream_signals},
+                    )
+                    break
         item["metadata"]["card"] = card
         if needs_media_deployment_profile(item):
             repository = fetch_model_repository_files(repo_id)
@@ -3441,6 +3854,19 @@ def count_metadata_values(items: Iterable[dict[str, Any]], *path: str) -> dict[s
     return dict(sorted(counts.items()))
 
 
+def count_metadata_scalar(items: Iterable[dict[str, Any]], *path: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value: Any = item.get("metadata") or {}
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if value in (None, ""):
+            continue
+        label = str(value)
+        counts[label] = counts.get(label, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def coverage_diagnostics(groups: dict[str, Any]) -> dict[str, Any]:
     flagship_items = [item for rows in groups["flagship"].values() for item in rows]
     local_items = groups["local"]
@@ -3475,6 +3901,9 @@ def coverage_diagnostics(groups: dict[str, Any]) -> dict[str, Any]:
         "local_by_deployment": count_metadata_values(local_items, "deployment"),
         "media_customization_by_capability": count_metadata_values(
             media_items, "media_customization", "capabilities"
+        ),
+        "media_by_discovery_track": count_metadata_values(
+            media_items, "discovery_tracks"
         ),
         "reproducible_projects": len({item.get("title") for item in reproducible}),
         "reproducible_by_component": {
@@ -3562,6 +3991,9 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
             "modalities",
             "role_evidence",
             "media_customization",
+            "comfyui_integration",
+            "activity_density",
+            "discovery_tracks",
             "alignment",
             "deployment",
             "deployment_profile",
@@ -3937,8 +4369,15 @@ def main() -> int:
         model_discoveries,
         dataset_discoveries,
     )
+    media_radar_rows = list(
+        {
+            str(row.get("id") or ""): row
+            for row in media_ecosystem_candidates + global_trending + global_recent
+            if row.get("id")
+        }.values()
+    )
     media_customization = media_customization_items(
-        media_ecosystem_candidates,
+        media_radar_rows,
         model_registry,
         start,
         end,
@@ -3971,6 +4410,7 @@ def main() -> int:
         start,
         end,
     )
+    media_customization = finalize_media_customization_items(media_customization)
     timings["formal_enrichment"] = time.perf_counter() - phase_started
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
     notable_model_count = len(notable_discoveries["models"])
@@ -4052,6 +4492,11 @@ def main() -> int:
             "local_selected": len(local_items),
             "model_discoveries": len(model_discoveries),
             "media_customization_selected": len(media_customization),
+            "media_open_activity_selected": sum(
+                "open-activity"
+                in set((item.get("metadata") or {}).get("discovery_tracks") or [])
+                for item in media_customization
+            ),
             "dataset_trending_candidates": dataset_query_counts.get("trending", 0),
             "dataset_recent_candidates": dataset_query_counts.get("recent", 0),
             "dataset_official_owner_candidates": dataset_query_counts.get("official_owner", 0),

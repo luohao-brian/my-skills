@@ -5,15 +5,16 @@
 - 精确查询模型、数据集和可复现项目注册表中的 Hugging Face 仓库。
 - 当前运行查询 HF 全局 Trending Top 500 和最近更新 Top 1000，召回未登记 owner 的热门社区模型和未被过滤器覆盖的完整权重仓库；历史运行不查询这两个实时池。
 - 当前运行额外按结构化任务查询图像生成、视频生成和 TTS 的 Trending 与最近更新池，并保留 HF 官方任务内排名；这是模态级召回漏斗，不依赖模型名或发布者。历史运行不查询这些实时池。
-- 当前运行查询 ComfyUI filter 的 Trending 与最近更新池，并对 digital-human、avatar、talking-head、lip-sync、lipsync、face-swap、faceswap、person-replacement、identity-consistency、character-consistency、video-editing 精确 tags 各查询一次最近更新池，用于补回 ComfyUI 大池 Top 200 之外的稀疏能力。共 13 个列表请求并行执行；历史运行不查询该实时池。
+- 当前运行查询 ComfyUI filter 的 Trending 与最近更新池，并对音频/语音驱动视频、参考图/首尾帧/多镜头视频、角色动画与动作/镜头控制、身份一致性、口型/数字人、视频编辑/特效/修补/扩图/重光照、补帧和放大等精确任务/tags 同时查询 Trending 与最近更新池，用于补回 ComfyUI 大池 Top 200 之外的稀疏能力。请求并行执行，具体过滤器以脚本常量和 `diagnostics.media_ecosystem_by_filter` 为准；历史运行不查询该实时池。
+- ComfyUI 后图像雷达还复用全局 Trending Top 500 与最近更新 Top 1000 的候选并集：结构化媒体任务或精确 ComfyUI 证据命中后，可按透明活动条件标记 `open-activity`，同时按能力路线保持覆盖，不要求模型名或 source repo 预先出现在关注名单中，也不读取任何下游验证平台的模型注册表。
 - 按 HF Trending 查询 GGUF、MLX、quantized、on-device、merge、finetune 和 adapter 衍生候选，并查询 uncensored、abliterated、heretic、decensored 精确 tags 形成低拒绝候选池。
 - 当前运行的数据集同时查询 HF Trending、最近更新和已登记主要厂商 owner；历史运行只查询已登记 owner 和精确注册表 ID，避免实时热度倒灌。
 - 当前运行查询已登记官方 owner、本地生态发布者和社区发布者的最近更新模型；历史运行只查询已登记官方 owner，并对注册表条目做精确查询。这一路径既复用为正式仓库状态，也作为已知社区雷达。
 - 使用已认证的 `gh api` 查询可复现项目注册表中已登记 GitHub 仓库的本窗口提交，追踪训练 recipe、数据管线和评测代码更新；GitHub 子目录链接必须使用 `path` 过滤提交，不用仓库级 `pushed_at` 代替子目录证据。
 - 当前运行通过 `gh api` 读取已登记 GitHub 工程的 star/fork，并在提供状态目录时计算增量；不从模型卡任意发现或猜测 GitHub 仓库。star/fork 只表达工程关注和采用信号，不证明模型质量或本窗口技术变化。
 - 只为最终入选的重点旗舰、本地热门、正式数据集和重点新发现读取对应 model card 或 dataset card。
-- 对最终入选的媒体模型及 ComfyUI 媒体定制雷达条目，在同一次 formal enrichment 中额外调用一次 HF model detail（`blobs=true&expand=siblings&expand=usedStorage`），一次取得仓库文件路径与尺寸，用于组件、精度和仓库占用汇总；不逐文件请求。
-- 运行时、NFE/步数、蒸馏/Turbo/Lightning/LCM、offload、外部模型链接和媒体定制措辞复用上述 model card 请求，不增加请求次数。
+- 对最终入选的媒体模型及 ComfyUI 后图像媒体雷达预取条目，在同一次 formal enrichment 中额外调用一次 HF model detail（`blobs=true&expand=siblings&expand=usedStorage`），一次取得仓库文件路径与尺寸，用于组件、精度和仓库占用汇总；不逐文件请求。模型卡补证后再执行最终筛选。
+- 运行时、NFE/步数、蒸馏/Turbo/Lightning/LCM、offload、外部模型链接和后图像能力措辞复用上述 model card 请求。若 ComfyUI 打包仓只有明确的“original model/base model”HF 链接且自身没有能力证据，可额外读取该上游模型的一张 model card，并以 `upstream-model-card` 记录来源；只跟随一层，不从仓库名猜测或递归扩散。
 - 默认不递归读取依赖仓库文件列表。基础模型、VAE、编码器、vocoder、LoRA 等依赖链会被保留，但精确完整运行占用需要显式部署 bundle manifest；没有 manifest 时不得把仓库中的可选权重全部相加。
 - 所有正式候选合并后共用一个 enrichment 任务池，不按报告分节串行抓取 model card 和提交历史；同一次 run 不重复采集同一正式候选。
 - 从最终入选模型的 model card 提取 Evaluation、Benchmark、Leaderboard 等评测小节和以 `Benchmark` 为表头的结果表，同时提取 Limitations / Caveats 作为评测边界。
@@ -42,6 +43,7 @@ HF 热门条件：
 - 热门衍生与本地部署：`trendingScore >= 4`，且 `downloads >= 2000` 或 `likes >= 20`。
 - 未登记 owner 的模型发现：`trendingScore >= 15`，且 `downloads >= 2000` 或 `likes >= 20`。
 - 图像生成、视频生成、TTS 和 ASR 模态雷达：候选必须有结构化任务证据，且 `trendingScore >= 4`，并满足 `downloads >= 500` 或 `likes >= 10`；较低阈值只作用于这些稀疏任务池，不降低 LLM/VLM 等通用发现阈值。
+- ComfyUI 后图像媒体雷达：候选必须有精确 `comfyui` tag，并满足本窗口发布/更新、媒体热门或透明高活动条件。高活动条件包括高 Trending、近期仓库活动同时达到媒体热度、发布 120 天内的高下载/点赞日均速度，或趋势快照证明的下载/点赞/排名增长；这些信号分开保存，不合成为分数。已识别的结构化输出必须包含视频；纯图片输出、只有 text-to-video 且没有动作/身份/音频驱动/编辑证据的候选不进入本节。标准 pipeline 缺失的 ComfyUI 候选最多预取 12 条模型卡，最终仍必须由 model card 明确证明后图像能力。正式输出最多 8 条：先保留最多 3 个开放高活动发现，再补齐图片到视频、角色动画、音频驱动和视频编辑/特效等通用工作流链路及新增能力；同能力量化、LoRA 或 workflow 包不为凑数重复占位。
 - 数据集：`trendingScore >= 15`，且 `downloads >= 1000` 或 `likes >= 20`。
 
 独立爆款条件：本地模型 `trendingScore >= 50`、`downloads >= 100000` 且 `likes >= 100`。已知本地部署生态发布者位于 [model-registry.json](model-registry.json)，只用于补充 owner 定向查询，不为其预留报告名额。发布者分层为 `registered-owner`、`local-ecosystem-publisher` 和 `unregistered`；分层用于召回、排序和审计，不把本地部署生态发布者升级为官方旗舰 owner。
@@ -69,7 +71,7 @@ HF 热门条件：
 - 媒体运行时：精确 `comfyui`、`diffusers`、`diffusion-single-file`、`mlx`、`onnx`、`tensorrt`、`transformers`、`vllm` tags，并用最终入选模型的 model card 补充明确运行方式。
 - 媒体组件与精度：最终入选模型的 HF sibling 文件路径、文件尺寸和 model card；文件路径按 transformer/UNet、VAE、文本/视觉编码器、vocoder、adapter、projector、upscaler 等部署组件归类。
 - NFE 与加速：从 model card 中同时含 inference/sampling/denoise/distill/turbo/lightning/NFE 语境的步数，以及明确的 distilled、turbo、lightning、LCM 表述提取；最终媒体仓库的权重文件名若精确包含 `4step`、`8step`、`distilled`、`turbo`、`lightning` 或 `lcm`，也保留文件路径作为结构化证据，不依赖仓库名。
-- 媒体定制：候选召回只接受精确 HF tags；最终候选可用 model card 的 digital human、talking head、lip sync、face swap、person/character replacement、identity consistency、video editing 明确措辞补充。不得从模型名推断。
+- 后图像媒体能力：候选召回接受可解析出 `image/audio/video -> video` 的 HF 结构化任务，以及 image-to-video、首尾帧/参考图/多镜头控制、character animation、motion transfer/control、identity consistency、audio/speech-driven video、talking head、lip sync、video editing/inpainting/outpainting/relighting/effects/interpolation/upscaling 等精确 tags。标准 pipeline 缺失时，最终候选可用 model card 的明确措辞补充；不得从模型名推断。
 - 依赖：`cardData.base_model`、`base_model_relation`、`base_model:*` tags，以及最终媒体模型卡中带 required/checkpoint/encoder/VAE/vocoder/LoRA 等依赖语境的 HF 模型链接。排除 docs、collections、datasets、spaces 等非模型页面。
 - 衍生关系：只接受 HF 结构化 `adapter`、`finetune`、`merge` 和 `quantized` 关系。
 - 对齐信号：只接受 HF 精确 `uncensored`、`abliterated`、`heretic`、`decensored` tags，归一为 `alignment.profile=low-refusal` 并保留原 tag 证据；不从模型 ID 或自然语言介绍推断，也不作为质量或安全结论。

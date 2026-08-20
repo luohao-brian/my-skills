@@ -19,17 +19,37 @@
     "media_ecosystem_candidates": 0,
     "media_ecosystem_by_filter": {
       "comfyui": 0,
+      "audio-driven-video": 0,
+      "audio-to-video": 0,
       "avatar": 0,
+      "camera-control": 0,
+      "character-animation": 0,
       "character-consistency": 0,
       "digital-human": 0,
       "face-swap": 0,
       "faceswap": 0,
+      "first-last-frame-to-video": 0,
       "identity-consistency": 0,
+      "image-to-video": 0,
+      "image-text-to-video": 0,
       "lip-sync": 0,
       "lipsync": 0,
+      "motion-control": 0,
+      "motion-transfer": 0,
+      "multi-shot-video": 0,
+      "pose-control": 0,
       "person-replacement": 0,
+      "reference-to-video": 0,
+      "speech-to-video": 0,
       "talking-head": 0,
-      "video-editing": 0
+      "video-editing": 0,
+      "video-effects": 0,
+      "video-inpainting": 0,
+      "video-outpainting": 0,
+      "video-relighting": 0,
+      "video-to-video": 0,
+      "frame-interpolation": 0,
+      "video-upscaling": 0
     },
     "global_trending_candidates": 0,
     "global_recent_candidates": 0,
@@ -38,6 +58,7 @@
     "local_selected": 0,
     "model_discoveries": 0,
     "media_customization_selected": 0,
+    "media_open_activity_selected": 0,
     "dataset_trending_candidates": 0,
     "dataset_recent_candidates": 0,
     "dataset_official_owner_candidates": 0,
@@ -55,7 +76,8 @@
       },
       "unique_model_repositories": 0,
       "local_by_deployment": {"gguf": 0, "mlx": 0},
-      "media_customization_by_capability": {"lip-sync": 0},
+      "media_customization_by_capability": {"image-to-video": 0, "motion-transfer": 0, "lip-sync": 0, "video-editing": 0},
+      "media_by_discovery_track": {"open-activity": 0},
       "reproducible_projects": 0,
       "reproducible_by_component": {
         "data": 0,
@@ -237,16 +259,40 @@
 }
 ```
 
-最终入选的媒体模型，以及命中 ComfyUI/diffusers 媒体运行时或媒体定制能力的模型，还可包含部署画像：
+最终入选的媒体模型，以及命中 ComfyUI/diffusers 媒体运行时或后图像媒体能力的模型，还可包含部署画像与 ComfyUI 上下游建议：
 
 ```json
 {
   "metadata": {
     "media_customization": {
-      "capabilities": ["talking-head", "lip-sync", "face-swap", "person-replacement"],
+      "lanes": ["audio-driven-avatar", "character-animation"],
+      "capabilities": ["audio-driven-video", "lip-sync", "motion-transfer", "identity-consistency"],
       "signals": [
-        {"capability": "face-swap", "source": "hf-tag", "value": "face-swap"}
+        {"capability": "motion-transfer", "source": "upstream-model-card", "value": "motion transfer", "repo_id": "owner/original-model"}
       ]
+    },
+    "activity_density": {
+      "high_activity": true,
+      "signals": ["high-trending", "high-download-velocity"],
+      "repository_age_days": 3,
+      "downloads_per_day": 2000.0,
+      "likes_per_day": 10.0
+    },
+    "discovery_tracks": ["open-activity"],
+    "comfyui_integration": {
+      "input_modalities": ["image", "audio"],
+      "output_modalities": ["video"],
+      "upstream": ["character-reference", "pose-motion-or-camera-control", "audio-cleanup-and-model-required-resampling"],
+      "core": {
+        "runtime": "comfyui",
+        "capabilities": ["audio-driven-video", "motion-transfer"],
+        "components": ["transformer", "video-vae"],
+        "dependencies": ["owner/component"]
+      },
+      "downstream": ["frame-interpolation-if-needed", "video-upscale-or-restoration", "audio-mux", "video-encode"],
+      "workflow_files": ["workflows/example-comfy-workflow.json"],
+      "topology_source": "capability-template",
+      "workflow_status": "repository-workflow-present"
     },
     "deployment_profile": {
       "runtimes": ["comfyui", "diffusers"],
@@ -310,10 +356,13 @@
 ```
 
 - `components` 和 `repository_bytes` 汇总当前 HF 仓库全部权重文件，可能同时包含多个可选精度或工作流，不能直接视为单次部署占用。
-- `artifact_options` 保留最多 32 个独立权重选项；索引分片先合并为一个 `required_all=true` 的 bundle，并用 `complete` 标记仓库是否包含全部分片。`workflow_files` 保留仓库内名称明确包含 workflow/ComfyUI 的 JSON 工作流。这些字段复用同一次 model detail，不增加调用。
+- `artifact_options` 保留最多 32 个独立权重选项；索引分片先合并为一个 `required_all=true` 的 bundle，并用 `complete` 标记仓库是否包含全部分片。`workflow_files` 只保留位于 `workflow(s)/`、`example(s)/` 目录，或文件名有独立 `workflow` token 的 JSON；仅含 `comfy` 的配置文件不算工作流。这些字段复用同一次 model detail，不增加调用。
 - model card 中出现的权重文件只记为 `referenced_files`，不擅自认定为全部必需文件。因此没有显式部署 bundle manifest 时，`complete_runtime_bytes` 为 `null`，`complete_runtime_status` 为 `partial` 或 `unknown`。
 - `dependencies` 合并 HF 结构化 `base_model` 关系和 model card 中带依赖语境的 HF 模型链接；它描述部署组件依赖，不做许可证判断，也不递归推算依赖仓库占用。
-- `media_customization` 只接受精确 HF tags，或最终入选模型的 model card 明确措辞；不从仓库名猜测换脸、换人、数字人等能力。
+- `media_customization` 只记录可解析的 HF 结构化任务、精确 HF tags、当前模型卡明确措辞，或 ComfyUI 打包仓明确链接的单层上游原模型卡；不从仓库名猜测图生视频、动作迁移、数字人或视频编辑能力。没有完整 `image/audio/video -> video` 结构化任务时，精确 tag 只能参与召回，正式入选仍须存在 `model-card` 或 `upstream-model-card` 信号。`upstream-model-card` 信号同时保留 `repo_id`。兼容字段名保持不变，但本节语义是图片之后的媒体链路。
+- `comfyui_integration` 把已确认能力映射为通用上下游拓扑，供报告解释输入准备、核心节点和后处理连接。`topology_source=capability-template` 始终表示建议，不是实机验证；`workflow_status=repository-workflow-present` 只表示仓库存在路径形态符合工作流约定的 JSON，未解析 JSON 拓扑，也不表示实机运行通过。
+- `activity_density` 保存透明活动证据，不生成综合分。仓库创建超过 120 天时不计算全生命周期日均速度；跨日增长只来自同一 `--state-dir` 的成熟快照。
+- `discovery_tracks=open-activity` 只表示候选命中透明活动条件。采集器不读取下游平台模型注册表，也不在输入中编码消费方的覆盖、缺口或验证优先级。
 
 方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。`text-to-speech` 归入 TTS，其他音频输出归入音频生成，避免把 voice conversion 或音乐生成误写成 TTS。无法得到完整输入和输出时保留空数组并使用“待确认”。
 

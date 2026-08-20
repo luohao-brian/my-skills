@@ -586,13 +586,23 @@ class MediaDeploymentProfileTests(unittest.TestCase):
         self.assertEqual(
             MODULE.media_customization_facet(
                 model_row("community/video-transform", tags=["video-to-video"])
-            ),
-            {},
+            )["capabilities"],
+            ["video-editing"],
         )
 
     def test_comfyui_ecosystem_queries_trending_and_recent(self):
         self.assertTrue(
-            {"faceswap", "lipsync", "avatar", "character-consistency"}
+            {
+                "speech-to-video",
+                "reference-to-video",
+                "multi-shot-video",
+                "image-to-video",
+                "video-to-video",
+                "audio-to-video",
+                "character-animation",
+                "motion-transfer",
+                "lipsync",
+            }
             <= set(MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS)
         )
 
@@ -611,13 +621,34 @@ class MediaDeploymentProfileTests(unittest.TestCase):
 
         self.assertEqual(
             api.call_count,
-            len(MODULE.MEDIA_ECOSYSTEM_FILTERS) * 2
-            + len(MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS),
+            (
+                len(MODULE.MEDIA_ECOSYSTEM_FILTERS)
+                + len(MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS)
+            )
+            * 2,
         )
         self.assertEqual(len(rows), api.call_count)
         self.assertEqual(counts["comfyui"], 2)
-        self.assertEqual(counts["face-swap"], 1)
+        self.assertEqual(counts["image-to-video"], 2)
         self.assertEqual(errors, {})
+
+    def test_media_activity_density_exposes_signals_without_composite_score(self):
+        row = model_row(
+            "Example/FastMedia",
+            createdAt="2026-08-18T00:00:00Z",
+            trendingScore=20,
+            downloads=6_000,
+            likes=30,
+        )
+        activity = MODULE.media_activity_density(
+            row,
+            ("published", "2026-08-18"),
+            dt.date(2026, 8, 20),
+        )
+        self.assertTrue(activity["high_activity"])
+        self.assertIn("high-trending", activity["signals"])
+        self.assertIn("high-download-velocity", activity["signals"])
+        self.assertNotIn("score", activity)
 
     def test_model_card_extracts_dependencies_steps_offload_and_customization(self):
         card = """# Local deployment
@@ -646,11 +677,50 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
             ["model_fp8.safetensors", "video_vae_bf16.safetensors"],
         )
 
+    def test_model_card_extracts_post_image_video_capabilities(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "ComfyUI image-to-video workflow with motion transfer, identity preservation, "
+            "camera control, and frame interpolation."
+        )
+        self.assertEqual(
+            evidence["customization"]["capabilities"],
+            [
+                "identity-consistency",
+                "image-to-video",
+                "motion-control",
+                "motion-transfer",
+                "video-enhancement",
+            ],
+        )
+
+    def test_image_object_replacement_is_not_treated_as_video_effect(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "Image editing LoRA for identity-preserving object replacement and outpainting."
+        )
+        self.assertEqual(
+            evidence["customization"]["capabilities"], ["identity-consistency"]
+        )
+
     def test_hf_docs_url_is_not_treated_as_model_dependency(self):
         evidence = MODULE.extract_media_deployment_evidence(
             "Required runtime docs: https://huggingface.co/docs/diffusers/main/en/index"
         )
         self.assertEqual(evidence["dependencies"], [])
+
+    def test_original_model_repository_is_a_base_model_dependency(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "Original model repository: https://huggingface.co/Example/Upstream-Video"
+        )
+        self.assertEqual(
+            evidence["dependencies"],
+            [
+                {
+                    "repo_id": "Example/Upstream-Video",
+                    "relation": "base_model",
+                    "source": "model-card",
+                }
+            ],
+        )
 
     def test_benchmark_source_model_is_not_treated_as_runtime_dependency(self):
         evidence = MODULE.extract_media_deployment_evidence(
@@ -705,6 +775,26 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
             profile["workflow_files"], ["workflows/example-comfy-workflow.json"]
         )
         self.assertEqual(len(profile["artifact_options"]), 2)
+
+    def test_comfyui_config_json_is_not_treated_as_workflow(self):
+        profile = MODULE.build_media_deployment_profile(
+            {
+                "model_id": "Example/Media",
+                "role": "video-generation",
+                "deployment": ["comfyui"],
+                "base_model_dependencies": [],
+                "media_customization": {},
+            },
+            {
+                "ok": True,
+                "files": [
+                    {"path": "configs/comfyui_config.json", "size": 3},
+                    {"path": "examples/usable.json", "size": 3},
+                ],
+            },
+            {},
+        )
+        self.assertEqual(profile["workflow_files"], ["examples/usable.json"])
 
     def test_sharded_weights_form_one_required_artifact_bundle(self):
         options = MODULE.build_artifact_options(
@@ -804,7 +894,7 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
             )
         )
 
-    def test_media_customization_radar_uses_exact_tags(self):
+    def test_media_customization_radar_excludes_image_only_and_keeps_post_image_video(self):
         rows = [
             {
                 "id": "Example/FaceSwap",
@@ -817,9 +907,19 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
                 "likes": 20,
             },
             {
-                "id": "Example/TalkingHeadByNameOnly",
+                "id": "Example/ImageToVideo",
                 "pipeline_tag": "image-to-video",
                 "tags": ["comfyui", "image-to-video"],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": 10,
+                "downloads": 1000,
+                "likes": 20,
+            },
+            {
+                "id": "Example/TextToVideo",
+                "pipeline_tag": "text-to-video",
+                "tags": ["comfyui", "text-to-video"],
                 "createdAt": "2026-08-14T00:00:00Z",
                 "lastModified": "2026-08-14T00:00:00Z",
                 "trendingScore": 10,
@@ -833,11 +933,227 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
             dt.date(2026, 8, 9),
             dt.date(2026, 8, 15),
         )
-        self.assertEqual([item["title"] for item in items], ["Example/FaceSwap"])
+        self.assertEqual([item["title"] for item in items], ["Example/ImageToVideo"])
         self.assertEqual(
             items[0]["metadata"]["media_customization"]["capabilities"],
-            ["face-swap"],
+            ["image-to-video"],
         )
+
+    def test_text_to_video_with_motion_control_is_not_post_image_media(self):
+        row = {
+            "id": "Example/TextMotion",
+            "pipeline_tag": "text-to-video",
+            "tags": ["comfyui", "text-to-video", "motion-control"],
+            "createdAt": "2026-08-14T00:00:00Z",
+            "lastModified": "2026-08-14T00:00:00Z",
+            "trendingScore": 20,
+            "downloads": 5000,
+            "likes": 100,
+        }
+        self.assertEqual(
+            MODULE.media_customization_items(
+                [row],
+                {"families": [], "local_publishers": []},
+                dt.date(2026, 8, 9),
+                dt.date(2026, 8, 15),
+            ),
+            [],
+        )
+
+    def test_unknown_pipeline_uses_media_hot_threshold(self):
+        row = {
+            "id": "Example/LipSync",
+            "tags": ["comfyui", "lip-sync"],
+            "createdAt": "2026-07-01T00:00:00Z",
+            "lastModified": "2026-07-01T00:00:00Z",
+            "trendingScore": 4,
+            "downloads": 500,
+            "likes": 0,
+        }
+        items = MODULE.media_customization_items(
+            [row],
+            {"families": [], "local_publishers": []},
+            dt.date(2026, 8, 9),
+            dt.date(2026, 8, 15),
+        )
+        self.assertEqual([item["title"] for item in items], ["Example/LipSync"])
+        self.assertEqual(items[0]["event"], "trending-observed")
+
+    def test_prefetch_balances_confirmed_workflow_lanes_before_hot_fill(self):
+        def row(name, pipeline_tag, tags, score):
+            return {
+                "id": name,
+                "pipeline_tag": pipeline_tag,
+                "tags": ["comfyui", pipeline_tag, *tags],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": score,
+                "downloads": 1000,
+                "likes": 20,
+            }
+
+        rows = [
+            row(f"Example/I2V-{index}", "image-to-video", [], 100 - index)
+            for index in range(4)
+        ] + [row("Example/AudioVideo", "audio-to-video", ["lip-sync"], 1)]
+        with mock.patch.object(MODULE, "MEDIA_CUSTOMIZATION_PREFETCH_LIMIT", 3), mock.patch.object(
+            MODULE, "MEDIA_CUSTOMIZATION_UNKNOWN_PREFETCH_LIMIT", 0
+        ):
+            items = MODULE.media_customization_items(
+                rows,
+                {"families": [], "local_publishers": []},
+                dt.date(2026, 8, 9),
+                dt.date(2026, 8, 15),
+            )
+        self.assertIn("Example/AudioVideo", {item["title"] for item in items})
+
+    def test_media_customization_finalizer_uses_card_evidence_and_adds_integration(self):
+        item = {
+            "title": "Example/WanAnimate",
+            "category": "unknown",
+            "metadata": {
+                "modalities": {"input": [], "output": [], "signals": []},
+                "deployment": ["comfyui"],
+                "media_customization": {
+                    "lanes": ["character-animation"],
+                    "capabilities": ["character-animation", "motion-transfer"],
+                    "signals": [
+                        {
+                            "capability": "motion-transfer",
+                            "source": "model-card",
+                            "value": "motion transfer",
+                        }
+                    ],
+                },
+                "deployment_profile": {
+                    "runtimes": ["comfyui"],
+                    "workflow_files": ["workflows/animate.json"],
+                },
+                "trendingScore": 10,
+            },
+        }
+        selected = MODULE.finalize_media_customization_items([item])
+        self.assertEqual([row["title"] for row in selected], ["Example/WanAnimate"])
+        integration = selected[0]["metadata"]["comfyui_integration"]
+        self.assertIn("character-reference", integration["upstream"])
+        self.assertIn("video-encode", integration["downstream"])
+        self.assertEqual(integration["workflow_status"], "repository-workflow-present")
+
+    def test_comfyui_package_can_use_explicit_upstream_model_card_capability(self):
+        item = {
+            "title": "Example/ComfyPackage",
+            "repo_type": "model",
+            "event": "published",
+            "metadata": {
+                "role": "unknown",
+                "deployment": ["comfyui"],
+                "modalities": {"input": [], "output": [], "signals": []},
+                "media_customization": {},
+            },
+        }
+
+        def card(repo_id, repo_type):
+            if repo_id == "Example/ComfyPackage":
+                return {
+                    "ok": True,
+                    "_deployment_evidence": {
+                        "dependencies": [
+                            {"repo_id": "Example/Upstream", "relation": "base_model"}
+                        ],
+                        "customization": {},
+                    },
+                }
+            return {
+                "ok": True,
+                "_deployment_evidence": {
+                    "dependencies": [],
+                    "customization": {
+                        "capabilities": ["character-animation"],
+                        "signals": [
+                            {
+                                "capability": "character-animation",
+                                "source": "model-card",
+                                "value": "character animation",
+                            }
+                        ],
+                    },
+                },
+            }
+
+        with mock.patch.object(MODULE, "fetch_card", side_effect=card), mock.patch.object(
+            MODULE,
+            "fetch_model_repository_files",
+            return_value={"ok": True, "files": []},
+        ):
+            enriched = MODULE.enrich_items_with_cards([item])
+
+        signal = enriched[0]["metadata"]["media_customization"]["signals"][0]
+        self.assertEqual(signal["source"], "upstream-model-card")
+        self.assertEqual(signal["repo_id"], "Example/Upstream")
+
+    def test_media_customization_finalizer_rejects_image_only_identity_signal(self):
+        item = {
+            "title": "Example/ImageIdentityEdit",
+            "metadata": {
+                "modalities": {"input": [], "output": [], "signals": []},
+                "deployment": ["comfyui"],
+                "media_customization": {
+                    "lanes": ["character-animation"],
+                    "capabilities": ["identity-consistency"],
+                    "signals": [],
+                },
+                "deployment_profile": {"runtimes": ["comfyui"]},
+            },
+        }
+        self.assertEqual(MODULE.finalize_media_customization_items([item]), [])
+
+    def test_media_customization_finalizer_rejects_tag_only_unknown_pipeline(self):
+        item = {
+            "title": "Example/TagOnlyMotion",
+            "metadata": {
+                "modalities": {"input": [], "output": [], "signals": []},
+                "deployment": ["comfyui"],
+                "media_customization": {
+                    "lanes": ["character-animation"],
+                    "capabilities": ["motion-control"],
+                    "signals": [
+                        {
+                            "capability": "motion-control",
+                            "source": "hf-tag",
+                            "value": "motion-control",
+                        }
+                    ],
+                },
+                "deployment_profile": {"runtimes": ["comfyui"]},
+            },
+        }
+        self.assertEqual(MODULE.finalize_media_customization_items([item]), [])
+
+    def test_media_customization_finalizer_does_not_fill_with_duplicate_capabilities(self):
+        def item(name, score):
+            return {
+                "title": name,
+                "metadata": {
+                    "modalities": {
+                        "input": ["image"],
+                        "output": ["video"],
+                        "signals": [{"source": "pipeline_tag", "value": "image-to-video"}],
+                    },
+                    "deployment": ["comfyui"],
+                    "media_customization": {
+                        "lanes": ["image-to-video"],
+                        "capabilities": ["image-to-video"],
+                        "signals": [],
+                    },
+                    "deployment_profile": {"runtimes": ["comfyui"]},
+                    "trendingScore": score,
+                },
+            }
+
+        selected = MODULE.finalize_media_customization_items(
+            [item("Example/I2V-A", 20), item("Example/I2V-B", 10)]
+        )
+        self.assertEqual([row["title"] for row in selected], ["Example/I2V-A"])
 
 
 class EvaluationEvidenceTests(unittest.TestCase):
