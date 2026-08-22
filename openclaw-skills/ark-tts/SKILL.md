@@ -38,4 +38,5 @@ If `python3` is unavailable, use `python`.
 - Speaker: `zh_female_vv_uranus_bigtts` unless `--voice` selects another documented 2.0 voice.
 - Output format: `mp3`.
 
-Use CLI flags only for backend, output, voice, format, and sample rate. The script reads no Agent-specific config file.
+Use CLI flags for backend, output, voice, format, sample rate, speed, language,
+and emotion. The script reads no Agent-specific config file.

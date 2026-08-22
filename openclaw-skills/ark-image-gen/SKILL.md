@@ -17,7 +17,7 @@ Generate images through Ark and save the result locally.
 ## Command
 
 ```bash
-python3 {baseDir}/scripts/volc_image_gen.py "一张 16:9 的未来城市海报" --size 16:9
+python3 {baseDir}/scripts/volc_image_gen.py "一张 16:9 的未来城市海报" --aspect-ratio 16:9 --resolution 2K
 ```
 
 With a reference image:
@@ -29,6 +29,7 @@ python3 {baseDir}/scripts/volc_image_gen.py "保留主体，改成水彩风格" 
 ## Contract
 
 1. Use Agent Plan by default. Map explicit user wording `ARK-API` or `方舟 API` to `--backend ark-api`; map `ARK-AGENT-PLAN` or `方舟 Agent Plan` to `--backend ark-agent-plan`. Never switch or retry across backends automatically. See [references/ark-image-gen.md](references/ark-image-gen.md) for credentials and models.
-2. Use `--size` for output dimensions, `--image` for a local/data-URL reference, and `--output` for the desired local path; the script corrects its suffix to the returned media type.
-3. Expect stdout JSON with `success`, `backend`, `local_path`, `remote_url`, `model`, `prompt`, and `size`.
-4. A response with no image is a failed call.
+2. Use `--aspect-ratio` and `--resolution` for output dimensions, repeat `--image` for references, and use `--count` only with a Lite model. `--size` remains a compatibility alias.
+3. Use `--model` only with a model listed for the selected backend. Seedream 5.0 Pro is Ark API-only, single-image, and supports 1K/1.5K/2K; Lite supports 2K/3K/4K and up to 15 images.
+4. Expect stdout JSON with `success`, `backend`, `images`, `local_path`, `remote_url`, `model`, `count`, `aspect_ratio`, `resolution`, and `size`.
+5. A response with no downloaded local image is a failed call.

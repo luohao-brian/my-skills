@@ -474,7 +474,11 @@ def main() -> int:
         print(json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    import websocket
+    try:
+        import websocket
+    except ImportError as exc:
+        print(json.dumps({"success": False, "backend": args.backend, "error": f"websocket-client is unavailable: {exc}"}, ensure_ascii=False), file=sys.stderr)
+        return 2
 
     audio_path = Path(args.audio_path).expanduser()
     data = audio_path.read_bytes()

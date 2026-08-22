@@ -1,14 +1,14 @@
 name: ark
-version: 0.1.0
+version: 0.2.0
 description: "Volcengine Ark multimodal backend for Hermes."
 author: local
 kind: standalone
-requires_env:
-  - ARK_AGENT_PLAN_API_KEY
-provides_tools:
-  - text_to_speech
-  - transcribe_audio
-  - image_generate
-  - video_generate
-  - vision_analyze
-  - video_analyze
+manifest_version: 2
+api_version: 1
+capabilities:
+  - tools.override
+python_dependencies:
+  - "httpx>=0.28.1,<1"
+  - "websocket-client>=1.7,<2"
+  - "requests>=2.32,<3"
+  - "volcengine-python-sdk[ark]>=5.0.5,<6"

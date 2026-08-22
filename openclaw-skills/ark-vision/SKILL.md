@@ -34,6 +34,7 @@ python3 {baseDir}/scripts/vision_analyze.py https://example.com/clip.mp4 "总结
 - `--json`: print structured JSON instead of plain analysis text.
 - `--raw`: include the raw provider response in JSON output.
 - `--backend`: use `ark-agent-plan` by default or `ark-api` when explicitly requested.
+- `--model`: select a Lite or Mini model from the chosen backend's catalog.
 
 ## Result Handling
 

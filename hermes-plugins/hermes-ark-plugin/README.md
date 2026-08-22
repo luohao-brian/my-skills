@@ -1,239 +1,132 @@
 # Hermes Ark Plugin
 
-Unified Volcengine Ark plugin for Hermes multimodal capabilities.
+Hermes v0.20.x does not natively provide direct Ark API or Ark Agent Plan
+multimedia backends. This plugin keeps Hermes' built-in tool shells and adds
+Ark implementations for TTS, STT, Seedream image generation, Seedance video
+generation, image understanding, and video understanding.
 
-This plugin is designed to live outside the Hermes core repository and be
-installed into `~/.hermes/plugins/ark`. Hermes keeps the public tool names and
-toolsets; this plugin owns Ark-specific provider code, API endpoints, models,
-timeouts, and credentials.
+The default backend is Ark Agent Plan. Ark API is an explicit alternative;
+the plugin never crosses backends automatically when a request fails.
 
-Status: this repository contains the working Ark implementations for Hermes'
-multimodal plugin hooks. The CLI installs, uninstalls, configures, and reports
-status; the plugin registers Ark providers for generation/transcription/speech
-and overrides the understanding tools.
+## What the v0.2 upgrade changes
+
+- Uses the Hermes v2 manifest and auditable `tools.override` capability.
+- Always registers Ark TTS, STT, image, and video providers. These capabilities
+  remain available when understanding-tool override consent is absent.
+- Keeps Hermes' native `transcribe_audio` tool, including its file guard and
+  preprocessing, and only supplies the Ark STT provider behind it.
+- Reuses Hermes' media resolver for image/video understanding, including
+  credential-file blocking, SSRF checks, remote terminal resolution, MIME
+  validation, and the 50 MB ingest limit.
+- Supports both Ark Agent Plan and Ark API with backend-specific credentials,
+  endpoints, models, parameters, and error messages.
+- Aligns Seedream 5.0, Seedance 2.0/2.5, Seed-TTS 2.0, BigASR, and Doubao Seed
+  vision contracts with the current `my-cowork` implementation.
 
 ## Install
 
-From this repository:
+Run from this directory in Hermes' Python environment:
 
 ```bash
-python cli.py install
-python cli.py config
+python cli.py install --with-deps
 ```
 
-The installer copies this directory to:
+Installation copies the plugin to `$HERMES_HOME/plugins/ark`, enables it, writes
+Ark Agent Plan defaults, and selects `ark` for Hermes TTS, STT, image generation,
+and video generation. Hermes then asks once for `tools.override` consent. If the
+consent is declined or the install is non-interactive, the four providers still
+work; Hermes keeps its native image/video understanding tools.
 
-```text
-~/.hermes/plugins/ark
+To configure direct Ark API instead:
+
+```bash
+python cli.py install --with-deps --backend ark-api
 ```
 
-and enables the plugin in `~/.hermes/config.yaml`:
+Existing installs can be reconfigured without replacing the plugin:
+
+```bash
+python cli.py config --backend ark-agent-plan
+python cli.py config --backend ark-api --overwrite
+```
+
+## Credentials
+
+| Backend/capability | Environment variable |
+| --- | --- |
+| Ark Agent Plan, all plugin capabilities | `ARK_AGENT_PLAN_API_KEY` |
+| Ark API image/video/vision | `ARK_API_KEY` |
+| Ark API TTS/STT | `ARK_TTS_X_API_KEY` |
+
+The normal Ark speech product uses its own `X-Api-Key`; it does not use
+`ARK_API_KEY`.
+
+Seed-TTS timing fields are normalized from provider seconds to
+`start_time_ms`/`end_time_ms` in the transcript sidecar.
+
+## Configuration
+
+Plugin-owned settings use the v2 namespace:
 
 ```yaml
 plugins:
-  enabled:
-    - ark
-```
-
-## Configure
-
-Default command:
-
-```bash
-python cli.py config
-```
-
-This writes the full Ark plugin block under `plugins`:
-
-```yaml
-plugins:
-  enabled:
-    - ark
-
+  enabled: [ark]
   entries:
     ark:
-      api_key: ${ARK_AGENT_PLAN_API_KEY}
-
-      ark:
-        base_url: https://ark.cn-beijing.volces.com/api/plan/v3
-        timeout_seconds: 300
-
-      text_to_speech:
-        base_url: https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional
-        resource_id: seed-tts-2.0
-        voice: zh_female_vv_uranus_bigtts
-        language: auto
-        output_format: mp3
-        timeout_seconds: 120
-        max_text_length: 4000
-
-      transcribe_audio:
-        base_url: wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream
-        resource_id: volc.seedasr.sauc.duration
-        language: zh
-        output_format: txt
-        timeout_seconds: 180
-
-      image_generate:
-        model: doubao-seedream-5.0-lite
-        timeout_seconds: 180
-
-      video_generate:
-        model: doubao-seedance-2.0-fast
-        timeout_seconds: 300
-        poll_interval_seconds: 5
-
-      vision_analyze:
-        model: doubao-seed-2.0-lite
-        timeout_seconds: 300
-        max_tokens: 2000
-        temperature: 0.1
-
-      video_analyze:
-        model: doubao-seed-2.0-lite
-        timeout_seconds: 300
-        max_tokens: 4000
-        temperature: 0.1
-        fps: 1
+      granted_capabilities: [tools.override]
+      settings:
+        image_generate:
+          backend: ark-agent-plan
+          api_key: ${ARK_AGENT_PLAN_API_KEY}
+          model: doubao-seedream-5.0-lite
+          resolution: 2K
+        video_generate:
+          backend: ark-agent-plan
+          api_key: ${ARK_AGENT_PLAN_API_KEY}
+          model: doubao-seedance-2.0-fast
+        vision_analyze:
+          backend: ark-agent-plan
+          api_key: ${ARK_AGENT_PLAN_API_KEY}
+          model: doubao-seed-2.0-lite
 ```
 
-Existing unrelated plugin entries are preserved.
+The CLI writes all six sections; the excerpt only shows the main model fields.
+Legacy keys directly under `plugins.entries.ark` remain readable for migration.
 
-Use `--overwrite` if you want to replace an existing `plugins.entries.ark`
-block instead of preserving user-edited values:
-
-```bash
-python cli.py config --overwrite
-```
-
-Use `--api-key-env` only when your `.env` key has a non-default name:
-
-```bash
-python cli.py config --api-key-env MY_ARK_API_KEY
-```
-
-Choose a TTS voice with a preset alias or a raw Ark speaker ID:
-
-```bash
-python cli.py voices
-python cli.py config --voice vivi
-python cli.py config --voice zh_male_m191_uranus_bigtts
-```
-
-When Ark returns TTS subtitle/timestamp events, `text_to_speech` writes a
-sidecar timeline next to the generated audio. For an output path like
-`/tmp/narration.mp3`, the timeline path is:
-
-```text
-/tmp/narration.transcript.json
-```
-
-The sidecar is a JSON array of segments shaped for caption workflows:
-
-```json
-[
-  {"id": 0, "text": "字幕文本。", "start": 0.135, "end": 1.235}
-]
-```
-
-This file is produced by the same TTS request as the audio. It is not generated
-by a separate STT pass.
-
-The plugin reuses Hermes' existing plugin config namespace:
-
-```yaml
-plugins:
-  enabled:
-    - ark
-
-  entries:
-    ark:
-      api_key: ${ARK_AGENT_PLAN_API_KEY}
-
-      ark:
-        base_url: https://ark.cn-beijing.volces.com/api/plan/v3
-        timeout_seconds: 300
-
-      text_to_speech:
-        base_url: https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional
-        resource_id: seed-tts-2.0
-        voice: zh_female_vv_uranus_bigtts
-        language: auto
-        output_format: mp3
-        timeout_seconds: 120
-        max_text_length: 4000
-
-      transcribe_audio:
-        base_url: wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream
-        resource_id: volc.seedasr.sauc.duration
-        language: zh
-        output_format: txt
-        timeout_seconds: 180
-
-      image_generate:
-        model: doubao-seedream-5.0-lite
-        timeout_seconds: 180
-
-      video_generate:
-        model: doubao-seedance-2.0-fast
-        timeout_seconds: 300
-        poll_interval_seconds: 5
-
-      vision_analyze:
-        model: doubao-seed-2.0-lite
-        timeout_seconds: 300
-        max_tokens: 2000
-        temperature: 0.1
-
-      video_analyze:
-        model: doubao-seed-2.0-lite
-        timeout_seconds: 300
-        max_tokens: 4000
-        temperature: 0.1
-        fps: 1
-```
-
-Provider selection stays in Hermes' native sections:
+Provider selection remains in Hermes-owned sections:
 
 ```yaml
 tts:
   provider: ark
-
 stt:
   enabled: true
   provider: ark
-
 image_gen:
   provider: ark
-  model: doubao-seedream-5.0-lite
-
 video_gen:
   provider: ark
-  model: doubao-seedance-2.0-fast
 ```
 
-Store the real secret in `~/.hermes/.env`:
+## Models
+
+- Seedream Agent Plan: `doubao-seedream-5.0-lite`
+- Seedream Ark API: `doubao-seedream-5-0-260128`,
+  `doubao-seedream-5-0-pro-260628`
+- Seedance Agent Plan: `doubao-seedance-2.0-fast`, `doubao-seedance-2.0`
+- Seedance Ark API: `doubao-seedance-2-5-260628`,
+  `doubao-seedance-2-0-fast-260128`, `doubao-seedance-2-0-mini-260615`,
+  `doubao-seedance-2-0-260128`
+- Vision Agent Plan: `doubao-seed-2.0-lite`, `doubao-seed-2.0-mini`
+- Vision Ark API: `doubao-seed-2-0-lite-260428`,
+  `doubao-seed-2-0-mini-260428`
+
+## Other commands
 
 ```bash
-ARK_AGENT_PLAN_API_KEY=...
-```
-
-## Uninstall
-
-```bash
+python cli.py status
+python cli.py voices
 python cli.py uninstall
-```
-
-This removes `~/.hermes/plugins/ark` and disables `ark` in
-`plugins.enabled`. By default it preserves `plugins.entries.ark` so a future
-reinstall can reuse the same settings.
-
-To remove plugin config too:
-
-```bash
 python cli.py uninstall --remove-config
 ```
 
-## Design
-
-See [DESIGN.md](DESIGN.md).
+See [DESIGN.md](DESIGN.md) for ownership and degradation behavior.

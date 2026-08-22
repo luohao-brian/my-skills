@@ -1,255 +1,74 @@
-# Hermes Ark Plugin System Design
+# Hermes Ark Plugin Design
 
-## Goals
+## Verdict
 
-- Keep all Volcengine Ark implementation code outside Hermes core.
-- Package Ark TTS, STT, image generation, video generation, image understanding,
-  and video understanding as one independently maintained plugin.
-- Reuse Hermes' existing plugin loading and `plugins.entries.<plugin_id>`
-  configuration namespace.
-- Preserve Hermes-facing tool names:
-  `text_to_speech`, `transcribe_audio`, `image_generate`, `video_generate`,
-  `vision_analyze`, and `video_analyze`.
-- Avoid changing Hermes core files.
+The plugin owns direct Ark API and Ark Agent Plan multimedia integration because
+Hermes v0.20.x does not provide those backends natively. Hermes continues to
+own public tool schemas, file safety, preprocessing, provider dispatch, and
+operator consent.
 
-## Non-Goals
+## Capability ownership
 
-- Add a new Hermes core provider registry for image/video understanding.
-- Introduce new public tool names such as `ark_vision_analyze`.
-- Store secrets directly in `config.yaml`.
-- Replace Hermes' CLI/TUI/gateway surfaces.
+| Capability | Integration | Owner of public tool shell |
+| --- | --- | --- |
+| TTS | `ctx.register_tts_provider` | Hermes |
+| STT | `ctx.register_transcription_provider` | Hermes |
+| Image generation | `ctx.register_image_gen_provider` | Hermes |
+| Video generation | `ctx.register_video_gen_provider` | Hermes |
+| Image understanding | authorized `vision_analyze` override | Ark plugin, schema imported from Hermes |
+| Video understanding | authorized `video_analyze` override | Ark plugin, schema imported from Hermes |
 
-## Existing Hermes Hook Points
+`transcribe_audio` is not overridden. The Ark provider receives the normalized,
+validated file from Hermes' native transcription dispatcher.
 
-### Provider Registry Hooks
+## Registration flow
 
-Hermes already exposes provider registries for four capabilities:
+`register(ctx)` stores the v2 namespaced config facade and always registers all
+four providers. It probes `ctx.has_capability("tools.override")` before
+registering the understanding overrides. A missing grant therefore degrades to:
 
-```python
-ctx.register_tts_provider(...)
-ctx.register_transcription_provider(...)
-ctx.register_image_gen_provider(...)
-ctx.register_video_gen_provider(...)
-```
+- Ark TTS/STT/image/video generation available.
+- Hermes-native image/video understanding unchanged.
+- Plugin load succeeds in fresh or non-interactive profiles.
 
-These hooks keep the Hermes tool shell intact. The model still calls the same
-Hermes tool, while the tool dispatches to the configured provider:
+## Backend contract
 
-```yaml
-tts.provider: ark
-stt.provider: ark
-image_gen.provider: ark
-video_gen.provider: ark
-```
+Every section has a `backend` setting. The default is `ark-agent-plan`.
+Credential selection is strict:
 
-Use provider registry hooks for:
+- Agent Plan: `ARK_AGENT_PLAN_API_KEY` for every section.
+- Ark API media/vision: `ARK_API_KEY`.
+- Ark API speech: `ARK_TTS_X_API_KEY`.
 
-- `text_to_speech`
-- `transcribe_audio`
-- `image_generate`
-- `video_generate`
+No request retries against another backend or credential family.
 
-### Tool Override Hooks
+## Media safety
 
-Hermes currently does not expose provider registries for image understanding
-or video understanding. Since core must not change, the plugin uses explicit
-tool override:
+Understanding overrides call `tools.image_source.resolve_image_source` with
+the active `task_id`. That preserves Hermes' local/remote terminal boundary,
+credential-file guard, SSRF policy, MIME sniffing, data-URL validation, and
+50 MB ingest cap. Image region crops occur only after safe resolution. Network
+calls run off the async event loop, and interruption is checked before upload.
 
-```python
-ctx.register_tool(
-    name="vision_analyze",
-    toolset="vision",
-    schema=VISION_ANALYZE_SCHEMA,
-    handler=ark_vision_analyze,
-    is_async=True,
-    override=True,
-)
+Generation providers apply Hermes' credential-file guard before converting a
+local reference image to a data URL. Generated URL media is materialized into
+Hermes' cache before reporting success.
 
-ctx.register_tool(
-    name="video_analyze",
-    toolset="video",
-    schema=VIDEO_ANALYZE_SCHEMA,
-    handler=ark_video_analyze,
-    is_async=True,
-    override=True,
-)
-```
+## Protocol alignment
 
-Use tool override for:
+- Vision and video understanding use multimodal Chat Completions.
+- Seedream Lite uses nested
+  `sequential_image_generation_options.max_images`; Pro stays single-image.
+- Seedance Agent Plan embeds `--dur`, `--ratio`, and `--rs`; Ark API sends
+  structured task fields.
+- BigASR receives 16 kHz, mono, signed 16-bit PCM in paced 200 ms packets while
+  a concurrent reader consumes provider frames.
+- TTS parses audio and timing events from the same Seed-TTS 2.0 stream.
 
-- `vision_analyze`
-- `video_analyze`
+## Upgrade boundary
 
-The overridden tools must keep Hermes-compatible schemas and JSON response
-envelopes.
-
-## Plugin Layout
-
-```text
-hermes-ark-plugin/
-  plugin.yaml
-  __init__.py
-  requirements.txt
-  cli.py
-  README.md
-  DESIGN.md
-  providers/
-    __init__.py
-    text_to_speech.py
-    transcribe_audio.py
-    image_generate.py
-    video_generate.py
-  tools/
-    __init__.py
-    vision_analyze.py
-    video_analyze.py
-  common/
-    __init__.py
-    config.py
-    auth.py
-    http.py
-    media.py
-```
-
-## Registration Flow
-
-```mermaid
-flowchart TD
-  A["Hermes imports plugin"] --> B["register(ctx)"]
-  B --> C["Register Ark TTS provider"]
-  B --> D["Register Ark STT provider"]
-  B --> E["Register Ark image generation provider"]
-  B --> F["Register Ark video generation provider"]
-  B --> G["Override vision_analyze"]
-  B --> H["Override video_analyze"]
-  C --> I["Hermes text_to_speech dispatch"]
-  D --> J["Hermes transcribe_audio dispatch"]
-  E --> K["Hermes image_generate dispatch"]
-  F --> L["Hermes video_generate dispatch"]
-  G --> M["Ark vision understanding handler"]
-  H --> N["Ark video understanding handler"]
-```
-
-## Configuration Model
-
-Hermes-owned provider selection remains in the native sections:
-
-```yaml
-tts:
-  provider: ark
-stt:
-  enabled: true
-  provider: ark
-image_gen:
-  provider: ark
-video_gen:
-  provider: ark
-```
-
-Ark-owned implementation details live under:
-
-```yaml
-plugins:
-  entries:
-    ark:
-      ...
-```
-
-This matches Hermes' existing per-plugin configuration convention used by
-`plugins.entries.<plugin_id>`.
-
-## CLI Design
-
-The plugin ships a standalone CLI:
-
-```bash
-python cli.py install
-python cli.py uninstall
-python cli.py config
-python cli.py status
-```
-
-### install
-
-- Creates `~/.hermes/plugins/ark`.
-- Defaults to copying this plugin repository into the Hermes plugin directory.
-- Supports `--symlink` for local development.
-- Enables `ark` in `plugins.enabled`.
-- Optionally installs `requirements.txt` into the active Hermes Python.
-
-### uninstall
-
-- Removes `~/.hermes/plugins/ark`.
-- Removes `ark` from `plugins.enabled`.
-- Adds `ark` to `plugins.disabled` only when requested.
-- Preserves `plugins.entries.ark` by default.
-- Removes `plugins.entries.ark` with `--remove-config`.
-
-### config
-
-- Uses Hermes' `hermes_cli.config.load_config()` for read-only status checks.
-- Writes the full `plugins.enabled` + `plugins.entries.ark` Ark block.
-- Patches raw `config.yaml` instead of saving Hermes' merged defaults, so
-  unrelated user config stays untouched.
-- Optionally switches native provider selectors to `ark`.
-- Does not write raw secrets. It writes `${ARK_AGENT_PLAN_API_KEY}` by default.
-
-Default command:
-
-```bash
-python cli.py config
-```
-
-### status
-
-- Shows install path, symlink/copy mode, enabled state, provider selector state,
-  and whether `plugins.entries.ark` exists.
-
-## Dependency Policy
-
-Dependencies are declared in `requirements.txt` with upper bounds.
-
-Current planned dependencies:
-
-```text
-httpx>=0.28.1,<1
-websocket-client>=1.7,<2
-```
-
-The plugin CLI may install dependencies into the current Hermes venv, but
-Hermes ordinary plugin loading does not auto-install them today.
-
-## Risk Controls
-
-- Tool override is explicit and auditable through Hermes plugin logs.
-- Override handlers keep the original tool names and response envelopes.
-- `vision_analyze` and `video_analyze` schemas should be copied from the
-  active Hermes version at plugin release time and covered by compatibility
-  tests.
-- Provider registry paths are preferred wherever available to avoid copying
-  core tool behavior.
-
-## Migration From Current Split Plugins
-
-Current split plugin/config shape:
-
-```text
-~/.hermes/plugins/tts/volc-ark
-~/.hermes/plugins/stt/volc-ark
-~/.hermes/plugins/image_gen/volc-seedream
-~/.hermes/plugins/video_gen/volc-seedance
-```
-
-Target shape:
-
-```text
-~/.hermes/plugins/ark
-```
-
-Migration steps:
-
-1. Install `ark`.
-2. Run `python cli.py config`.
-3. Disable old split plugins.
-4. Verify all six Hermes tool names.
-5. Remove old split plugins after successful verification.
+If a future Hermes release adds first-class direct Ark providers, the matching
+plugin provider should be removed and Hermes' native implementation selected.
+Model availability through a third-party gateway does not satisfy this boundary:
+native coverage must support the same Ark credentials, endpoints, and entitlement
+semantics.

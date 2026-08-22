@@ -21,7 +21,7 @@ BACKENDS = {
     "ark-agent-plan": {
         "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
         "api_key_env": "ARK_AGENT_PLAN_API_KEY",
-        "model": "doubao-seedance-2.0",
+        "model": "doubao-seedance-2.0-fast",
     },
     "ark-api": {
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
@@ -29,12 +29,23 @@ BACKENDS = {
         "model": "doubao-seedance-2-5-260628",
     },
 }
+BACKEND_MODELS = {
+    "ark-agent-plan": (
+        "doubao-seedance-2.0-fast",
+        "doubao-seedance-2.0",
+    ),
+    "ark-api": (
+        "doubao-seedance-2-5-260628",
+        "doubao-seedance-2-0-fast-260128",
+        "doubao-seedance-2-0-mini-260615",
+        "doubao-seedance-2-0-260128",
+    ),
+}
 DEFAULT_DURATION_SECONDS = 5
 DEFAULT_ASPECT_RATIO = "16:9"
 DEFAULT_RESOLUTION = "720p"
-SUPPORTED_DURATIONS = (-1, *range(4, 16))
 SUPPORTED_ASPECT_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
-SUPPORTED_RESOLUTIONS = ("480p", "720p")
+SUPPORTED_RESOLUTIONS = ("480p", "720p", "1080p", "4k")
 TASK_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 5
 TERMINAL_FAILURE_STATUSES = {"failed", "cancelled", "expired"}
@@ -79,14 +90,65 @@ def build_generation_settings(
     }
 
 
+def model_profile(model: str) -> tuple[int, tuple[str, ...]]:
+    normalized = model.lower()
+    seedance_25 = "seedance-2-5" in normalized or "seedance-2.5" in normalized
+    fast_or_mini = any(token in normalized for token in (
+        "seedance-2-0-fast", "seedance-2.0-fast", "seedance-2-0-mini", "seedance-2.0-mini",
+    ))
+    max_duration = 30 if seedance_25 else 15
+    resolutions = ("480p", "720p") if seedance_25 or fast_or_mini else SUPPORTED_RESOLUTIONS
+    return max_duration, resolutions
+
+
+def validate_generation(backend: str, model: str, duration: int, resolution: str) -> None:
+    if model not in BACKEND_MODELS[backend]:
+        raise ValueError(f"Model {model} is not supported by backend {backend}")
+    max_duration, resolutions = model_profile(model)
+    if duration != -1 and not 4 <= duration <= max_duration:
+        raise ValueError(f"Model {model} supports 4-{max_duration} seconds or -1 smart duration")
+    if resolution not in resolutions:
+        raise ValueError(f"Model {model} supports resolutions: {', '.join(resolutions)}")
+
+
+def build_request(
+    *,
+    backend: str,
+    model: str,
+    prompt: str,
+    image_url: str | None,
+    duration: int,
+    aspect_ratio: str,
+    resolution: str,
+    generate_audio: bool,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    validate_generation(backend, model, duration, resolution)
+    text = prompt.strip()
+    settings: dict[str, Any] = {"generate_audio": generate_audio}
+    if backend == "ark-agent-plan":
+        text += f" --dur {duration} --ratio {aspect_ratio} --rs {resolution}"
+    else:
+        settings.update(build_generation_settings(
+            resolution=resolution,
+            aspect_ratio=aspect_ratio,
+            duration=duration,
+            generate_audio=generate_audio,
+        ))
+    content: list[dict[str, Any]] = [{"type": "text", "text": text}]
+    if image_url:
+        content.append({"type": "image_url", "image_url": {"url": image_url}})
+    return content, settings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate video with Ark")
     parser.add_argument("prompt")
     parser.add_argument("--image", help="Optional first-frame image path, data URL, or remote URL")
-    parser.add_argument("--duration", type=int, choices=SUPPORTED_DURATIONS, default=DEFAULT_DURATION_SECONDS)
+    parser.add_argument("--duration", type=int, default=DEFAULT_DURATION_SECONDS)
     parser.add_argument("--aspect-ratio", choices=SUPPORTED_ASPECT_RATIOS, default=DEFAULT_ASPECT_RATIO)
     parser.add_argument("--resolution", choices=SUPPORTED_RESOLUTIONS, default=DEFAULT_RESOLUTION)
     parser.add_argument("--audio", action="store_true")
+    parser.add_argument("--model", help="Backend-compatible model override")
     parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
@@ -96,29 +158,32 @@ def main() -> int:
         print(json.dumps({"success": False, "backend": args.backend, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    from volcenginesdkarkruntime import Ark
-
     duration = args.duration
-    generation_settings = build_generation_settings(
-        resolution=args.resolution,
-        aspect_ratio=args.aspect_ratio,
-        duration=duration,
-        generate_audio=bool(args.audio),
-    )
+    model = args.model or profile["model"]
 
     task_id: str | None = None
     last_status = "not_submitted"
     try:
+        from volcenginesdkarkruntime import Ark
         client = Ark(base_url=profile["base_url"], api_key=api_key)
-        content: list[dict[str, Any]] = [{"type": "text", "text": args.prompt.strip()}]
+        image_url = None
         if args.image:
             image_url = args.image
             if not (image_url.startswith("http://") or image_url.startswith("https://") or image_url.startswith("data:")):
                 image_url = file_to_data_url(image_url)
-            content.append({"type": "image_url", "image_url": {"url": image_url}})
+        content, generation_settings = build_request(
+            backend=args.backend,
+            model=model,
+            prompt=args.prompt,
+            image_url=image_url,
+            duration=duration,
+            aspect_ratio=args.aspect_ratio,
+            resolution=args.resolution,
+            generate_audio=bool(args.audio),
+        )
 
         created = client.content_generation.tasks.create(
-            model=profile["model"],
+            model=model,
             content=content,
             extra_body=generation_settings,
         )
@@ -140,7 +205,7 @@ def main() -> int:
                     "task_id": task_id,
                     "status": last_status,
                     "video_url": video_url,
-                    "model": profile["model"],
+                    "model": model,
                     "prompt": args.prompt,
                     "duration": getattr(task, "duration", None) or duration,
                     "aspect_ratio": getattr(task, "ratio", None) or args.aspect_ratio,
@@ -160,7 +225,7 @@ def main() -> int:
             "task_id": task_id,
             "status": last_status,
             "backend": args.backend,
-            "model": profile["model"],
+            "model": model,
         }, ensure_ascii=False), file=sys.stderr)
         return 1
     except Exception as exc:
@@ -170,7 +235,7 @@ def main() -> int:
             "task_id": task_id,
             "status": last_status,
             "backend": args.backend,
-            "model": profile["model"],
+            "model": model,
         }, ensure_ascii=False), file=sys.stderr)
         return 1
 

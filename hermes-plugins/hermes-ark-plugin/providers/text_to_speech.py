@@ -54,6 +54,8 @@ def _tts_payload(
     sample_rate: int = 24000,
     language: str = "",
     subtitle_flag: str = "enable_subtitle",
+    speed: float = 1.0,
+    emotion: str = "",
 ) -> dict[str, Any]:
     additions = {
         "disable_markdown_filter": True,
@@ -61,6 +63,8 @@ def _tts_payload(
     }
     if language:
         additions["explicit_language"] = language
+    if emotion:
+        additions["emotion"] = emotion
     return {
         "user": {"uid": "hermes-ark-plugin"},
         "req_params": {
@@ -69,6 +73,7 @@ def _tts_payload(
             "audio_params": {
                 "format": fmt,
                 "sample_rate": sample_rate,
+                "speed_ratio": speed,
                 subtitle_flag: True,
             },
             "additions": json.dumps(additions, ensure_ascii=False),
@@ -95,11 +100,24 @@ def _words_to_segment(sentence: dict[str, Any], segment_id: int) -> dict[str, An
         text = "".join(str(word.get("word") or "") for word in timed_words).strip()
     if not text:
         return None
+    projected_words = [
+        {
+            "text": str(word.get("word") or ""),
+            "start_time_ms": round(float(word["startTime"]) * 1000),
+            "end_time_ms": round(float(word["endTime"]) * 1000),
+            **({"confidence": word["confidence"]} if isinstance(word.get("confidence"), (int, float)) else {}),
+        }
+        for word in timed_words
+        if str(word.get("word") or "")
+    ]
+    if not projected_words:
+        return None
     return {
         "id": segment_id,
         "text": text,
-        "start": round(float(timed_words[0]["startTime"]), 3),
-        "end": round(float(timed_words[-1]["endTime"]), 3),
+        "start_time_ms": min(word["start_time_ms"] for word in projected_words),
+        "end_time_ms": max(word["end_time_ms"] for word in projected_words),
+        "words": projected_words,
     }
 
 
@@ -133,9 +151,9 @@ class ArkTextToSpeechProvider(TTSProvider):
         return "Volcengine Ark"
 
     def is_available(self) -> bool:
-        from ..common.config import api_key
+        from ..common.config import section_api_key
 
-        return bool(api_key())
+        return bool(section_api_key("text_to_speech", speech=True))
 
     def synthesize(
         self,
@@ -151,13 +169,13 @@ class ArkTextToSpeechProvider(TTSProvider):
         from pathlib import Path
 
         from ..common.client import response_error
-        from ..common.config import section, section_api_key, timeout_seconds
+        from ..common.config import section, section_api_key, speech_endpoint, timeout_seconds
 
         cfg = section("text_to_speech")
-        api_key = section_api_key("text_to_speech")
+        api_key = section_api_key("text_to_speech", speech=True)
         if not api_key:
             raise RuntimeError("Ark TTS API key is not configured")
-        url = str(cfg.get("base_url") or "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional")
+        url = speech_endpoint("text_to_speech", "tts")
         resource_id = str(cfg.get("resource_id") or "seed-tts-2.0")
         voice_id = voice or str(cfg.get("voice") or "zh_female_vv_uranus_bigtts")
         language = str(extra.get("language") or cfg.get("language") or "auto").strip().lower()
@@ -169,6 +187,9 @@ class ArkTextToSpeechProvider(TTSProvider):
 
         path = Path(output_path).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
+        speed_ratio = float(speed) if speed is not None else 1.0
+        if not 0.5 <= speed_ratio <= 2.0:
+            raise ValueError("Ark TTS speed must be between 0.5 and 2.0")
         response = None
         try:
             response = requests.post(
@@ -186,6 +207,8 @@ class ArkTextToSpeechProvider(TTSProvider):
                     output_format,
                     language=explicit_language,
                     subtitle_flag=subtitle_flag,
+                    speed=speed_ratio,
+                    emotion=str(extra.get("emotion") or ""),
                 ),
                 stream=True,
                 timeout=max(timeout_seconds("text_to_speech", 120), 120),

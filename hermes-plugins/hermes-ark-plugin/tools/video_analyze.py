@@ -1,81 +1,67 @@
-"""Ark override for Hermes `video_analyze`."""
+"""Ark override for Hermes ``video_analyze`` with host-owned media safety."""
 
 from __future__ import annotations
 
+import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
+from tools.vision_tools import VIDEO_ANALYZE_SCHEMA
 
-VIDEO_ANALYZE_SCHEMA: dict[str, Any] = {
-    "name": "video_analyze",
-    "description": "Analyze a video with the configured Ark video model.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "video_url": {
-                "type": "string",
-                "description": "Video URL, local file path, or data URL to analyze.",
-            },
-            "question": {
-                "type": "string",
-                "description": "Question or instruction about the video.",
-            },
-            "model": {
-                "type": "string",
-                "description": "Optional model override.",
-            },
-        },
-        "required": ["video_url", "question"],
-    },
-}
+MAX_VIDEO_DATA_URL_BYTES = 50 * 1024 * 1024
 
 
 def check_ark_video() -> bool:
-    from ..common.config import api_key
+    from ..common.config import section_api_key
+    return bool(section_api_key("video_analyze"))
 
-    return bool(api_key())
 
-
-async def ark_video_analyze(args: dict[str, Any], **_kw: Any) -> str:
+async def ark_video_analyze(args: dict[str, Any], **kw: Any) -> str:
+    from tools.image_source import ResolveContext, resolve_image_source
+    from tools.interrupt import is_interrupted
     from ..common.auth import require_api_key
-    from ..common.client import extract_responses_text, file_to_data_url, post_json, response_error
-    from ..common.config import ark_base_url, section, timeout_seconds
+    from ..common.client import bytes_to_data_url, extract_chat_text, post_json, response_error
+    from ..common.config import ark_base_url, section, section_backend, timeout_seconds
 
     cfg = section("video_analyze")
-    video_url = str(args.get("video_url") or "")
-    question = str(args.get("question") or "")
-    source_path = Path(video_url).expanduser()
-    resolved_video = file_to_data_url(source_path, "video/mp4") if source_path.is_file() else video_url
-    model = str(args.get("model") or cfg.get("model") or "doubao-seed-2.0-lite")
+    backend = section_backend("video_analyze")
+    default_model = "doubao-seed-2.0-lite" if backend == "ark-agent-plan" else "doubao-seed-2-0-lite-260428"
+    model = str(cfg.get("model") or default_model)
+    if is_interrupted():
+        return json.dumps({"success": False, "analysis": "", "error": "Interrupted", "provider": "ark"})
     try:
-        response = post_json(
-            ark_base_url(),
-            "responses",
-            require_api_key(),
+        resolved = await resolve_image_source(
+            str(args.get("video_url") or ""),
+            ResolveContext(task_id=kw.get("task_id")),
+            permitted=("video",),
+        )
+        video_url = bytes_to_data_url(resolved.data, resolved.mime)
+        if len(video_url) > MAX_VIDEO_DATA_URL_BYTES:
+            raise ValueError("Video base64 payload exceeds the 50 MB Hermes limit")
+        response = await asyncio.to_thread(
+            post_json,
+            ark_base_url("video_analyze"),
+            "chat/completions",
+            require_api_key("video_analyze"),
             {
                 "model": model,
-                "input": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_video",
-                                "video_url": resolved_video,
-                                "fps": int(cfg.get("fps", 1)),
-                            },
-                            {"type": "input_text", "text": question},
-                        ],
-                    }
-                ],
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "video_url", "video_url": {"url": video_url}},
+                        {"type": "text", "text": str(args.get("question") or "")},
+                    ],
+                }],
                 "temperature": float(cfg.get("temperature", 0.1)),
-                "max_output_tokens": int(cfg.get("max_tokens", 4000)),
+                "max_tokens": int(cfg.get("max_tokens", 4000)),
             },
             timeout=max(timeout_seconds("video_analyze", 300), 60),
         )
         if response.status_code >= 400:
-            return json.dumps({"success": False, "analysis": "", "error": response_error(response), "model": model}, ensure_ascii=False)
-        text = extract_responses_text(response.json())
-        return json.dumps({"success": True, "analysis": text, "model": model, "provider": "ark"}, ensure_ascii=False)
+            raise RuntimeError(response_error(response))
+        text = extract_chat_text(response.json())
+        if not text:
+            raise RuntimeError("Ark video response contained no analysis text")
+        return json.dumps({"success": True, "analysis": text, "model": model, "provider": "ark", "backend": backend}, ensure_ascii=False)
     except Exception as exc:
-        return json.dumps({"success": False, "analysis": "", "error": str(exc), "model": model, "provider": "ark"}, ensure_ascii=False)
+        return json.dumps({"success": False, "analysis": "", "error": str(exc), "model": model, "provider": "ark", "backend": backend}, ensure_ascii=False)

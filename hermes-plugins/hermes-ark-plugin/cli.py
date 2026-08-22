@@ -13,6 +13,7 @@ from typing import Any
 
 PLUGIN_ID = "ark"
 DEFAULT_API_KEY_ENV = "ARK_AGENT_PLAN_API_KEY"
+DEFAULT_BACKEND = "ark-agent-plan"
 DEFAULT_TTS_VOICE = "zh_female_vv_uranus_bigtts"
 
 TTS_VOICES = [
@@ -196,16 +197,24 @@ def _disable_plugin(config: dict[str, Any]) -> None:
         plugins["enabled"] = [item for item in enabled if item != PLUGIN_ID]
 
 
-def _default_ark_entry(api_key_env: str, *, voice: str | None = None) -> dict[str, Any]:
+def _default_ark_entry(api_key_env: str, *, voice: str | None = None, backend: str = DEFAULT_BACKEND) -> dict[str, Any]:
     voice_id = _resolve_tts_voice(voice)
-    return {
-        "api_key": "${" + api_key_env + "}",
+    plan = backend == "ark-agent-plan"
+    if not plan and api_key_env == DEFAULT_API_KEY_ENV:
+        media_key_env = "ARK_API_KEY"
+        speech_key_env = "ARK_TTS_X_API_KEY"
+    else:
+        media_key_env = api_key_env
+        speech_key_env = api_key_env
+    settings = {
         "ark": {
-            "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
+            "backend": backend,
+            "api_key": "${" + media_key_env + "}",
             "timeout_seconds": 300,
         },
         "text_to_speech": {
-            "base_url": "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional",
+            "backend": backend,
+            "api_key": "${" + speech_key_env + "}",
             "resource_id": "seed-tts-2.0",
             "voice": voice_id,
             "language": "auto",
@@ -214,35 +223,46 @@ def _default_ark_entry(api_key_env: str, *, voice: str | None = None) -> dict[st
             "max_text_length": 4000,
         },
         "transcribe_audio": {
-            "base_url": "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream",
+            "backend": backend,
+            "api_key": "${" + speech_key_env + "}",
             "resource_id": "volc.seedasr.sauc.duration",
             "language": "zh",
             "output_format": "txt",
             "timeout_seconds": 180,
         },
         "image_generate": {
-            "model": "doubao-seedream-5.0-lite",
+            "backend": backend,
+            "api_key": "${" + media_key_env + "}",
+            "model": "doubao-seedream-5.0-lite" if plan else "doubao-seedream-5-0-260128",
+            "resolution": "2K",
             "timeout_seconds": 180,
         },
         "video_generate": {
-            "model": "doubao-seedance-2.0-fast",
+            "backend": backend,
+            "api_key": "${" + media_key_env + "}",
+            "model": "doubao-seedance-2.0-fast" if plan else "doubao-seedance-2-5-260628",
             "timeout_seconds": 300,
             "poll_interval_seconds": 5,
         },
         "vision_analyze": {
-            "model": "doubao-seed-2.0-lite",
+            "backend": backend,
+            "api_key": "${" + media_key_env + "}",
+            "model": "doubao-seed-2.0-lite" if plan else "doubao-seed-2-0-lite-260428",
             "timeout_seconds": 300,
             "max_tokens": 2000,
             "temperature": 0.1,
         },
         "video_analyze": {
-            "model": "doubao-seed-2.0-lite",
+            "backend": backend,
+            "api_key": "${" + media_key_env + "}",
+            "model": "doubao-seed-2.0-lite" if plan else "doubao-seed-2-0-lite-260428",
             "timeout_seconds": 300,
             "max_tokens": 4000,
             "temperature": 0.1,
             "fps": 1,
         },
     }
+    return {"settings": settings}
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -261,6 +281,7 @@ def _write_ark_config(
     voice: str | None,
     activate_providers: bool,
     overwrite: bool,
+    backend: str = DEFAULT_BACKEND,
 ) -> None:
     config, save_config = _load_raw_config_pair()
     plugins = _ensure_plugins_section(config)
@@ -269,14 +290,28 @@ def _write_ark_config(
         entries = {}
         plugins["entries"] = entries
 
-    desired = _default_ark_entry(api_key_env, voice=voice)
+    desired = _default_ark_entry(api_key_env, voice=voice, backend=backend)
     current = entries.get(PLUGIN_ID)
     if overwrite or not isinstance(current, dict):
         entries[PLUGIN_ID] = desired
     else:
-        entries[PLUGIN_ID] = _deep_merge(desired, current)
+        current_for_merge = dict(current)
+        if not isinstance(current.get("settings"), dict):
+            legacy_settings: dict[str, Any] = {}
+            legacy_api_key = current.get("api_key")
+            for key in desired["settings"]:
+                value = current_for_merge.pop(key, None)
+                if isinstance(value, dict):
+                    legacy_settings[key] = dict(value)
+                if legacy_api_key and key not in legacy_settings:
+                    legacy_settings[key] = {}
+                if legacy_api_key:
+                    legacy_settings[key].setdefault("api_key", legacy_api_key)
+            current_for_merge.pop("api_key", None)
+            current_for_merge["settings"] = legacy_settings
+        entries[PLUGIN_ID] = _deep_merge(desired, current_for_merge)
         if voice:
-            entries[PLUGIN_ID].setdefault("text_to_speech", {})["voice"] = desired["text_to_speech"]["voice"]
+            entries[PLUGIN_ID].setdefault("settings", {}).setdefault("text_to_speech", {})["voice"] = desired["settings"]["text_to_speech"]["voice"]
 
     if activate_providers:
         config.setdefault("tts", {})["provider"] = PLUGIN_ID
@@ -285,10 +320,10 @@ def _write_ark_config(
         stt["provider"] = PLUGIN_ID
         image_gen = config.setdefault("image_gen", {})
         image_gen["provider"] = PLUGIN_ID
-        image_gen.setdefault("model", desired["image_generate"]["model"])
+        image_gen.setdefault("model", desired["settings"]["image_generate"]["model"])
         video_gen = config.setdefault("video_gen", {})
         video_gen["provider"] = PLUGIN_ID
-        video_gen.setdefault("model", desired["video_generate"]["model"])
+        video_gen.setdefault("model", desired["settings"]["video_generate"]["model"])
 
     _enable_plugin(config)
     save_config(config)
@@ -339,16 +374,26 @@ def cmd_install(args: argparse.Namespace) -> None:
         shutil.copytree(source, target, ignore=ignore)
         mode = "copied"
 
-    config, save_config = _load_raw_config_pair()
-    _enable_plugin(config)
-    save_config(config)
-
     if args.with_deps:
         _install_requirements(source / "requirements.txt")
 
+    _write_ark_config(
+        api_key_env=args.api_key_env,
+        voice=None,
+        activate_providers=args.activate_providers,
+        overwrite=False,
+        backend=args.backend,
+    )
+    try:
+        from hermes_cli.plugins_cmd import cmd_enable
+        cmd_enable(PLUGIN_ID)
+    except Exception as exc:
+        print(f"Capability consent was not completed: {exc}", file=sys.stderr)
+
     print(f"Installed ark plugin: {target} ({mode})")
     print("Enabled plugin: ark")
-    print("Run `python cli.py config` to select Ark providers.")
+    print("Configured Ark as the default TTS/STT/image/video provider.")
+    print("Understanding overrides require tools.override consent; providers work without it.")
 
 
 def cmd_uninstall(args: argparse.Namespace) -> None:
@@ -381,6 +426,7 @@ def cmd_config(args: argparse.Namespace) -> None:
         voice=args.voice,
         activate_providers=args.activate_providers,
         overwrite=args.overwrite,
+        backend=args.backend,
     )
     print("Wrote Hermes plugin config block:")
     print("  plugins.enabled += ark")
@@ -424,7 +470,8 @@ def cmd_status(_args: argparse.Namespace) -> None:
     print(f"image_gen.provider: {config.get('image_gen', {}).get('provider') if isinstance(config.get('image_gen'), dict) else None}")
     print(f"video_gen.provider: {config.get('video_gen', {}).get('provider') if isinstance(config.get('video_gen'), dict) else None}")
     ark_entry = entries.get(PLUGIN_ID) if isinstance(entries.get(PLUGIN_ID), dict) else {}
-    tts_entry = ark_entry.get("text_to_speech") if isinstance(ark_entry.get("text_to_speech"), dict) else {}
+    settings = ark_entry.get("settings") if isinstance(ark_entry.get("settings"), dict) else ark_entry
+    tts_entry = settings.get("text_to_speech") if isinstance(settings.get("text_to_speech"), dict) else {}
     print(f"tts.voice: {_voice_display(tts_entry.get('voice'))}")
 
 
@@ -435,7 +482,12 @@ def build_parser() -> argparse.ArgumentParser:
     install = sub.add_parser("install", help="Install plugin into ~/.hermes/plugins/ark")
     install.add_argument("--force", action="store_true", help="Replace an existing install")
     install.add_argument("--symlink", action="store_true", help="Create a symlink instead of copying files")
-    install.add_argument("--with-deps", action="store_true", help="Install requirements into this Python environment")
+    install.add_argument("--with-deps", action="store_true", dest="with_deps", help="Install requirements (default)")
+    install.add_argument("--no-deps", action="store_false", dest="with_deps", help="Skip dependency installation")
+    install.add_argument("--backend", choices=["ark-agent-plan", "ark-api"], default=DEFAULT_BACKEND)
+    install.add_argument("--api-key-env", default=DEFAULT_API_KEY_ENV)
+    install.add_argument("--no-activate-providers", action="store_false", dest="activate_providers")
+    install.set_defaults(activate_providers=True, with_deps=True)
     install.set_defaults(func=cmd_install)
 
     uninstall = sub.add_parser("uninstall", aliases=["remove"], help="Uninstall plugin")
@@ -444,6 +496,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     config = sub.add_parser("config", help="Write plugins.entries.ark config")
     config.add_argument("--api-key-env", default=DEFAULT_API_KEY_ENV, help="Environment variable referenced by api_key")
+    config.add_argument("--backend", choices=["ark-agent-plan", "ark-api"], default=DEFAULT_BACKEND)
     config.add_argument(
         "--voice",
         help="TTS voice alias or raw Ark speaker ID. Run `python cli.py voices` to list common presets.",

@@ -29,7 +29,8 @@ python3 {baseDir}/scripts/volc_video_gen.py "镜头缓慢推进，人物转身" 
 ## Contract
 
 1. Use Agent Plan by default. Map explicit user wording `ARK-API` or `方舟 API` to `--backend ark-api`; map `ARK-AGENT-PLAN` or `方舟 Agent Plan` to `--backend ark-agent-plan`. Never switch or retry across backends automatically. See [references/ark-video-gen.md](references/ark-video-gen.md) for credentials and models.
-2. Use the fixed endpoint and model selected by the backend.
-3. Submit one task, poll until success, failure, cancellation, expiry, or timeout.
-4. Expect stdout JSON containing `success`, `backend`, `task_id`, `status`, `video_url`, `model`, and generation settings.
-5. On timeout, use the last known task status and task id from the script output.
+2. Use the selected backend's model catalog. Agent Plan defaults to `doubao-seedance-2.0-fast`; Ark API defaults to `doubao-seedance-2-5-260628`.
+3. Encode duration/ratio/resolution as `--dur`, `--ratio`, and `--rs` switches for Agent Plan; send structured task fields for Ark API.
+4. Validate model-specific duration and resolution before submission, then poll until success, failure, cancellation, expiry, or timeout.
+5. Expect stdout JSON containing `success`, `backend`, `task_id`, `status`, `video_url`, `model`, and generation settings.
+6. On timeout, use the last known task status and task id from the script output.

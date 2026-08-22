@@ -18,7 +18,7 @@ Endpoints are fixed, and the script does not fall back between backends.
 - Default format: `mp3`
 - Default sample rate: `24000`
 
-`--voice`, `--format`, and `--sample-rate` can override the three media settings
+`--voice`, `--format`, `--sample-rate`, `--speed`, `--language`, and `--emotion` can override request settings
 for one call. Select `--voice` from [seed-tts-2.0-voices.md](seed-tts-2.0-voices.md).
 Subtitle events are enabled with `req_params.audio_params.enable_subtitle`; the
 script does not duplicate that flag inside the JSON-encoded `additions` field.
@@ -60,7 +60,7 @@ The transcript file is a JSON array:
 
 ```json
 [
-  {"id": 0, "text": "欢迎使用 OpenClaw。", "start": 0.12, "end": 1.68}
+  {"id": 0, "text": "欢迎使用 OpenClaw。", "start_time_ms": 120, "end_time_ms": 1680, "words": []}
 ]
 ```
 

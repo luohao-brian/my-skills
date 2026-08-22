@@ -6,8 +6,6 @@ kept separate so Ark can be maintained independently from Hermes core.
 
 from __future__ import annotations
 
-import importlib
-
 
 def register(ctx) -> None:
     """Register Ark providers and override understanding tools.
@@ -19,29 +17,24 @@ def register(ctx) -> None:
     from .providers.text_to_speech import ArkTextToSpeechProvider
     from .providers.transcribe_audio import ArkTranscribeAudioProvider
     from .providers.video_generate import ArkVideoGenerateProvider
-    from .tools.transcribe_audio import TRANSCRIBE_AUDIO_SCHEMA, ark_transcribe_audio, check_ark_transcribe_audio
+    from .common.config import configure_context
     from .tools.vision_analyze import VISION_ANALYZE_SCHEMA, ark_vision_analyze, check_ark_vision
     from .tools.video_analyze import VIDEO_ANALYZE_SCHEMA, ark_video_analyze, check_ark_video
 
+    configure_context(ctx)
     ctx.register_tts_provider(ArkTextToSpeechProvider())
     ctx.register_transcription_provider(ArkTranscribeAudioProvider())
     ctx.register_image_gen_provider(ArkImageGenerateProvider())
     ctx.register_video_gen_provider(ArkVideoGenerateProvider())
 
-    # Some Hermes entrypoints discover plugins before importing model_tools.
-    # Preload the built-in understanding tools so Ark's same-name overrides
-    # are registered last and cannot be reclaimed by a later built-in import.
-    importlib.import_module("tools.vision_tools")
+    # Understanding has no provider registry in Hermes v0.20.x. Keep the four
+    # provider-backed capabilities available even when override consent was
+    # declined, and only replace the two understanding tools when authorized.
+    if not ctx.has_capability("tools.override"):
+        return
 
-    ctx.register_tool(
-        name="transcribe_audio",
-        toolset="tts",
-        schema=TRANSCRIBE_AUDIO_SCHEMA,
-        handler=ark_transcribe_audio,
-        check_fn=check_ark_transcribe_audio,
-        emoji="🎙️",
-        override=True,
-    )
+    import importlib
+    importlib.import_module("tools.vision_tools")
     ctx.register_tool(
         name="vision_analyze",
         toolset="vision",

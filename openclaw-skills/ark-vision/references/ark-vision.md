@@ -4,19 +4,19 @@
 
 | `--backend` | Credential | Endpoint | Model |
 | --- | --- | --- | --- |
-| `ark-agent-plan` (default) | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/responses` | `doubao-seed-2-0-lite` |
-| `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3/responses` | `doubao-seed-2-0-lite-260428` |
+| `ark-agent-plan` (default) | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions` | `doubao-seed-2.0-lite` |
+| `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3/chat/completions` | `doubao-seed-2-0-lite-260428` |
 
 Endpoints and models are fixed. The script does not fall back between backends.
 
-- Official Responses API quick start: https://www.volcengine.com/docs/82379/1795150?lang=zh
-- Official response object: https://www.volcengine.com/docs/82379/1783703?lang=zh
+Each backend also supports its Mini variant (`doubao-seed-2.0-mini` or
+`doubao-seed-2-0-mini-260428`) through `--model`.
 
-The request contains one user message with `type:message` and:
+The request uses OpenAI-compatible Chat Completions with one user message and:
 
-- `{"type":"input_image","image_url":"..."}` for images
-- `{"type":"input_video","video_url":"..."}` for remote video URLs
-- `{"type":"input_text","text":"..."}`
+- `{"type":"image_url","image_url":{"url":"..."}}` for images
+- `{"type":"video_url","video_url":{"url":"..."}}` for remote video URLs
+- `{"type":"text","text":"..."}`
 
 ## Usage
 
@@ -41,7 +41,7 @@ JSON mode prints:
   "backend": "ark-agent-plan",
   "media_type": "image",
   "analysis": "图片主体是...",
-  "model": "doubao-seed-2-0-lite",
+  "model": "doubao-seed-2.0-lite",
   "image": "./ui.png"
 }
 ```

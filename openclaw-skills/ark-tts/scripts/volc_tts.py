@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -53,10 +54,18 @@ def build_payload(
     voice: str,
     fmt: str,
     sample_rate: int,
+    speed: float = 1.0,
+    language: str | None = None,
+    emotion: str | None = None,
 ) -> dict[str, Any]:
     additions: dict[str, Any] = {
         "disable_markdown_filter": True,
+        "enable_subtitle": True,
     }
+    if language:
+        additions["explicit_language"] = language
+    if emotion:
+        additions["emotion"] = emotion
     return {
         "user": {"uid": "ark-tts"},
         "req_params": {
@@ -65,6 +74,7 @@ def build_payload(
             "audio_params": {
                 "format": fmt,
                 "sample_rate": sample_rate,
+                "speed_ratio": speed,
                 "enable_subtitle": True,
             },
             "additions": json.dumps(additions, ensure_ascii=False),
@@ -110,11 +120,24 @@ def words_to_segment(sentence: dict[str, Any], segment_id: int) -> dict[str, Any
         text = "".join(str(word.get("word") or "") for word in timed_words).strip()
     if not text:
         return None
+    projected_words = [
+        {
+            "text": str(word.get("word") or ""),
+            "start_time_ms": round(float(word["startTime"]) * 1000),
+            "end_time_ms": round(float(word["endTime"]) * 1000),
+            **({"confidence": word["confidence"]} if isinstance(word.get("confidence"), (int, float)) else {}),
+        }
+        for word in timed_words
+        if str(word.get("word") or "")
+    ]
+    if not projected_words:
+        return None
     return {
         "id": segment_id,
         "text": text,
-        "start": round(float(timed_words[0]["startTime"]), 3),
-        "end": round(float(timed_words[-1]["endTime"]), 3),
+        "start_time_ms": min(word["start_time_ms"] for word in projected_words),
+        "end_time_ms": max(word["end_time_ms"] for word in projected_words),
+        "words": projected_words,
     }
 
 
@@ -147,7 +170,11 @@ def synthesize(
     voice: str,
     fmt: str,
     sample_rate: int,
+    speed: float,
+    language: str | None,
+    emotion: str | None,
 ) -> tuple[bytes, list[dict[str, Any]]]:
+    request_id = str(uuid.uuid4())
     response = requests.post(
         endpoint,
         headers={
@@ -156,14 +183,16 @@ def synthesize(
             "Content-Type": "application/json",
             "Connection": "keep-alive",
             "X-Control-Require-Usage-Tokens-Return": "*",
+            "X-Api-Request-Id": request_id,
         },
-        json=build_payload(text, voice, fmt, sample_rate),
+        json=build_payload(text, voice, fmt, sample_rate, speed, language, emotion),
         stream=True,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
     try:
         if response.status_code >= 400:
-            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:500]}")
+            log_id = response.headers.get("x-tt-logid") or response.headers.get("X-Tt-Logid")
+            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:500]}; request_id={log_id or request_id}")
         audio, transcript = parse_stream(response)
         return audio, transcript
     finally:
@@ -177,6 +206,9 @@ def main() -> int:
     parser.add_argument("--voice", default=DEFAULT_VOICE)
     parser.add_argument("--format", choices=["mp3", "ogg_opus", "pcm"], default="mp3")
     parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
+    parser.add_argument("--speed", type=float, default=1.0, help="Speech speed ratio, usually 0.5-2.0")
+    parser.add_argument("--language", help="Explicit language hint")
+    parser.add_argument("--emotion", help="Optional supported emotion name")
     parser.add_argument(
         "--sample-rate",
         type=int,
@@ -184,6 +216,8 @@ def main() -> int:
         default=24000,
     )
     args = parser.parse_args()
+    if not 0.5 <= args.speed <= 2.0:
+        parser.error("--speed must be between 0.5 and 2.0")
 
     try:
         profile, api_key = resolve_backend(args.backend)
@@ -194,7 +228,11 @@ def main() -> int:
         )
         return 2
 
-    import requests
+    try:
+        import requests
+    except ImportError as exc:
+        print(json.dumps({"success": False, "backend": args.backend, "error": f"requests is unavailable: {exc}"}, ensure_ascii=False), file=sys.stderr)
+        return 2
 
     fmt = args.format.lower().strip(".")
     output_path = Path(args.output).expanduser() if args.output else default_output(fmt)
@@ -209,6 +247,9 @@ def main() -> int:
             voice=args.voice,
             fmt=fmt,
             sample_rate=args.sample_rate,
+            speed=args.speed,
+            language=args.language,
+            emotion=args.emotion,
         )
         output_path.write_bytes(audio)
         transcript_path = output_path.with_suffix(".transcript.json")
@@ -231,6 +272,7 @@ def main() -> int:
             "bytes": len(audio),
             "speaker": args.voice,
             "sample_rate": args.sample_rate,
+            "speed": args.speed,
         }, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:

@@ -20,8 +20,6 @@ def endpoint(base_url: str, suffix: str) -> str:
         return base
     if base.endswith("/chat/completions") and suffix != "chat/completions":
         base = base[: -len("/chat/completions")]
-    if base.endswith("/responses") and suffix != "responses":
-        base = base[: -len("/responses")]
     return f"{base}/{suffix}"
 
 
@@ -49,30 +47,44 @@ def post_json(
 
 
 def response_error(response: requests.Response) -> str:
+    message = ""
     with contextlib.suppress(Exception):
         payload = response.json()
-        message = payload.get("error", {}).get("message")
-        if message:
-            return str(message)[:500]
-    return response.text[:500]
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = str(error.get("message") or error.get("code") or "")
+        elif isinstance(error, str):
+            message = error
+    if not message:
+        message = response.text[:500]
+    request_id = (
+        response.headers.get("x-request-id")
+        or response.headers.get("x-tt-logid")
+        or response.headers.get("x-client-request-id")
+    )
+    suffix = f"; request_id={request_id}" if request_id else ""
+    return f"HTTP {response.status_code}: {message[:500]}{suffix}"
 
 
-def extract_responses_text(payload: dict[str, Any]) -> str:
-    output_text = payload.get("output_text")
-    if isinstance(output_text, str) and output_text.strip():
-        return output_text.strip()
+def extract_chat_text(payload: dict[str, Any]) -> str:
+    choices = payload.get("choices") or []
+    if not isinstance(choices, list) or not choices:
+        return ""
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return "\n".join(
+            str(item.get("text") or "").strip()
+            for item in content
+            if isinstance(item, dict) and str(item.get("text") or "").strip()
+        ).strip()
+    return ""
 
-    chunks: list[str] = []
-    for item in payload.get("output") or []:
-        if not isinstance(item, dict):
-            continue
-        for content in item.get("content") or []:
-            if not isinstance(content, dict):
-                continue
-            text = content.get("text") or content.get("output_text")
-            if isinstance(text, str) and text.strip():
-                chunks.append(text.strip())
-    return "\n".join(chunks).strip()
+
+def bytes_to_data_url(data: bytes, mime: str) -> str:
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
 
 
 def file_to_data_url(path: str | Path, fallback_mime: str = "application/octet-stream") -> str:

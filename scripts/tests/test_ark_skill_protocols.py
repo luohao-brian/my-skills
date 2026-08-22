@@ -28,9 +28,54 @@ STT = load_script("ark_stt_protocol", "openclaw-skills/ark-stt/scripts/volc_stt.
 TTS = load_script("ark_tts_protocol", "openclaw-skills/ark-tts/scripts/volc_tts.py")
 VISION = load_script("ark_vision_protocol", "openclaw-skills/ark-vision/scripts/vision_analyze.py")
 SEARCH = load_script("ark_search_protocol", "openclaw-skills/ark-search/scripts/web_search.py")
+PLUGIN_CLI = load_script("hermes_ark_plugin_cli", "hermes-plugins/hermes-ark-plugin/cli.py")
 
 
 class ArkSkillProtocolTests(unittest.TestCase):
+    def test_hermes_plugin_manifest_and_default_config(self) -> None:
+        manifest = (ROOT / "hermes-plugins/hermes-ark-plugin/plugin.yaml").read_text(encoding="utf-8")
+        self.assertIn("manifest_version: 2", manifest)
+        self.assertIn("api_version: 1", manifest)
+        self.assertIn("- tools.override", manifest)
+        self.assertNotIn("requires_env:", manifest)
+        self.assertNotIn("transcribe_audio\n", manifest)
+
+        plan = PLUGIN_CLI._default_ark_entry(
+            "ARK_AGENT_PLAN_API_KEY", backend="ark-agent-plan",
+        )["settings"]
+        api = PLUGIN_CLI._default_ark_entry(
+            "ARK_AGENT_PLAN_API_KEY", backend="ark-api",
+        )["settings"]
+        self.assertEqual(plan["video_generate"]["model"], "doubao-seedance-2.0-fast")
+        self.assertEqual(api["image_generate"]["api_key"], "${ARK_API_KEY}")
+        self.assertEqual(api["text_to_speech"]["api_key"], "${ARK_TTS_X_API_KEY}")
+
+        legacy = {
+            "plugins": {
+                "enabled": ["ark"],
+                "entries": {
+                    "ark": {
+                        "api_key": "${LEGACY_PLAN_KEY}",
+                        "allow_tool_override": True,
+                        "image_generate": {"model": "custom-seedream"},
+                    },
+                },
+            },
+        }
+        saved: list[dict] = []
+        with patch.object(PLUGIN_CLI, "_load_raw_config_pair", return_value=(legacy, saved.append)):
+            PLUGIN_CLI._write_ark_config(
+                api_key_env="ARK_AGENT_PLAN_API_KEY",
+                voice=None,
+                activate_providers=False,
+                overwrite=False,
+                backend="ark-agent-plan",
+            )
+        migrated = saved[0]["plugins"]["entries"]["ark"]
+        self.assertTrue(migrated["allow_tool_override"])
+        self.assertEqual(migrated["settings"]["image_generate"]["model"], "custom-seedream")
+        self.assertEqual(migrated["settings"]["text_to_speech"]["api_key"], "${LEGACY_PLAN_KEY}")
+
     def test_skill_instructions_map_user_backend_wording(self) -> None:
         for skill_name in ("ark-image-gen", "ark-video-gen", "ark-tts", "ark-stt", "ark-vision"):
             text = (ROOT / "openclaw-skills" / skill_name / "SKILL.md").read_text(encoding="utf-8")
@@ -49,11 +94,11 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(IMAGE.BACKENDS["ark-api"], {
             "base_url": "https://ark.cn-beijing.volces.com/api/v3",
             "api_key_env": "ARK_API_KEY",
-            "model": "doubao-seedream-5-0-pro-260628",
+            "model": "doubao-seedream-5-0-260128",
         })
-        self.assertEqual(VIDEO.BACKENDS["ark-agent-plan"]["model"], "doubao-seedance-2.0")
+        self.assertEqual(VIDEO.BACKENDS["ark-agent-plan"]["model"], "doubao-seedance-2.0-fast")
         self.assertEqual(VIDEO.BACKENDS["ark-api"]["model"], "doubao-seedance-2-5-260628")
-        self.assertEqual(VISION.BACKENDS["ark-agent-plan"]["model"], "doubao-seed-2-0-lite")
+        self.assertEqual(VISION.BACKENDS["ark-agent-plan"]["model"], "doubao-seed-2.0-lite")
         self.assertEqual(VISION.BACKENDS["ark-api"]["model"], "doubao-seed-2-0-lite-260428")
         self.assertEqual(VIDEO.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
         self.assertEqual(VISION.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
@@ -92,18 +137,18 @@ class ArkSkillProtocolTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ARK_TTS_X_API_KEY"):
                 TTS.resolve_backend("ark-api")
 
-    def test_vision_routes_remote_videos_to_input_video(self) -> None:
+    def test_vision_uses_chat_completions_media_blocks(self) -> None:
         video, video_type = VISION.build_media_content("https://example.com/clip.mp4?token=x")
         self.assertEqual(video_type, "video")
         self.assertEqual(video, {
-            "type": "input_video",
-            "video_url": "https://example.com/clip.mp4?token=x",
+            "type": "video_url",
+            "video_url": {"url": "https://example.com/clip.mp4?token=x"},
         })
         image, image_type = VISION.build_media_content("https://example.com/frame.png")
         self.assertEqual(image_type, "image")
         self.assertEqual(image, {
-            "type": "input_image",
-            "image_url": "https://example.com/frame.png",
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/frame.png"},
         })
 
     def test_image_size_uses_provider_native_casing(self) -> None:
@@ -112,6 +157,29 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(IMAGE.normalize_size("4:3"), "2304x1728")
         self.assertEqual(IMAGE.normalize_size("3:2"), "2496x1664")
         self.assertEqual(IMAGE.normalize_size("21:9"), "3136x1344")
+        self.assertEqual(IMAGE.resolve_size("16:9", "3K"), "4272x2400")
+
+        lite = IMAGE.build_payload(
+            model="doubao-seedream-5-0-260128",
+            prompt="three panels",
+            images=[],
+            aspect_ratio="16:9",
+            resolution="2K",
+            count=3,
+        )
+        self.assertEqual(lite["sequential_image_generation_options"], {"max_images": 3})
+        self.assertNotIn("max_images", lite)
+        pro = IMAGE.build_payload(
+            model=IMAGE.PRO_MODEL,
+            prompt="one panel",
+            images=[],
+            aspect_ratio="1:1",
+            resolution="1.5K",
+            count=1,
+        )
+        self.assertNotIn("sequential_image_generation", pro)
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            IMAGE.validate_request("ark-api", IMAGE.PRO_MODEL, "2K", 2)
 
     def test_video_settings_and_terminal_states_match_task_contract(self) -> None:
         settings = VIDEO.build_generation_settings(
@@ -128,9 +196,32 @@ class ArkSkillProtocolTests(unittest.TestCase):
             "watermark": False,
         })
         self.assertEqual(VIDEO.TERMINAL_FAILURE_STATUSES, {"failed", "cancelled", "expired"})
-        self.assertIn(-1, VIDEO.SUPPORTED_DURATIONS)
-        self.assertNotIn(2, VIDEO.SUPPORTED_DURATIONS)
-        self.assertEqual(VIDEO.SUPPORTED_RESOLUTIONS, ("480p", "720p"))
+        plan_content, plan_settings = VIDEO.build_request(
+            backend="ark-agent-plan",
+            model="doubao-seedance-2.0-fast",
+            prompt="robot waves",
+            image_url=None,
+            duration=5,
+            aspect_ratio="9:16",
+            resolution="720p",
+            generate_audio=True,
+        )
+        self.assertIn("--dur 5 --ratio 9:16 --rs 720p", plan_content[0]["text"])
+        self.assertEqual(plan_settings, {"generate_audio": True})
+        api_content, api_settings = VIDEO.build_request(
+            backend="ark-api",
+            model="doubao-seedance-2-5-260628",
+            prompt="robot waves",
+            image_url=None,
+            duration=30,
+            aspect_ratio="16:9",
+            resolution="720p",
+            generate_audio=False,
+        )
+        self.assertEqual(api_content[0]["text"], "robot waves")
+        self.assertEqual(api_settings["duration"], 30)
+        with self.assertRaisesRegex(ValueError, "resolutions"):
+            VIDEO.validate_generation("ark-api", "doubao-seedance-2-0-fast-260128", 5, "1080p")
 
     def test_search_enforces_query_and_site_limits(self) -> None:
         sites = "|".join(f"{index}.example" for index in range(1, 21))
@@ -161,7 +252,17 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(params["speaker"], "voice-id")
         self.assertEqual(params["audio_params"]["format"], "mp3")
         self.assertTrue(params["audio_params"]["enable_subtitle"])
-        self.assertNotIn("enable_subtitle", json.loads(params["additions"]))
+        self.assertTrue(json.loads(params["additions"])["enable_subtitle"])
+        self.assertEqual(params["audio_params"]["speed_ratio"], 1.0)
+        segment = TTS.words_to_segment({
+            "text": "official protocol",
+            "words": [
+                {"word": "official", "startTime": 0.125, "endTime": 0.5},
+                {"word": " protocol", "startTime": 0.5, "endTime": 1.25},
+            ],
+        }, 0)
+        self.assertEqual(segment["start_time_ms"], 125)
+        self.assertEqual(segment["end_time_ms"], 1250)
 
     def test_stt_receives_while_audio_is_still_being_sent(self) -> None:
         class FakeWebSocket:

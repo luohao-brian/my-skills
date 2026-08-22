@@ -12,22 +12,23 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-# Official Responses API quick start and response object:
-# https://www.volcengine.com/docs/82379/1795150?lang=zh
-# https://www.volcengine.com/docs/82379/1783703?lang=zh
-# Agent Plan exposes the same request shape under the fixed /api/plan/v3 base.
+# Ark vision uses the OpenAI-compatible multimodal Chat Completions contract.
 DEFAULT_BACKEND = "ark-agent-plan"
 BACKENDS = {
     "ark-agent-plan": {
         "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
         "api_key_env": "ARK_AGENT_PLAN_API_KEY",
-        "model": "doubao-seed-2-0-lite",
+        "model": "doubao-seed-2.0-lite",
     },
     "ark-api": {
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
         "api_key_env": "ARK_API_KEY",
         "model": "doubao-seed-2-0-lite-260428",
     },
+}
+BACKEND_MODELS = {
+    "ark-agent-plan": ("doubao-seed-2.0-lite", "doubao-seed-2.0-mini"),
+    "ark-api": ("doubao-seed-2-0-lite-260428", "doubao-seed-2-0-mini-260428"),
 }
 MAX_OUTPUT_TOKENS = 2000
 TEMPERATURE = 0.1
@@ -78,67 +79,71 @@ def media_type(reference: str) -> str:
     return "video" if Path(path).suffix.lower() in VIDEO_EXTENSIONS else "image"
 
 
-def build_media_content(reference: str) -> tuple[dict[str, str], str]:
+def build_media_content(reference: str) -> tuple[dict[str, Any], str]:
     normalized = normalize_image(reference)
     kind = media_type(reference)
     if kind == "video":
-        return {"type": "input_video", "video_url": normalized}, kind
-    return {"type": "input_image", "image_url": normalized}, kind
+        return {"type": "video_url", "video_url": {"url": normalized}}, kind
+    return {"type": "image_url", "image_url": {"url": normalized}}, kind
 
 
-def extract_responses_text(payload: dict[str, Any]) -> str:
-    output_text = payload.get("output_text")
-    if isinstance(output_text, str) and output_text.strip():
-        return output_text.strip()
-
-    chunks: list[str] = []
-    for item in payload.get("output") or []:
-        if not isinstance(item, dict):
-            continue
-        for content in item.get("content") or []:
-            if not isinstance(content, dict):
-                continue
-            text = content.get("text") or content.get("output_text")
-            if isinstance(text, str) and text.strip():
-                chunks.append(text.strip())
-    return "\n".join(chunks).strip()
+def extract_chat_text(payload: dict[str, Any]) -> str:
+    choices = payload.get("choices") or []
+    if not isinstance(choices, list) or not choices:
+        return ""
+    content = (choices[0].get("message") or {}).get("content")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return "\n".join(
+            str(item.get("text") or "").strip()
+            for item in content
+            if isinstance(item, dict) and str(item.get("text") or "").strip()
+        ).strip()
+    return ""
 
 
 def response_error(response: Any) -> str:
+    message = ""
     try:
         payload = response.json()
         error = payload.get("error")
         if isinstance(error, dict) and error.get("message"):
-            return str(error["message"])[:800]
+            message = str(error["message"])
         if isinstance(error, str) and error:
-            return error[:800]
+            message = error
     except Exception:
         pass
-    return response.text[:800]
+    if not message:
+        message = response.text[:800]
+    request_id = response.headers.get("x-request-id") or response.headers.get("x-client-request-id")
+    return f"HTTP {response.status_code}: {message[:800]}" + (f"; request_id={request_id}" if request_id else "")
 
 
 def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
     requests = _require_requests()
     profile, api_key = resolve_backend(args.backend)
+    model = args.model or profile["model"]
+    if model not in BACKEND_MODELS[args.backend]:
+        raise ValueError(f"Model {model} is not supported by backend {args.backend}")
 
     media_content, input_type = build_media_content(args.image)
     payload = {
-        "model": profile["model"],
-        "input": [
+        "model": model,
+        "messages": [
             {
-                "type": "message",
                 "role": "user",
                 "content": [
                     media_content,
-                    {"type": "input_text", "text": args.question},
+                    {"type": "text", "text": args.question},
                 ],
             }
         ],
         "temperature": TEMPERATURE,
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_tokens": MAX_OUTPUT_TOKENS,
     }
     response = requests.post(
-        f"{profile['base_url']}/responses",
+        f"{profile['base_url']}/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
         timeout=REQUEST_TIMEOUT_SECONDS,
@@ -147,7 +152,7 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(response_error(response))
 
     body = response.json()
-    analysis = extract_responses_text(body)
+    analysis = extract_chat_text(body)
     if not analysis:
         raise RuntimeError("Vision response contained no analysis text")
     result: dict[str, Any] = {
@@ -156,7 +161,7 @@ def analyze_image(args: argparse.Namespace) -> dict[str, Any]:
         "backend": args.backend,
         "media_type": input_type,
         "analysis": analysis,
-        "model": profile["model"],
+        "model": model,
         "image": args.image,
     }
     if args.raw:
@@ -170,6 +175,7 @@ def main() -> int:
     parser.add_argument("question", help="Question or extraction instruction about the media")
     parser.add_argument("--json", action="store_true", help="Print structured JSON instead of plain analysis text")
     parser.add_argument("--raw", action="store_true", help="Include raw provider response in JSON output")
+    parser.add_argument("--model", help="Backend-compatible model override")
     parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()
 
@@ -182,7 +188,7 @@ def main() -> int:
             "backend": args.backend,
             "media_type": media_type(args.image),
             "error": str(exc),
-            "model": BACKENDS[args.backend]["model"],
+            "model": args.model or BACKENDS[args.backend]["model"],
             "image": args.image,
         }
         print(json.dumps(error, ensure_ascii=False), file=sys.stderr)
