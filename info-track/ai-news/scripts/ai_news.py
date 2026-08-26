@@ -191,11 +191,6 @@ def is_noise_entry(item: dict[str, str], source_id: str, window: dict[str, Any])
         return True
     if re.match(r"^\d+\s*天前", title):
         return True
-    if source_id == "tmtpost-edge-ai-daily" and window.get("date"):
-        month = int(str(window["date"])[5:7])
-        day = int(str(window["date"])[8:10])
-        if f"{month}月{day}日" not in title:
-            return True
     if lowered_title in {"research", "product", "announcements", "policy"}:
         return True
     return False

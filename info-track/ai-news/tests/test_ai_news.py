@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -12,6 +13,11 @@ SPEC = importlib.util.spec_from_file_location("ai_news", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+from adapters import html_index as HTML_INDEX
+
+
+TZ = timezone(timedelta(hours=8))
 
 
 class AiNewsDiagnosticsTests(unittest.TestCase):
@@ -126,6 +132,79 @@ class AiNewsDiagnosticsTests(unittest.TestCase):
                 "localhost,127.0.0.1,::1,example.cn",
             )
             install_opener.assert_called_once()
+
+
+class TmtpostAdapterTests(unittest.TestCase):
+    def test_current_linked_blocks_use_individual_article_urls(self) -> None:
+        html = """
+        <blockquote><p><a href="/agent/ai-article?id=20045"><strong>
+        一、结构性而非周期性：德意志银行为何把核心总账搬上谷歌云
+        </strong></a></p></blockquote>
+        <p>1.德意志银行将核心财务平台迁移至谷歌云。</p>
+        <p>2.AI 研究助手嵌入研究生产流程。</p>
+        """
+
+        items = HTML_INDEX._parse_tmtpost_daily(
+            html,
+            "https://www.tmtpost.com/8116690.html",
+            "2026-08-26",
+        )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["title"], "结构性而非周期性：德意志银行为何把核心总账搬上谷歌云")
+        self.assertEqual(
+            items[0]["source_url"],
+            "https://www.tmtpost.com/agent/ai-article?id=20045",
+        )
+        self.assertIn("AI 研究助手", items[0]["summary_basis"])
+
+    def test_legacy_unlinked_blocks_keep_daily_url(self) -> None:
+        html = "<blockquote>一、旧格式标题</blockquote><p>旧格式摘要。</p>"
+        daily_url = "https://www.tmtpost.com/legacy.html"
+
+        items = HTML_INDEX._parse_tmtpost_daily(html, daily_url, "2026-08-25")
+
+        self.assertEqual(items[0]["source_url"], daily_url)
+        self.assertEqual(items[0]["title"], "旧格式标题")
+
+    def test_exact_date_selects_daily_before_parsing_child_titles(self) -> None:
+        source = {"url": "https://www.tmtpost.com/user/7944025"}
+        window = {
+            "date": "2026-08-26",
+            "start": datetime(2026, 8, 26, tzinfo=TZ),
+            "end": datetime(2026, 8, 26, 23, 59, 59, tzinfo=TZ),
+        }
+        index_items = [
+            {
+                "title": "Edge AI Daily 早报（8月26日）",
+                "source_url": "https://www.tmtpost.com/8116690.html",
+                "published_at": "2026-08-26",
+                "summary_basis": "Edge AI Daily 早报（8月26日）",
+            }
+        ]
+        daily_html = "<blockquote>一、子条目标题不含日期</blockquote><p>完整摘要。</p>"
+        with (
+            mock.patch.object(HTML_INDEX, "fetch_generic_html", return_value=index_items),
+            mock.patch.object(HTML_INDEX, "fetch_text", return_value=daily_html),
+        ):
+            items = HTML_INDEX.fetch_tmtpost(source, window)
+
+        self.assertEqual([item["title"] for item in items], ["子条目标题不含日期"])
+        self.assertFalse(MODULE.is_noise_entry(items[0], "tmtpost-edge-ai-daily", window))
+
+    def test_exact_date_without_matching_daily_returns_no_generic_links(self) -> None:
+        source = {"url": "https://www.tmtpost.com/user/7944025"}
+        window = {"date": "2026-08-26"}
+        stale_items = [
+            {
+                "title": "Edge AI Daily 早报（8月25日）",
+                "source_url": "https://www.tmtpost.com/8115451.html",
+                "published_at": "2026-08-26",
+                "summary_basis": "Edge AI Daily 早报（8月25日）",
+            }
+        ]
+        with mock.patch.object(HTML_INDEX, "fetch_generic_html", return_value=stale_items):
+            self.assertEqual(HTML_INDEX.fetch_tmtpost(source, window), [])
 
 
 if __name__ == "__main__":

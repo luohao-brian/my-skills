@@ -138,6 +138,8 @@ def fetch_tmtpost(source: dict[str, Any], window: dict[str, Any] | None = None) 
         and (not target or target in item["title"])
     ]
     if not daily_items:
+        if window and window.get("date"):
+            return []
         return items
 
     daily = daily_items[0]
@@ -294,6 +296,8 @@ def _parse_tmtpost_daily(html: str, url: str, published_at: str) -> list[dict[st
         title = re.sub(r"^[一二三四五六七八九十]+、\s*", "", title)
         if not title:
             continue
+        href_match = LINK_RE.search(block.group(0))
+        source_url = absolutize_url(url, href_match.group(1)) if href_match else url
         start = block.end()
         end = blocks[index + 1].start() if index + 1 < len(blocks) else len(html)
         segment = html[start:end]
@@ -303,7 +307,7 @@ def _parse_tmtpost_daily(html: str, url: str, published_at: str) -> list[dict[st
         items.append(
             {
                 "title": title,
-                "source_url": url,
+                "source_url": source_url,
                 "published_at": published_at,
                 "summary_basis": summary,
             }
