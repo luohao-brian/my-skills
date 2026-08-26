@@ -59,8 +59,12 @@ Hermes' cache before reporting success.
 - Vision and video understanding use multimodal Chat Completions.
 - Seedream Lite uses nested
   `sequential_image_generation_options.max_images`; Pro stays single-image.
-- Seedance Agent Plan embeds `--dur`, `--ratio`, and `--rs`; Ark API sends
-  structured task fields.
+- Seedance Agent Plan and Ark API both send duration, ratio, resolution, audio,
+  and watermark as structured task fields. The provider maps `image_url` to
+  `first_frame` and `reference_image_urls` to ordered `reference_image` items.
+- Seedance capabilities are model-specific. The Hermes provider does not
+  rewrite prompts or expose edit, extend, video-reference, or audio-reference
+  behavior that is absent from Hermes' unified video tool.
 - BigASR receives 16 kHz, mono, signed 16-bit PCM in paced 200 ms packets while
   a concurrent reader consumes provider frames.
 - TTS parses audio and timing events from the same Seed-TTS 2.0 stream.

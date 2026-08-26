@@ -22,6 +22,11 @@ the plugin never crosses backends automatically when a request fails.
   endpoints, models, parameters, and error messages.
 - Aligns Seedream 5.0, Seedance 2.0/2.5, Seed-TTS 2.0, BigASR, and Doubao Seed
   vision contracts with the current `my-cowork` implementation.
+- Publishes Seedance capabilities per model, maps `image_url` to a strict first
+  frame, and maps every `reference_image_urls` entry to a reference image.
+- Sends Seedance duration, ratio, resolution, audio, and watermark as structured
+  task fields for both Agent Plan and Ark API. Seedance 2.x does not accept a seed.
+- Keeps a successful remote video URL when local cache download fails.
 
 ## Install
 

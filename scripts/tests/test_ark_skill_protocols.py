@@ -6,6 +6,7 @@ import os
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -154,10 +155,9 @@ class ArkSkillProtocolTests(unittest.TestCase):
     def test_image_size_uses_provider_native_casing(self) -> None:
         self.assertEqual(IMAGE.normalize_size("2k"), "2K")
         self.assertEqual(IMAGE.normalize_size("4K"), "4K")
-        self.assertEqual(IMAGE.normalize_size("4:3"), "2304x1728")
-        self.assertEqual(IMAGE.normalize_size("3:2"), "2496x1664")
-        self.assertEqual(IMAGE.normalize_size("21:9"), "3136x1344")
-        self.assertEqual(IMAGE.resolve_size("16:9", "3K"), "4272x2400")
+        self.assertEqual(IMAGE.normalize_size("4:3"), "4:3")
+        self.assertEqual(IMAGE.normalize_size("2048X1024"), "2048x1024")
+        self.assertEqual(IMAGE.resolve_size("16:9", "3K"), "3K")
 
         lite = IMAGE.build_payload(
             model="doubao-seedream-5-0-260128",
@@ -167,6 +167,8 @@ class ArkSkillProtocolTests(unittest.TestCase):
             resolution="2K",
             count=3,
         )
+        self.assertEqual(lite["size"], "2K")
+        self.assertIn("画面宽高比为 16:9", lite["prompt"])
         self.assertEqual(lite["sequential_image_generation_options"], {"max_images": 3})
         self.assertNotIn("max_images", lite)
         pro = IMAGE.build_payload(
@@ -177,9 +179,41 @@ class ArkSkillProtocolTests(unittest.TestCase):
             resolution="1.5K",
             count=1,
         )
+        self.assertEqual(pro["size"], "1.5K")
+        self.assertNotIn("seed", pro)
         self.assertNotIn("sequential_image_generation", pro)
-        with self.assertRaisesRegex(ValueError, "exactly one"):
+        with self.assertRaisesRegex(ValueError, "1 to 1"):
             IMAGE.validate_request("ark-api", IMAGE.PRO_MODEL, "2K", 2)
+
+        layers = IMAGE.build_payload(
+            backend="ark-api",
+            model=IMAGE.PRO_MODEL,
+            prompt="",
+            images=["https://example.com/poster.png"],
+            aspect_ratio="1:1",
+            resolution="auto",
+            count=1,
+            layer_decomposition=True,
+        )
+        self.assertEqual(layers["image"], "https://example.com/poster.png")
+        self.assertEqual(layers["size"], "auto")
+        self.assertTrue(layers["layer_decomposition"])
+        self.assertNotIn("prompt", layers)
+        self.assertNotIn("layer_image", layers)
+        self.assertNotIn("layer_size", layers)
+
+        with self.assertRaisesRegex(ValueError, "must not exceed 15"):
+            IMAGE.validate_request(
+                "ark-agent-plan",
+                "doubao-seedream-5.0-lite",
+                "2K",
+                3,
+                image_count=13,
+            )
+        self.assertEqual(
+            IMAGE.normalize_image_input("https://example.com/reference.png"),
+            "https://example.com/reference.png",
+        )
 
     def test_video_settings_and_terminal_states_match_task_contract(self) -> None:
         settings = VIDEO.build_generation_settings(
@@ -206,8 +240,15 @@ class ArkSkillProtocolTests(unittest.TestCase):
             resolution="720p",
             generate_audio=True,
         )
-        self.assertIn("--dur 5 --ratio 9:16 --rs 720p", plan_content[0]["text"])
-        self.assertEqual(plan_settings, {"generate_audio": True})
+        self.assertEqual(plan_content[0]["text"], "robot waves")
+        self.assertEqual(plan_settings, {
+            "generate_audio": True,
+            "resolution": "720p",
+            "ratio": "9:16",
+            "duration": 5,
+            "watermark": False,
+        })
+        self.assertNotIn("--dur", plan_content[0]["text"])
         api_content, api_settings = VIDEO.build_request(
             backend="ark-api",
             model="doubao-seedance-2-5-260628",
@@ -215,13 +256,125 @@ class ArkSkillProtocolTests(unittest.TestCase):
             image_url=None,
             duration=30,
             aspect_ratio="16:9",
-            resolution="720p",
+            resolution="1080p",
             generate_audio=False,
+            output_format="mov",
+            return_last_frame=True,
         )
         self.assertEqual(api_content[0]["text"], "robot waves")
         self.assertEqual(api_settings["duration"], 30)
+        self.assertEqual(api_settings["resolution"], "1080p")
+        self.assertEqual(api_settings["output_format"], "mov")
+        self.assertTrue(api_settings["return_last_frame"])
         with self.assertRaisesRegex(ValueError, "resolutions"):
             VIDEO.validate_generation("ark-api", "doubao-seedance-2-0-fast-260128", 5, "1080p")
+        with self.assertRaisesRegex(ValueError, "resolutions"):
+            VIDEO.validate_generation("ark-api", "doubao-seedance-2-5-260628", 5, "4k")
+        VIDEO.validate_generation("ark-api", "doubao-seedance-2-0-260128", 15, "4k")
+
+    def test_video_material_roles_modes_and_order(self) -> None:
+        frames, frame_settings = VIDEO.build_request(
+            backend="ark-api",
+            model="doubao-seedance-2-5-260628",
+            prompt="move from first to last frame",
+            first_frame="https://example.com/first.png",
+            last_frame="https://example.com/last.png",
+            duration=5,
+            aspect_ratio="adaptive",
+            resolution="720p",
+            generate_audio=False,
+        )
+        self.assertEqual([item.get("role") for item in frames[1:]], ["first_frame", "last_frame"])
+        self.assertEqual(frame_settings["ratio"], "adaptive")
+
+        references, reference_settings = VIDEO.build_request(
+            backend="ark-api",
+            model="doubao-seedance-2-5-260628",
+            prompt="use @图像1, @视频1 and @音频1",
+            reference_images=["https://example.com/one.png", "https://example.com/two.png"],
+            reference_videos=["https://example.com/motion.mp4"],
+            reference_audios=["https://example.com/voice.mp3"],
+            duration=10,
+            aspect_ratio="16:9",
+            resolution="1080p",
+            generate_audio=True,
+            task_type="reference",
+        )
+        self.assertEqual(
+            [(item["type"], item.get("role")) for item in references[1:]],
+            [
+                ("image_url", "reference_image"),
+                ("image_url", "reference_image"),
+                ("video_url", "reference_video"),
+                ("audio_url", "reference_audio"),
+            ],
+        )
+        self.assertEqual(reference_settings["omni_reference_task_type"], "reference")
+        self.assertTrue(reference_settings["generate_audio"])
+
+        with self.assertRaisesRegex(ValueError, "cannot be combined"):
+            VIDEO.build_request(
+                backend="ark-api",
+                model="doubao-seedance-2-5-260628",
+                prompt="conflict",
+                first_frame="https://example.com/first.png",
+                reference_images=["https://example.com/reference.png"],
+                duration=5,
+                aspect_ratio="adaptive",
+                resolution="720p",
+                generate_audio=False,
+            )
+        with self.assertRaisesRegex(ValueError, "requires --aspect-ratio adaptive and --duration -1"):
+            VIDEO.validate_generation(
+                "ark-api",
+                "doubao-seedance-2-5-260628",
+                5,
+                "720p",
+                aspect_ratio="adaptive",
+                reference_videos=["https://example.com/edit.mp4"],
+                task_type="edit",
+            )
+        with self.assertRaisesRegex(ValueError, "must be combined"):
+            VIDEO.validate_generation(
+                "ark-agent-plan",
+                "doubao-seedance-2.0-fast",
+                5,
+                "720p",
+                reference_audios=["https://example.com/voice.mp3"],
+            )
+
+    def test_video_success_preserves_remote_result_when_download_fails(self) -> None:
+        task = SimpleNamespace(
+            status="succeeded",
+            model="doubao-seedance-2-5-260628",
+            content=SimpleNamespace(
+                video_url="https://example.com/result.mp4",
+                last_frame_url="https://example.com/last.png",
+            ),
+            duration=7,
+            ratio="9:16",
+            resolution="1080p",
+            generate_audio=True,
+            usage={"completion_tokens": 123},
+            request_id="request-1",
+            output_format="mp4",
+        )
+        with patch.object(VIDEO, "download_video", side_effect=OSError("offline")):
+            result = VIDEO.task_result(
+                task,
+                backend="ark-api",
+                task_id="task-1",
+                prompt="compiled prompt",
+                requested_model=None,
+                output_path=None,
+                download_timeout=5,
+            )
+        self.assertTrue(result["success"])
+        self.assertIsNone(result["local_path"])
+        self.assertEqual(result["video_url"], "https://example.com/result.mp4")
+        self.assertEqual(result["duration"], 7)
+        self.assertEqual(result["aspect_ratio"], "9:16")
+        self.assertIn("download failed", result["warnings"][0])
 
     def test_search_enforces_query_and_site_limits(self) -> None:
         sites = "|".join(f"{index}.example" for index in range(1, 21))
