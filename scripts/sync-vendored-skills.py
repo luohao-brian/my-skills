@@ -47,7 +47,17 @@ def different(left: Path, right: Path) -> bool:
 
 
 def frontmatter_version(skill_file: Path) -> str | None:
-    match = re.search(r"(?m)^version:\s*[\"']?([^\"'\n]+)", skill_file.read_text(encoding="utf-8"))
+    text = skill_file.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return None
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return None
+    frontmatter = parts[1]
+    match = re.search(
+        r"(?m)^[ \t]*version:\s*[\"']?([^\"'\n#]+)",
+        frontmatter,
+    )
     return match.group(1).strip() if match else None
 
 

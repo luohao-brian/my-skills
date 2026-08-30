@@ -12,7 +12,7 @@ Pinned upstream content lives under `upstream/`. Keep it unchanged.
 
 Read only what the current task needs:
 
-1. Choose a type with [`visual type guide`](references/upstream-sections/04-3-selection-semantic-pattern-then-visual-type--visual-type-guide-27.md), then read [`complexity budget`](references/upstream-sections/08-7-layout-spacing--complexity-budget-per-diagram.md), [`taste gate`](references/upstream-sections/10-9-pre-output-checklist-taste-gate.md), and [`output contract`](references/upstream-sections/13-12-output.md).
+1. Choose a type with [`visual type guide`](references/upstream-sections/04-3-selection-semantic-pattern-then-visual-type--visual-type-guide-39.md), then read [`complexity budget`](references/upstream-sections/08-7-layout-spacing--complexity-budget-per-diagram.md), [`taste gate`](references/upstream-sections/10-9-pre-output-checklist-taste-gate.md), and [`output contract`](references/upstream-sections/13-12-output.md).
 2. Read [`upstream/references/style-guide.md`](upstream/references/style-guide.md) and exactly one selected `upstream/references/type-*.md`. Read `semantic-patterns.md` only when behavior, state, enforcement, or risk carries the meaning.
 3. Load only the needed primitive section under `references/upstream-sections/07-6-core-svg-primitives--*.md`. For an editorial page, read [`summary card pattern`](references/upstream-sections/09-8-summary-card-pattern.md) and use the nearest `upstream/assets/template*.html`.
 4. For Draw.io or Mermaid input, read [`import routing`](references/upstream-sections/12-11-importing-an-existing-diagram-draw-io-and-mermaid.md), the matching `upstream/references/import-*.md`, and `output-spec.md`. Read `export.md` only when SVG or PNG is requested.

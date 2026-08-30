@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "repository": "https://github.com/cathrynlavery/diagram-design.git",
-  "commit": "f3622cf66a3c557cb2ead57b687a3c1ff63f5a2b",
+  "commit": "b52a33bfeef85d43995193ee52c13b485154b7b4",
   "source_path": "skills/diagram-design",
-  "skill_version": "2.3",
-  "package_version": "2.3.2",
+  "skill_version": "2.6",
+  "package_version": "2.6.11",
   "package_manifest": ".claude-plugin/plugin.json",
   "license_path": "LICENSE",
-  "synced_at": "2026-08-13"
+  "synced_at": "2026-08-30"
 }

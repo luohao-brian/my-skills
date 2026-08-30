@@ -26,10 +26,24 @@ Source section: `Complexity budget (per diagram)`
 | Max radar axes | 5 |
 | Max radar series | 5 |
 | Max focal radar series | 1 |
+| Max polar categories | 8 |
+| Max polar series | 1 |
+| Max focal polar categories | 1 |
 | Max bars (bar chart) | 8 |
+| Max cells (treemap) | 8 |
 | Max series (line chart) | 5 |
 | Max tasks (Gantt) | 12 |
 | Max points (scatter plot) | 30 |
+| Max stages / nodes / flows (sankey) | 3 / 8 / 12 |
+| Max categories (fishbone) | 6 bones, 3 sub-causes each |
+| Max components / links (wardley) | 9 / 12, 2 movement arrows |
+| Max columns / cards (kanban) | 5 / 12 total, 4 per column |
+| Max stages / rows (user journey) | 6 / 3, 2 pain markers |
+| Max zones / nodes / paths (deployment) | 3 / 6 / 8, 9 artifacts |
+| Max nodes / edges (dependency) | 9 / 14, 4 ranks, 1 cycle |
+| Max classes / relationships (UML class) | 7 / 8, 5 members per compartment |
+| Max activities / slices / cards (story map) | 5 / 3 / 12 |
+| Max tables / columns / FKs (db schema) | 5 / 8 shown / 6 |
 | Max annotation callouts | 2 |
 | Max motion (optional) | 8 steps, 12 marked items, 2 simultaneous items — see [animation.md](../../upstream/references/animation.md) |
 

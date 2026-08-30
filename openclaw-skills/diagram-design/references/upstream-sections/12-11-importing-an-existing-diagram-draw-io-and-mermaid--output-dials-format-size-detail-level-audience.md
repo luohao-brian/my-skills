@@ -13,9 +13,6 @@ Every imported diagram is shaped by four decisions. Full spec in [`references/ou
 | **Detail** | `faithful` (≤24 nodes, zoned) · `balanced` (≤12) · `simplified` (≤7) | `balanced` |
 | **Audience** | `engineer` · `mixed` · `executive` — governs wording, not count | `mixed` |
 
-Two consequences worth remembering here:
-
-- The size preset sets the `viewBox` **and** the type ramp. A slide gets 16px node names, not 12px — scaling the canvas without scaling the type is how projected diagrams end up unreadable.
-- `faithful` is the one documented exemption from the §7 complexity budget, and it's conditional: above 9 nodes the layout must be zoned, above 24 it must split into overview + detail. The connector rules in §6 never relax.
+Two consequences: the size preset sets the `viewBox` **and** the type ramp (a slide gets 16px node names, not 12px), and `faithful` is the only exemption from the §7 budget — conditional, zoned above 9 nodes, split above 24. The §6 connector rules never relax.
 
 ---

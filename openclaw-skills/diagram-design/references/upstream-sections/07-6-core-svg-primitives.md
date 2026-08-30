@@ -4,7 +4,7 @@ Source section: `6. Core SVG Primitives`
 
 ## 6. Core SVG Primitives
 
-Universal building blocks. Type-specialized primitives (lifeline, activation bar, region) live in the relevant `references/type-*.md`. Optional primitives:
+Universal building blocks. Type-specialized primitives (lifeline, activation bar, region) live in the relevant type reference linked in the guide. Optional primitives:
 
 - Editorial callouts → [primitive-annotation.md](../../upstream/references/primitive-annotation.md)
 - Hand-drawn variant → [primitive-sketchy.md](../../upstream/references/primitive-sketchy.md)
