@@ -42,7 +42,7 @@
 - 如果任务涉及 OpenClaw metadata、触发描述、homepage、依赖或安装方式，优先修改对应 `SKILL.md`。
 - 如果任务涉及火山 Ark 调用、签名、输出 JSON 或错误处理，修改对应 `openclaw-skills/<skill>/scripts/*.py`。
 - 如果任务涉及 Hermes provider 行为，修改 `hermes-plugins/hermes-ark-plugin/`。
-- 如果任务涉及 skill 标准或前台展示字段，先参考 `docs/OPENCLAW-SKILL.md`，并以 `../openclaw/docs/tools/skills.md` 当前实现为准。
+- 如果任务涉及 skill 标准或前台展示字段，以 `docs/OPENCLAW-SKILL.md` 和 `scripts/verify-repo.sh` 的仓库内合同为准；新增字段时先更新合同与校验器。
 
 ## 渐进式加载约定
 
