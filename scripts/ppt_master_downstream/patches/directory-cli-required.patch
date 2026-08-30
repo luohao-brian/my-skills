@@ -1,10 +1,11 @@
 diff --git a/scripts/project_management/cli.py b/scripts/project_management/cli.py
+index 8cbf8cb..fe52734 100644
 --- a/scripts/project_management/cli.py
 +++ b/scripts/project_management/cli.py
-@@ -1076,7 +1076,11 @@ def build_parser() -> argparse.ArgumentParser:
-     init = subparsers.add_parser("init", help="Create a project directory")
-     init.add_argument("project_name", help="Project name")
-     init.add_argument("--format", default="ppt169", help="Canvas format (default: ppt169)")
+@@ -1108,7 +1108,11 @@ def build_parser() -> argparse.ArgumentParser:
+         default=None,
+         help="Registered canvas format; omit to determine the canvas during authoring",
+     )
 -    init.add_argument("--dir", default=None, help="Base directory for the project")
 +    init.add_argument(
 +        "--dir",

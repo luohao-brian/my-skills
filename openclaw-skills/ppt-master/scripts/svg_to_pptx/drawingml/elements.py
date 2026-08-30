@@ -23,7 +23,14 @@ from pptx_shapes import (
     load_shape_type_values,
     validate_ooxml_xfrm,
 )
-from pptx_effects import EFFECT_REASON_ATTR, EFFECT_STATUS_ATTR
+from pptx_effects import (
+    EFFECT_REASON_ATTR,
+    EFFECT_STATUS_ATTR,
+    NATIVE_EFFECT_ATTR,
+    NATIVE_EFFECT_SHA256_ATTR,
+    preserved_native_effect_xml,
+)
+from hyperlink_contract import svg_hyperlink_href
 from pptx_to_svg.preset_authoring import AUTHORING_ATTR, AUTHORING_VALUE
 from resource_paths import (
     resolve_external_image_reference,
@@ -36,11 +43,18 @@ from .context import (
     ConvertContext,
     ShapeResult,
 )
+from .hyperlinks import (
+    HYPERLINK_ACTION_KEY,
+    HYPERLINK_RID_KEY,
+    hyperlink_click_xml,
+    hyperlink_run_metadata,
+)
 from .theme_colors import color_node_xml
 from .theme_fonts import theme_font_tokens
 from .text_properties import (
     drawingml_letter_spacing,
     normalize_project_text_segments,
+    parse_project_baseline_shift,
     parse_project_font_style,
     parse_project_font_weight,
     parse_project_letter_spacing,
@@ -56,7 +70,7 @@ from .utils import (
     ctx_x, ctx_y, ctx_w, ctx_h,
     rect_to_dml_xfrm,
     combine_opacity, parse_hex_color, parse_svg_color,
-    resolve_url_id, get_effective_filter_id,
+    resolve_project_text_image_fill, resolve_url_id, get_effective_filter_id,
     parse_inline_style, parse_font_family, is_cjk_char,
     detect_text_lang, estimate_text_cluster_widths, font_px_to_hpt,
     resolve_text_run_fonts, split_project_text_clusters,
@@ -83,16 +97,21 @@ from .paths import (
 )
 
 
-def _resolve_external_image(svg_dir: Path, href: str) -> Path:
+def _resolve_external_image(
+    svg_dir: Path,
+    href: str,
+    resource_root: Path | None = None,
+) -> Path:
     """Resolve a non-data-URI image href to a file on disk.
 
-    Search order: next to the SVG (``svg_output/``), the project root, the
-    project's ``images/`` (the single runtime image pool — template-bundled
-    bitmaps plus AI / web / user images all live here), then ``templates/``
-    (legacy flat-copied template assets). Raises ``FileNotFoundError`` if none
-    of these exist.
+    The href is interpreted exactly relative to the owning SVG and must remain
+    inside the project. No root, ``images/``, or template-path guessing occurs.
     """
-    candidate = resolve_external_image_reference(svg_dir, href)
+    candidate = resolve_external_image_reference(
+        svg_dir,
+        href,
+        project_root=resource_root,
+    )
     if candidate is not None:
         return candidate
     raise FileNotFoundError(f'External image not found: {href}')
@@ -348,6 +367,7 @@ def _project_image_href(elem: ET.Element) -> str:
 def load_project_image_source(
     elem: ET.Element,
     svg_dir: Path | None,
+    resource_root: Path | None = None,
 ) -> ProjectImageSource:
     """Load one exact SVG image source or raise a contract error."""
     if elem.tag != f'{{{SVG_NS}}}image':
@@ -366,7 +386,7 @@ def load_project_image_source(
     if svg_dir is None:
         raise ValueError('external image requires an SVG directory context')
     try:
-        img_path = _resolve_external_image(svg_dir, href)
+        img_path = _resolve_external_image(svg_dir, href, resource_root)
     except FileNotFoundError as exc:
         raise ValueError(str(exc)) from exc
     img_format = _normalize_project_image_format(img_path.suffix)
@@ -391,6 +411,7 @@ def project_image_errors(
     svg_dir: Path | None,
     *,
     allow_template_placeholders: bool = False,
+    resource_root: Path | None = None,
 ) -> list[str]:
     """Return source and frame errors for exact SVG image elements."""
     errors: list[str] = []
@@ -435,7 +456,7 @@ def project_image_errors(
         ):
             continue
         try:
-            load_project_image_source(elem, svg_dir)
+            load_project_image_source(elem, svg_dir, resource_root)
         except ValueError as exc:
             errors.append(f'{label} invalid image source: {exc}')
     return sorted(errors)
@@ -449,6 +470,7 @@ def _wrap_shape(
     effect_xml: str = '', extra_xml: str = '',
     rot: int = 0,
     xfrm_attr: str = '',
+    placeholder_xml: str = '',
 ) -> str:
     """Wrap DrawingML content into a <p:sp> shape element."""
     rot_attr = f' rot="{rot}"' if rot else ''
@@ -456,7 +478,7 @@ def _wrap_shape(
     return f'''<p:sp>
 <p:nvSpPr>
 <p:cNvPr id="{shape_id}" name="{_xml_escape(name)}"/>
-<p:cNvSpPr/><p:nvPr/>
+<p:cNvSpPr/><p:nvPr>{placeholder_xml}</p:nvPr>
 </p:nvSpPr>
 <p:spPr>
 <a:xfrm{xfrm_attrs}><a:off x="{off_x}" y="{off_y}"/><a:ext cx="{ext_cx}" cy="{ext_cy}"/></a:xfrm>
@@ -520,6 +542,8 @@ def _wrap_geometry_object(
     xfrm_attr: str = '',
 ) -> str:
     """Wrap a semantic leaf as a shape or connector without guessing."""
+    if not effect_xml:
+        effect_xml = _element_effect_xml(elem, ctx)
     name = elem.get('data-pptx-shape-name') or name
     shape_style_xml = _decode_shape_style(elem)
     object_kind = elem.get('data-pptx-object')
@@ -537,6 +561,7 @@ def _wrap_geometry_object(
             effect_xml,
             extra_xml=shape_style_xml,
             xfrm_attr=xfrm_attr,
+            placeholder_xml=_imported_placeholder_xml(elem),
         )
 
     prst = elem.get('data-pptx-prst')
@@ -561,6 +586,56 @@ def _wrap_geometry_object(
         connection_xml=_connector_connection_xml(elem, ctx),
         extra_xml=shape_style_xml,
     )
+
+
+def _imported_placeholder_xml(elem: ET.Element) -> str:
+    """Restore an imported slide placeholder marker when its identity is exact."""
+    placeholder_type = elem.get('data-ph-type')
+    placeholder_index = elem.get('data-pptx-placeholder-index')
+    if not placeholder_type or placeholder_index is None:
+        return ''
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', placeholder_type):
+        raise ValueError(
+            f'Invalid imported placeholder type: {placeholder_type!r}'
+        )
+    if not placeholder_index.isdigit() or int(placeholder_index) > 0xFFFFFFFF:
+        raise ValueError(
+            f'Invalid imported placeholder index: {placeholder_index!r}'
+        )
+    attrs = {
+        'type': placeholder_type,
+        'idx': placeholder_index,
+    }
+    placeholder_size = elem.get('data-pptx-placeholder-size')
+    if placeholder_size is not None:
+        if placeholder_size not in {'full', 'half', 'quarter'}:
+            raise ValueError(
+                f'Invalid imported placeholder size: {placeholder_size!r}'
+            )
+        attrs['sz'] = placeholder_size
+    orientation = elem.get('data-pptx-placeholder-orientation')
+    if orientation is not None:
+        if orientation not in {'horz', 'vert'}:
+            raise ValueError(
+                f'Invalid imported placeholder orientation: {orientation!r}'
+            )
+        attrs['orient'] = orientation
+    serialized = ' '.join(
+        f'{name}="{_xml_escape(value)}"'
+        for name, value in attrs.items()
+    )
+    return f'<p:ph {serialized}/>'
+
+
+def _element_effect_xml(elem: ET.Element, ctx: ConvertContext) -> str:
+    """Honor an authored SVG filter before the imported native fallback."""
+    filt_id = get_effective_filter_id(elem, ctx)
+    if filt_id and filt_id in ctx.defs:
+        return build_effect_xml(
+            ctx.defs[filt_id],
+            get_element_opacity(elem, ctx),
+        )
+    return preserved_native_effect_xml(elem) or ''
 
 
 def _decode_shape_style(elem: ET.Element) -> str:
@@ -1957,6 +2032,41 @@ _TEXT_BULLET_MARKERS = {
 _TEXT_BULLET_RE = re.compile(
     r'^(?P<prefix>\s*)(?P<marker>[·•●▪■◆◇◦‣])(?P<space>\s*)'
 )
+_INLINE_FORMULA_ATTR = 'data-pptx-inline-formula'
+_INLINE_FORMULA_KEY = '_inline_formula_latex'
+
+
+def _text_line_vertical_extent(
+    runs: list[dict[str, Any]],
+    font_size: float,
+) -> tuple[float, float, bool]:
+    """Return native-math-aware ascent/descent for one authored text line."""
+    ascent = font_size * 0.85
+    descent = font_size * 0.35
+    has_inline_formula = False
+    from ..native_objects.formula_compiler import (
+        estimate_inline_formula_vertical_extent,
+    )
+
+    for run in runs:
+        latex = run.get(_INLINE_FORMULA_KEY)
+        if latex is None:
+            continue
+        has_inline_formula = True
+        run_font_size = float(run.get('font_size', font_size))
+        extent = estimate_inline_formula_vertical_extent(str(latex))
+        ascent = max(ascent, run_font_size * extent.ascent_em)
+        descent = max(descent, run_font_size * extent.descent_em)
+    return ascent, descent, has_inline_formula
+
+
+def _native_text_line_frame_height(
+    ascent: float,
+    descent: float,
+    font_size: float,
+) -> float:
+    """Add the ordinary text-frame headroom to one visible line extent."""
+    return ascent + descent + font_size * 0.30
 
 
 def _normalize_text_run_whitespace(
@@ -2172,6 +2282,12 @@ def _extract_text_bullet(
     runs: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     """Convert a leading text bullet marker into paragraph metadata."""
+    first_nonspace = _first_nonspace_run(runs)
+    if first_nonspace and (
+        first_nonspace.get(_INLINE_FORMULA_KEY) is not None
+        or first_nonspace.get(HYPERLINK_RID_KEY) is not None
+    ):
+        return runs, None
     full_text = ''.join(str(run.get('text', '')) for run in runs)
     match = _TEXT_BULLET_RE.match(full_text)
     if not match:
@@ -2334,6 +2450,11 @@ def _override_run_attrs(
         run_attrs['font_weight'] = parse_project_font_weight(
             tspan_attr('font-weight')
         ).canonical
+    raw_baseline_shift = tspan.get('baseline-shift')
+    if raw_baseline_shift is not None:
+        run_attrs['baseline_shift'] = int(
+            parse_project_baseline_shift(raw_baseline_shift).value
+        )
     if tspan_attr('fill'):
         child_fill = tspan_attr('fill')
         run_attrs['fill_raw'] = child_fill
@@ -2385,33 +2506,68 @@ def _collect_tspan_runs(
     ctx: ConvertContext,
     inherited_xml_space: str = 'default',
 ) -> list[dict[str, Any]]:
-    """Recursively turn a tspan subtree into runs, propagating styling through nested tspans.
+    """Recursively turn one inline SVG subtree into DrawingML text runs."""
+    return _collect_inline_runs(
+        tspan,
+        inherited_attrs,
+        ctx,
+        inherited_xml_space,
+    )
 
-    Order: tspan.text → (each nested child tspan's runs → that child's tail under THIS tspan's attrs).
-    """
+
+def _collect_inline_runs(
+    container: ET.Element,
+    inherited_attrs: dict[str, Any],
+    ctx: ConvertContext,
+    inherited_xml_space: str = 'default',
+    inherited_hyperlink: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Collect nested ``tspan``/``a`` content with style and link inheritance."""
     runs: list[dict[str, Any]] = []
-    own_attrs = _override_run_attrs(inherited_attrs, tspan, ctx)
-    own_xml_space = resolve_project_xml_space(tspan, inherited_xml_space)
+    own_attrs = _override_run_attrs(inherited_attrs, container, ctx)
+    own_xml_space = resolve_project_xml_space(container, inherited_xml_space)
+    container_tag = container.tag.replace(f'{{{SVG_NS}}}', '')
+    own_hyperlink = inherited_hyperlink
+    if container_tag == 'a':
+        own_hyperlink = hyperlink_run_metadata(
+            ctx,
+            svg_hyperlink_href(container),
+        )
 
-    if tspan.text:
-        runs.append({
+    if container.text:
+        run = {
             **own_attrs,
-            'text': tspan.text,
+            'text': container.text,
             '_xml_space': own_xml_space,
-        })
+        }
+        if own_hyperlink is not None:
+            run.update(own_hyperlink)
+        inline_formula = container.get(_INLINE_FORMULA_ATTR)
+        if inline_formula is not None:
+            run[_INLINE_FORMULA_KEY] = inline_formula
+        runs.append(run)
 
-    for child in tspan:
+    for child in container:
         child_tag = child.tag.replace(f'{{{SVG_NS}}}', '')
-        if child_tag == 'tspan':
+        if child_tag in {'tspan', 'a'}:
             runs.extend(
-                _collect_tspan_runs(child, own_attrs, ctx, own_xml_space)
+                _collect_inline_runs(
+                    child,
+                    own_attrs,
+                    ctx,
+                    own_xml_space,
+                    own_hyperlink,
+                )
             )
             if child.tail:
-                runs.append({
+                tail_run = {
                     **own_attrs,
                     'text': child.tail,
                     '_xml_space': own_xml_space,
-                })
+                }
+                if own_hyperlink is not None:
+                    tail_run.update(own_hyperlink)
+                runs.append(tail_run)
 
     return runs
 
@@ -2423,9 +2579,9 @@ def _build_text_runs(
 ) -> list[dict[str, Any]]:
     """Build a list of text runs from a <text> element, handling <tspan> children.
 
-    Each run is a dict with keys: text, fill, fill_raw, font_weight,
-    font_style, font_family, font_size, letter_spacing. Nested tspans are walked
-    recursively so inline format changes inside a tspan still produce distinct runs.
+    Each run carries text plus resolved paint, typography, tracking, and baseline
+    shift. Nested tspans are walked recursively so inline format changes still
+    produce distinct runs.
     """
     runs: list[dict[str, Any]] = []
     xml_space = resolve_project_xml_space(elem)
@@ -2439,10 +2595,13 @@ def _build_text_runs(
 
     for child in elem:
         child_tag = child.tag.replace(f'{{{SVG_NS}}}', '')
-        if child_tag == 'tspan':
-            runs.extend(
-                _collect_tspan_runs(child, parent_attrs, ctx, xml_space)
-            )
+        if child_tag in {'tspan', 'a'}:
+            runs.extend(_collect_inline_runs(
+                child,
+                parent_attrs,
+                ctx,
+                xml_space,
+            ))
             if child.tail:
                 runs.append({
                     **parent_attrs,
@@ -2463,14 +2622,36 @@ def _build_text_fill_xml(
     if fill_raw.strip().lower() in ('none', 'transparent'):
         return '<a:noFill/>'
 
-    grad_id = resolve_url_id(fill_raw)
-    if grad_id and ctx and grad_id in ctx.defs:
-        return build_gradient_fill(
-            ctx.defs[grad_id],
-            opacity,
-            ctx.theme_color_spec,
-            "text",
-        )
+    paint_id = resolve_url_id(fill_raw)
+    if paint_id and ctx and paint_id in ctx.defs:
+        paint = ctx.defs[paint_id]
+        paint_tag = paint.tag.rsplit('}', 1)[-1]
+        if paint_tag in {'linearGradient', 'radialGradient'}:
+            return build_gradient_fill(
+                paint,
+                opacity,
+                ctx.theme_color_spec,
+                "text",
+            )
+        if paint_tag == 'pattern':
+            mode, image = resolve_project_text_image_fill(paint)
+            source = load_project_image_source(
+                image,
+                ctx.svg_dir,
+                ctx.resource_root,
+            )
+            r_id = _register_image_media(
+                ctx,
+                source.img_format,
+                source.img_data,
+                reuse_text_fill=True,
+            )
+            blip_xml = _build_image_blip_xml(r_id, opacity)
+            if mode == 'stretch':
+                fill_mode_xml = '<a:stretch><a:fillRect/></a:stretch>'
+            else:
+                fill_mode_xml = '<a:tile/>'
+            return f'<a:blipFill>{blip_xml}{fill_mode_xml}</a:blipFill>'
 
     parsed_color, color_alpha = parse_svg_color(fill_raw)
     fill = parsed_color or fill
@@ -2522,6 +2703,7 @@ def _build_run_properties_xml(
     default_fonts: dict[str, str],
     ctx: ConvertContext | None = None,
     effect_xml: str = '',
+    fixed_font_family: str | None = None,
 ) -> str:
     """Build the final ``a:rPr`` used to compare and emit one text run."""
     text = str(run['text'])
@@ -2532,6 +2714,7 @@ def _build_run_properties_xml(
     fstyle = run.get('font_style', '')
     ff = run.get('font_family', '')
     letter_spacing_px = float(run.get('letter_spacing', 0.0) or 0.0)
+    baseline_shift = int(run.get('baseline_shift', 0) or 0)
     opacity = run.get('opacity')
 
     text_dec = run.get('text_decoration', '')
@@ -2549,16 +2732,25 @@ def _build_run_properties_xml(
     u_attr = ' u="sng"' if underline else ''
     strike_attr = ' strike="sngStrike"' if strike else ''
     spc_attr = _letter_spacing_to_drawingml_spc(letter_spacing_px)
+    baseline_attr = f' baseline="{baseline_shift}"' if baseline_shift else ''
 
     fonts = parse_font_family(ff) if ff else default_fonts
-    run_fonts = theme_font_tokens(
-        fonts,
-        ctx.theme_font_spec if ctx is not None else None,
-    ) or resolve_text_run_fonts(text, fonts)
-    lang = detect_text_lang(
+    run_fonts = (
+        {
+            'latin': fixed_font_family,
+            'ea': fixed_font_family,
+            'cs': fixed_font_family,
+        }
+        if fixed_font_family is not None
+        else theme_font_tokens(
+            fonts,
+            ctx.theme_font_spec if ctx is not None else None,
+        ) or resolve_text_run_fonts(text, fonts)
+    )
+    lang = str(run.get('_language_override') or detect_text_lang(
         text,
         ctx.primary_language if ctx is not None else None,
-    )
+    ))
     rtl_xml = (
         '\n<a:rtl val="1"/>'
         if text_has_rtl_characters(text)
@@ -2567,14 +2759,26 @@ def _build_run_properties_xml(
 
     fill_xml = _build_text_fill_xml(fill, fill_raw, opacity, ctx)
     outline_xml = _build_text_outline_xml(run, ctx)
+    relationship_id = run.get(HYPERLINK_RID_KEY)
+    hyperlink_xml = (
+        hyperlink_click_xml(
+            str(relationship_id),
+            str(run.get(HYPERLINK_ACTION_KEY))
+            if run.get(HYPERLINK_ACTION_KEY) is not None
+            else None,
+        )
+        if relationship_id is not None
+        else ''
+    )
 
-    return f'''<a:rPr lang="{lang}" sz="{sz}"{b_attr}{i_attr}{u_attr}{strike_attr}{spc_attr} dirty="0">
+    return f'''<a:rPr lang="{lang}" sz="{sz}"{b_attr}{i_attr}{u_attr}{strike_attr}{spc_attr}{baseline_attr} dirty="0">
 {outline_xml}
 {fill_xml}
 {effect_xml}
 <a:latin typeface="{_xml_escape(run_fonts['latin'])}"/>
 <a:ea typeface="{_xml_escape(run_fonts['ea'])}"/>
-<a:cs typeface="{_xml_escape(run_fonts['cs'])}"/>{rtl_xml}
+<a:cs typeface="{_xml_escape(run_fonts['cs'])}"/>
+{hyperlink_xml}{rtl_xml}
 </a:rPr>'''
 
 
@@ -2594,8 +2798,18 @@ def _coalesce_text_runs(
         text = str(run.get('text', ''))
         if not text:
             continue
+        if run.get(_INLINE_FORMULA_KEY) is not None:
+            merged.append({**run, 'text': text})
+            previous_properties = None
+            continue
         properties = _build_run_properties_xml(run, default_fonts, ctx)
-        if merged and properties == previous_properties:
+        if (
+            merged
+            and merged[-1].get(_INLINE_FORMULA_KEY) is None
+            and merged[-1].get(HYPERLINK_RID_KEY) == run.get(HYPERLINK_RID_KEY)
+            and merged[-1].get(HYPERLINK_ACTION_KEY) == run.get(HYPERLINK_ACTION_KEY)
+            and properties == previous_properties
+        ):
             candidate = {
                 **merged[-1],
                 'text': str(merged[-1].get('text', '')) + text,
@@ -2634,6 +2848,37 @@ def _build_run_xml(
     if run.get('_line_break'):
         return '<a:br/>'
     text = str(run['text'])
+    inline_formula = run.get(_INLINE_FORMULA_KEY)
+    if inline_formula is not None:
+        fill_raw = str(run.get('fill_raw') or f"#{run.get('fill', '000000')}")
+        fill_color, fill_alpha = parse_svg_color(fill_raw)
+        if fill_color is None or fill_alpha <= 0:
+            raise ValueError(
+                'inline formula text requires one visible solid fill color'
+            )
+        math_run = {
+            **run,
+            'font_family': 'Cambria Math',
+            'font_weight': '400',
+            'font_style': 'normal',
+            'text_decoration': 'none',
+            'letter_spacing': 0.0,
+            'stroke_raw': '',
+            'stroke_opacity': None,
+            '_language_override': (
+                ctx.primary_language
+                if ctx is not None and ctx.primary_language is not None
+                else 'en-US'
+            ),
+        }
+        properties_xml = _build_run_properties_xml(
+            math_run,
+            default_fonts,
+            ctx,
+            fixed_font_family='Cambria Math',
+        )
+        from ..native_objects.inline_formula import build_inline_formula_xml
+        return build_inline_formula_xml(str(inline_formula), properties_xml)
     properties_xml = _build_run_properties_xml(
         run,
         default_fonts,
@@ -2720,6 +2965,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         'font_style': font_style,
         'text_decoration': text_decoration,
         'letter_spacing': letter_spacing_px,
+        'baseline_shift': 0,
         '_scale_x': ctx.scale_x or 1.0,
         '_object_opacity': object_opacity,
         '_fill_opacity': fill_opacity,
@@ -2746,6 +2992,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     # of how many merge into one <a:p>; used to size the textbox so PowerPoint
     # has room to wrap text to the SVG's original line widths.
     visual_line_widths: list[float] = []
+    visual_line_runs: list[list[dict[str, Any]]] = []
     if line_height_px is not None and line_height_px > 0:
         xml_space = resolve_project_xml_space(elem)
         paragraph_runs = []
@@ -2761,6 +3008,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             line_runs = _normalize_text_run_whitespace(line_runs)
             if not line_runs:
                 continue
+            visual_line_runs.append(line_runs)
             visual_line_widths.append(
                 _estimate_bullet_line_width(line_runs, fonts, ctx)
             )
@@ -2784,11 +3032,15 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
                 if prev and not prev_text.endswith(' ') \
                         and not next_text.startswith(' ') \
                         and not boundary_is_cjk:
-                    prev.append({
+                    joining_space = {
                         **prev[-1],
                         'text': ' ',
                         'letter_spacing': 0.0,
-                    })
+                    }
+                    joining_space.pop(_INLINE_FORMULA_KEY, None)
+                    joining_space.pop(HYPERLINK_RID_KEY, None)
+                    joining_space.pop(HYPERLINK_ACTION_KEY, None)
+                    prev.append(joining_space)
                 prev.extend(line_runs)
             else:
                 paragraph_runs.append(line_runs)
@@ -2798,6 +3050,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             paragraph_runs = None
             paragraph_space_before = []
             visual_line_widths = []
+            visual_line_runs = []
         else:
             stripped_paragraphs: list[list[dict[str, Any]]] = []
             for line_runs in paragraph_runs:
@@ -2829,24 +3082,61 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         paragraph_space_before = []
         paragraph_bullets = []
         visual_line_widths = []
+        visual_line_runs = []
         single_bullet = None
 
     # Estimate text dimensions
     if paragraph_runs is not None:
         # Use the widest authored visual line, not a reflow-joined paragraph.
         text_width = max(visual_line_widths) if visual_line_widths else 0.0
-        # Keep the authored visual-line count as the source height contract.
-        text_height = (
-            line_height_px * (len(visual_line_widths) - 1)
-            + sum(paragraph_space_before)
-            + font_size * 1.5
-        )
+        line_extents = [
+            _text_line_vertical_extent(line, font_size)
+            for line in visual_line_runs
+        ]
+        text_height = sum(paragraph_space_before)
+        for ascent, descent, has_formula in line_extents[:-1]:
+            line_advance = line_height_px
+            if has_formula:
+                line_advance = max(
+                    line_advance,
+                    _native_text_line_frame_height(
+                        ascent,
+                        descent,
+                        font_size,
+                    ),
+                )
+            text_height += line_advance
+        first_line_ascent = line_extents[0][0]
+        last_ascent, last_descent, last_has_formula = line_extents[-1]
+        last_line_height = font_size * 1.5
+        if last_has_formula:
+            last_line_height = max(
+                last_line_height,
+                _native_text_line_frame_height(
+                    last_ascent,
+                    last_descent,
+                    font_size,
+                ),
+            )
+        text_height += last_line_height
     else:
         text_width = _estimate_text_runs_width(runs)
         if single_bullet:
             fs_px = float(runs[0].get('font_size', font_size)) if runs else font_size
             text_width += _bullet_margin_px(single_bullet, fs_px)
+        first_line_ascent, line_descent, has_formula = (
+            _text_line_vertical_extent(runs, font_size)
+        )
         text_height = font_size * 1.5
+        if has_formula:
+            text_height = max(
+                text_height,
+                _native_text_line_frame_height(
+                    first_line_ascent,
+                    line_descent,
+                    font_size,
+                ),
+            )
     padding = _textbox_padding(font_size)
 
     # Adjust position based on text-anchor. This first box follows the visible
@@ -2859,7 +3149,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     else:
         box_x = x - padding
 
-    box_y = y - font_size * 0.85
+    box_y = y - first_line_ascent
     box_w = text_width + padding * 2
     box_h = text_height + padding
     if reflect_y:
@@ -3018,6 +3308,11 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
                 (run for run in line if not run.get('_line_break')),
                 None,
             )
+            effective_line_spacing = (
+                ''
+                if any(run.get(_INLINE_FORMULA_KEY) is not None for run in line)
+                else ln_spc_xml
+            )
             p_pr_xml = _paragraph_pr_xml(
                 algn=algn,
                 font_size=(
@@ -3025,7 +3320,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
                     if first_text_run is not None
                     else font_size
                 ),
-                body_xml=f'{ln_spc_xml}{spc_bef_xml}',
+                body_xml=f'{effective_line_spacing}{spc_bef_xml}',
                 bullet=bullet,
                 ctx=ctx,
                 rtl=text_uses_rtl(
@@ -3110,7 +3405,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             'anchor="t" anchorCtr="0">\n<a:spAutoFit/>\n</a:bodyPr>'
         )
 
-    return ShapeResult(xml=f'''<p:sp>
+    shape_xml = f'''<p:sp>
 <p:nvSpPr>
 <p:cNvPr id="{shape_id}" name="TextBox {shape_id}"/>
 <p:cNvSpPr txBox="1"/><p:nvPr/>
@@ -3128,7 +3423,14 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 <a:lstStyle/>
 {paragraphs_xml}
 </p:txBody>
-</p:sp>''', bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy))
+</p:sp>'''
+    if any(run.get(_INLINE_FORMULA_KEY) is not None for run in runs):
+        from ..native_objects.inline_formula import wrap_inline_formula_shape
+        shape_xml = wrap_inline_formula_shape(shape_xml)
+    return ShapeResult(
+        xml=shape_xml,
+        bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -4267,6 +4569,34 @@ def _build_image_blip_xml(r_id: str, opacity: float | None) -> str:
     )
 
 
+def _register_image_media(
+    ctx: ConvertContext,
+    img_format: str,
+    img_data: bytes,
+    *,
+    reuse_text_fill: bool = False,
+) -> str:
+    """Register image bytes and return a DrawingML relationship id."""
+    cache_key: tuple[str, str] | None = None
+    if reuse_text_fill:
+        cache_key = (img_format, hashlib.sha256(img_data).hexdigest())
+        if cache_key in ctx.text_image_fill_cache:
+            return ctx.text_image_fill_cache[cache_key]
+
+    img_idx = len(ctx.media_files) + 1
+    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
+    ctx.media_files[img_filename] = img_data
+    r_id = ctx.next_rel_id()
+    ctx.rel_entries.append({
+        'id': r_id,
+        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        'target': f'../media/{img_filename}',
+    })
+    if cache_key is not None:
+        ctx.text_image_fill_cache[cache_key] = r_id
+    return r_id
+
+
 def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <image> to DrawingML picture element.
 
@@ -4274,7 +4604,7 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     to DrawingML picture geometry (prstGeom or custGeom) so the image is
     natively clipped in PowerPoint.
     """
-    source = load_project_image_source(elem, ctx.svg_dir)
+    source = load_project_image_source(elem, ctx.svg_dir, ctx.resource_root)
 
     # Raw coordinates (pre-context-transform) for clip path calculations
     raw_x = svg_length_x(elem.get('x'), ctx)
@@ -4342,26 +4672,11 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         visible_source_fraction=visible_source_fraction,
     )
 
-    img_idx = len(ctx.media_files) + 1
-    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
-    ctx.media_files[img_filename] = img_data
-
-    r_id = ctx.next_rel_id()
-    ctx.rel_entries.append({
-        'id': r_id,
-        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
-        'target': f'../media/{img_filename}',
-    })
+    r_id = _register_image_media(ctx, img_format, img_data)
 
     # Resolve clip-path → DrawingML geometry
     clip_geom = _resolve_clip_geometry(elem, ctx, raw_x, raw_y, raw_w, raw_h)
-    effect_xml = ''
-    filter_id = get_effective_filter_id(elem, ctx)
-    if filter_id and filter_id in ctx.defs:
-        effect_xml = build_effect_xml(
-            ctx.defs[filter_id],
-            get_element_opacity(elem, ctx),
-        )
+    effect_xml = _element_effect_xml(elem, ctx)
 
     # Resolve preserveAspectRatio="<align> slice" as DrawingML crop metadata.
     # Image optimization only downscales the full source image; it never crops
@@ -4544,6 +4859,8 @@ _NESTED_CROP_OUTER_ATTRIBUTES = frozenset({
     'data-pptx-editable',
     EFFECT_REASON_ATTR,
     EFFECT_STATUS_ATTR,
+    NATIVE_EFFECT_ATTR,
+    NATIVE_EFFECT_SHA256_ATTR,
     'data-pptx-frame',
     'data-pptx-layer',
     'data-pptx-object',
@@ -4914,7 +5231,11 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
     """
     crop = parse_project_nested_svg_crop(elem)
     image_elem = crop.image
-    source = load_project_image_source(image_elem, ctx.svg_dir)
+    source = load_project_image_source(
+        image_elem,
+        ctx.svg_dir,
+        ctx.resource_root,
+    )
 
     svg_x = crop.x
     svg_y = crop.y
@@ -4965,16 +5286,7 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
         ),
     )
 
-    img_idx = len(ctx.media_files) + 1
-    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
-    ctx.media_files[img_filename] = img_data
-
-    r_id = ctx.next_rel_id()
-    ctx.rel_entries.append({
-        'id': r_id,
-        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
-        'target': f'../media/{img_filename}',
-    })
+    r_id = _register_image_media(ctx, img_format, img_data)
 
     shape_id = _claim_element_shape_id(elem, ctx)
     xfrm_attr, off_x, off_y, ext_cx, ext_cy, bounds_emu = _picture_xfrm_from_svg_rect(
@@ -5000,13 +5312,7 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
             svg_w,
             svg_h,
         )
-    effect_xml = ''
-    filter_id = get_effective_filter_id(elem, ctx)
-    if filter_id and filter_id in ctx.defs:
-        effect_xml = build_effect_xml(
-            ctx.defs[filter_id],
-            get_element_opacity(elem, ctx),
-        )
+    effect_xml = _element_effect_xml(elem, ctx)
     blip_xml = _build_image_blip_xml(
         r_id,
         get_element_opacity(image_elem, ctx),

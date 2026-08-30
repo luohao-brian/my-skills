@@ -161,6 +161,22 @@ def verify_runtime_files(errors: list[str]) -> None:
             errors.append(f"runtime.md does not load {name}")
     if "downstream_release.py" not in runtime_text:
         errors.append("runtime.md does not route formal export through downstream_release.py")
+    if "Direct `svg_to_pptx.py` calls are diagnostic" not in runtime_text:
+        errors.append("runtime.md does not classify direct exporter calls as diagnostic")
+    for relative in (
+        "workflows/generate-pptx.md",
+        "workflows/profiles/quick-generate.md",
+    ):
+        route_text = (SKILL / relative).read_text(encoding="utf-8")
+        if "formal-svg-route-publication" not in route_text:
+            errors.append(f"{relative} does not reference the formal release command owner")
+        if re.search(r"python3\s+\{baseDir\}/scripts/svg_to_pptx\.py", route_text):
+            errors.append(f"{relative} still declares a competing formal exporter command")
+    quick_text = (SKILL / "workflows" / "profiles" / "quick-generate.md").read_text(
+        encoding="utf-8"
+    )
+    if "\\ --dir" in quick_text:
+        errors.append("Quick project initialization contains an escaped-space --dir argument")
     if (SKILL / "scripts" / "attribution_guard.py").exists():
         errors.append("unsupported upstream attribution_guard.py is present")
     for path in sorted((SKILL / "scripts").rglob("*.py")):
@@ -218,7 +234,11 @@ def verify_patch_effects(errors: list[str]) -> None:
     if "return {'latin': ea, 'ea': ea, 'cs': ea}" not in font_utils:
         errors.append("East Asian run pinning patch is not active")
     exporter = (SKILL / "scripts" / "svg_to_pptx" / "pptx_package" / "cli.py").read_text(encoding="utf-8")
-    if "release_quality_gate = args.quick_generate or args.source in {None, 'output'}" not in exporter:
+    if not re.search(
+        r"release_quality_gate\s*=\s*\(\s*args\.quick_generate\s*"
+        r"or\s*args\.source\s+in\s+\{None,\s*'output'\}\s*\)",
+        exporter,
+    ):
         errors.append("upstream formal release fail-closed gate is missing")
     image_gen = (SKILL / "scripts" / "image_gen.py").read_text(encoding="utf-8")
     if 'FIXED_IMAGE_BACKEND = "volcengine"' not in image_gen:
@@ -255,7 +275,10 @@ def main() -> int:
             print(f"FAIL: {error}", file=sys.stderr)
         return 1
     markdown_count = len(list(SKILL.rglob("*.md")))
-    print(f"OK: ppt-master v4.5.0 runtime contract across {markdown_count} Markdown files")
+    lock = load_json(LOCK, [])
+    upstream = lock.get("upstream") if isinstance(lock, dict) else None
+    release = upstream.get("release", "unknown") if isinstance(upstream, dict) else "unknown"
+    print(f"OK: ppt-master {release} runtime contract across {markdown_count} Markdown files")
     return 0
 
 

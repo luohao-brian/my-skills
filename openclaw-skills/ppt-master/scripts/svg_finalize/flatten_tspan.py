@@ -15,6 +15,7 @@ configure_utf8_stdio()
 
 
 SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
 NSMAP = {"svg": SVG_NS}
 
 # Ensure pretty element names without ns0 prefix on write
@@ -189,6 +190,7 @@ PARAGRAPH_SOFT_BREAK_ATTR = "data-paragraph-soft-break"
 # Marks an authored visual line boundary that remains a hard DrawingML break
 # in the default single-frame preserve mode.
 PARAGRAPH_LINE_BREAK_ATTR = "data-paragraph-line-break"
+INLINE_FORMULA_ATTR = "data-pptx-inline-formula"
 
 # Tolerance for detecting "base line-height" vs "paragraph gap": dy values
 # within ±DY_TOLERANCE_PX of each other are considered the same line-height.
@@ -274,6 +276,24 @@ def _build_paragraph_child_view(
 
     view = ([synthetic_first] if synthetic_first is not None else []) + direct_tspans
     return view, synthetic_first
+
+
+def _is_svg_tag(el: ET.Element, name: str) -> bool:
+    """Return whether one element has the requested SVG namespace tag."""
+    return el.tag == f"{{{SVG_NS}}}{name}"
+
+
+def _is_new_line_tspan(tspan: ET.Element) -> bool:
+    """Return whether one direct tspan starts a positioned visual line."""
+    t_dy_attr = get_attr(tspan, "dy")
+    t_y_attr = get_attr(tspan, "y")
+    t_x_attr = get_attr(tspan, "x")
+    dy_val = parse_first_number(t_dy_attr) if t_dy_attr is not None else None
+    return (
+        t_y_attr is not None
+        or (dy_val is not None and dy_val != 0)
+        or t_x_attr is not None
+    )
 
 
 def _get_font_size_px(elem: ET.Element) -> float | None:
@@ -435,6 +455,19 @@ def _classify_paragraph_block(
     return base, extras, break_kinds, line_groups, synthetic_first
 
 
+def classify_paragraph_block(
+    text_el: ET.Element,
+    preserve_line_breaks: bool = False,
+) -> tuple[float, list[float], list[str], list[list[ET.Element]], ET.Element | None] | None:
+    """Classify one paragraph block with the shared synthetic-first logic."""
+    return _classify_paragraph_block(
+        text_el,
+        _is_svg_tag,
+        _is_new_line_tspan,
+        preserve_line_breaks,
+    )
+
+
 def _emit_mergeable_paragraph(
     text_el: ET.Element,
     base_dy: float,
@@ -538,30 +571,11 @@ def flatten_text_with_tspans(
     parent_map = {c: p for p in root.iter() for c in p}
     changed = False
 
-    def is_svg_tag(el: ET.Element, name: str) -> bool:
-        return el.tag == f"{{{SVG_NS}}}{name}"
-
-    def is_new_line_tspan(tspan: ET.Element) -> bool:
-        """Determine whether a tspan represents a new line (has its own y or non-zero dy)."""
-        t_dy_attr = get_attr(tspan, "dy")
-        t_y_attr = get_attr(tspan, "y")
-        t_x_attr = get_attr(tspan, "x")
-        dy_val = parse_first_number(t_dy_attr) if t_dy_attr is not None else None
-        # Has its own y attribute, or has non-zero dy, or has its own x attribute (indicating a new line)
-        if t_y_attr is not None:
-            return True
-        if dy_val is not None and dy_val != 0:
-            return True
-        # If tspan has an x attribute and there are preceding sibling tspans, treat it as a new line
-        if t_x_attr is not None:
-            return True
-        return False
-
     # Collect candidates first to avoid modifying while iterating
     candidates = []
     for el in root.iter():
-        if is_svg_tag(el, "text"):
-            has_tspan_child = any(is_svg_tag(c, "tspan") for c in list(el))
+        if _is_svg_tag(el, "text"):
+            has_tspan_child = any(_is_svg_tag(c, "tspan") for c in list(el))
             if has_tspan_child:
                 candidates.append(el)
 
@@ -573,9 +587,9 @@ def flatten_text_with_tspans(
         # First check whether any tspan needs flattening (dy != 0 or has its own y attribute)
         needs_flatten = False
         for child in list(text_el):
-            if not is_svg_tag(child, "tspan"):
+            if not _is_svg_tag(child, "tspan"):
                 continue
-            if is_new_line_tspan(child):
+            if _is_new_line_tspan(child):
                 needs_flatten = True
                 break
 
@@ -587,11 +601,9 @@ def flatten_text_with_tspans(
         # <text>. The downstream converter either preserves visual breaks or
         # reflows them. Split mode promotes each positioned line to <text>.
         if merge_paragraphs:
-            paragraph = _classify_paragraph_block(
+            paragraph = classify_paragraph_block(
                 text_el,
-                is_svg_tag,
-                is_new_line_tspan,
-                preserve_line_breaks,
+                preserve_line_breaks=preserve_line_breaks,
             )
             if paragraph is not None:
                 base_dy, extras, break_kinds, line_groups, synthetic_first = paragraph
@@ -617,13 +629,13 @@ def flatten_text_with_tspans(
         current_line_lead_text = text_el.text or None
 
         for idx, child in enumerate(list(text_el)):
-            if not is_svg_tag(child, "tspan"):
+            if not _is_svg_tag(child, "tspan"):
                 continue
 
             content = collect_text_content(child)
 
             # Check whether this tspan starts a new line
-            if is_new_line_tspan(child):
+            if _is_new_line_tspan(child):
                 # Save previously accumulated same-line tspans first
                 if current_line_tspans or _has_non_xml_whitespace(
                     current_line_lead_text
@@ -676,8 +688,50 @@ def flatten_text_with_tspans(
 
 
 def _has_tspan_children(elem: ET.Element) -> bool:
-    """Return True if elem contains any nested <tspan> children (inline runs)."""
-    return any(c.tag == f"{{{SVG_NS}}}tspan" for c in list(elem))
+    """Return True when one inline subtree has nested runs or hyperlinks."""
+    return any(
+        c.tag in {
+            f"{{{SVG_NS}}}a",
+            f"{{{SVG_NS}}}tspan",
+        }
+        for c in list(elem)
+    )
+
+
+def _declares_baseline_shift(elem: ET.Element) -> bool:
+    """Keep tspan ownership for the project-only baseline-shift contract."""
+    return (
+        elem.get("baseline-shift") is not None
+        or "baseline-shift" in parse_style(elem.get("style"))
+    )
+
+
+def _copy_inline_element(src: ET.Element, strip_line_attrs: bool) -> ET.Element:
+    """Deep-copy one supported inline ``tspan`` or hyperlink subtree."""
+    local = src.tag.rsplit("}", 1)[-1]
+    if local not in {"a", "tspan"}:
+        raise ValueError(f"Unsupported inline text child <{local}>")
+    new = ET.Element(f"{{{SVG_NS}}}{local}")
+    consumed_dx = (
+        local == "tspan"
+        and strip_line_attrs
+        and _positional_tspan_attribute(src) is not None
+    )
+    for k, v in src.attrib.items():
+        if strip_line_attrs and k in ("x", "y", "dy"):
+            continue
+        if k == "dx" and consumed_dx:
+            continue
+        new.set(k, v)
+    new.text = src.text
+    for child in list(src):
+        if child.tag in {
+            f"{{{SVG_NS}}}a",
+            f"{{{SVG_NS}}}tspan",
+        }:
+            new.append(_copy_inline_element(child, strip_line_attrs=False))
+    new.tail = src.tail
+    return new
 
 
 def _copy_inline_tspan(src: ET.Element, strip_line_attrs: bool) -> ET.Element:
@@ -689,23 +743,7 @@ def _copy_inline_tspan(src: ET.Element, strip_line_attrs: bool) -> ET.Element:
     dx on later inline runs.
     Nested tspans are copied recursively without stripping (they are already inline-only).
     """
-    new = ET.Element(f"{{{SVG_NS}}}tspan")
-    consumed_dx = (
-        strip_line_attrs
-        and _positional_tspan_attribute(src) is not None
-    )
-    for k, v in src.attrib.items():
-        if strip_line_attrs and k in ("x", "y", "dy"):
-            continue
-        if k == "dx" and consumed_dx:
-            continue
-        new.set(k, v)
-    new.text = src.text
-    for child in list(src):
-        if child.tag == f"{{{SVG_NS}}}tspan":
-            new.append(_copy_inline_tspan(child, strip_line_attrs=False))
-    new.tail = src.tail
-    return new
+    return _copy_inline_element(src, strip_line_attrs)
 
 
 def _create_text_element_from_line(
@@ -741,6 +779,8 @@ def _create_text_element_from_line(
         and len(tspans) == 1
         and not _has_tspan_children(tspans[0])
         and not tspans[0].tail
+        and tspans[0].get(INLINE_FORMULA_ATTR) is None
+        and not _declares_baseline_shift(tspans[0])
     ):
         tspan = tspans[0]
         content = collect_text_content(tspan)
@@ -798,6 +838,8 @@ def process_svg_file(
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
     # Write out XML without XML declaration to mimic input style
+    ET.register_namespace("", SVG_NS)
+    ET.register_namespace("xlink", XLINK_NS)
     tree.write(dst_path, encoding="utf-8", xml_declaration=False, method="xml")
     return changed
 

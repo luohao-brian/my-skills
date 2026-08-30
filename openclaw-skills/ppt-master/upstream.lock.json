@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/hugohe3/ppt-master.git",
     "subtree": "skills/ppt-master",
-    "release": "v4.5.0",
-    "commit": "ec824aecd551a0bc2990b617a131d907a5d808ea"
+    "release": "v6.0.0",
+    "commit": "e5a05edebe24c7c00c589dbed4f4777cb9855c91"
   },
   "packaging_transforms": [
     "openclaw_frontmatter",
@@ -12,6 +12,7 @@
     "disable_runtime_identity_guard",
     "portable_base_dir_paths",
     "portable_project_init",
+    "downstream_release_command_owner",
     "readme_to_progressive_index",
     "external_upstream_links",
     "text_whitespace_normalization"
@@ -41,7 +42,6 @@
     "scripts/tests/test_visual_layout_audit.py"
   ],
   "core_patches": [
-    "image-provider-bridge.patch",
     "tts-provider-bridge.patch",
     "agent-plan-media-only.patch",
     "directory-cli-required.patch",

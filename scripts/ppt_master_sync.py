@@ -129,14 +129,8 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         1,
     )
     load_pattern = re.compile(
-        r"1\. Read this file\.\n"
-        r"2\. Run `python3 scripts/attribution_guard\.py`.*?\n"
-        r"   bypass the integrity gate\.\n"
-        r"3\. Read \[`workflows/routing\.md`\]\(workflows/routing\.md\)\.\n"
-        r"4\. Select exactly one top-level route and its active profile from the routing\n"
-        r"   authority\.\n"
-        r"5\. Read only the resulting runtime authority and its explicitly triggered\n"
-        r"   supporting documents\.",
+        r"(?<=## Mandatory Load Order\n\n).*?"
+        r"(?=\| Selected route / profile \| Runtime authority \|)",
         re.DOTALL,
     )
     replacement = (
@@ -144,7 +138,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         "2. Read [`references/runtime.md`](references/runtime.md); its Directory, Font, and Dependency contracts are mandatory for every route.\n"
         "3. Read [`workflows/routing.md`](workflows/routing.md).\n"
         "4. Select exactly one top-level route and its active profile from the routing authority.\n"
-        "5. Read only the resulting runtime authority and its explicitly triggered supporting documents."
+        "5. Read only the resulting runtime authority and its explicitly triggered supporting documents.\n\n"
     )
     body, count = load_pattern.subn(replacement, body, count=1)
     if count != 1:
@@ -184,9 +178,9 @@ def _disable_identity_guard(stage: Path) -> None:
             path.write_text(text, encoding="utf-8")
         import_count += imports
         call_count += calls
-    if import_count < 10 or call_count < 10:
+    if import_count == 0 or call_count == 0:
         raise SyncError(
-            f"identity transform matched only {import_count} imports and {call_count} calls"
+            f"identity transform matched {import_count} imports and {call_count} calls"
         )
 
 
@@ -199,6 +193,7 @@ def _portable_paths(stage: Path) -> None:
         except UnicodeDecodeError:
             continue
         updated = text.replace("skills/ppt-master", "{baseDir}")
+        updated = updated.replace("${SKILL_DIR}", "{baseDir}")
         if updated != text:
             path.write_text(updated, encoding="utf-8")
 
@@ -216,6 +211,9 @@ def _portable_project_init(stage: Path) -> None:
                 line = command_match.group(1)
                 if "--dir" in line:
                     return line
+                if line.rstrip().endswith("\\"):
+                    command = line.rstrip()[:-1].rstrip()
+                    return f"{command} --dir <absolute-projects-root> \\"
                 return f"{line} --dir <absolute-projects-root>"
 
             updated = command.sub(update_command, block)
@@ -224,6 +222,55 @@ def _portable_project_init(stage: Path) -> None:
         updated = fence.sub(update_fence, text)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
+
+
+def _downstream_release_command_owner(stage: Path) -> None:
+    """Keep formal SVG-route publication owned by the downstream runtime."""
+    quick = stage / "workflows" / "profiles" / "quick-generate.md"
+    quick_text = quick.read_text(encoding="utf-8")
+    quick_pattern = re.compile(
+        r"```bash\n"
+        r"python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --quick-generate --with-notes\s+# Speaker Notes enabled\n"
+        r"python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --quick-generate --no-notes\s+# Speaker Notes disabled\n"
+        r"```"
+    )
+    quick_replacement = (
+        "Use the [downstream formal SVG-route publication command]"
+        "(../../references/runtime.md#formal-svg-route-publication), passing exactly one "
+        "of these upstream exporter argument sets:\n\n"
+        "- Speaker Notes enabled: `--quick-generate --with-notes`\n"
+        "- Speaker Notes disabled: `--quick-generate --no-notes`"
+    )
+    quick_text, quick_count = quick_pattern.subn(quick_replacement, quick_text, count=1)
+    if quick_count != 1:
+        raise SyncError("Quick formal-export command anchor did not match")
+    quick.write_text(quick_text, encoding="utf-8")
+
+    default = stage / "workflows" / "generate-pptx.md"
+    default_text = default.read_text(encoding="utf-8")
+    default_pattern = re.compile(
+        r"\| Effective decision \| Command \|\n"
+        r"\|---\|---\|\n"
+        r"\| Speaker Notes `enabled` \| `python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path>` \|\n"
+        r"\| Speaker Notes `disabled` \| `python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --no-notes` \|"
+    )
+    default_replacement = (
+        "Use the [downstream formal SVG-route publication command]"
+        "(../references/runtime.md#formal-svg-route-publication) with the upstream "
+        "exporter arguments below:\n\n"
+        "| Effective decision | Upstream exporter arguments |\n"
+        "|---|---|\n"
+        "| Speaker Notes `enabled` | _(none)_ |\n"
+        "| Speaker Notes `disabled` | `--no-notes` |"
+    )
+    default_text, default_count = default_pattern.subn(
+        default_replacement,
+        default_text,
+        count=1,
+    )
+    if default_count != 1:
+        raise SyncError("Default formal-export command anchor did not match")
+    default.write_text(default_text, encoding="utf-8")
 
 
 def _rename_readmes(stage: Path) -> None:
@@ -428,6 +475,7 @@ def main() -> int:
             _rename_readmes(stage)
             _rewrite_escaping_links(stage, manifest)
             _write_openclaw_skill(stage / "SKILL.md")
+            _downstream_release_command_owner(stage)
             _copy_overlays(stage, manifest)
             _apply_patches(stage, manifest)
             _write_provenance(stage, manifest, commit)

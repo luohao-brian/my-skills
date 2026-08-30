@@ -30,6 +30,7 @@ from image_backends.backend_common import (
     MAX_RETRIES,
     download_image,
     http_error,
+    is_permanent_error,
     is_rate_limit_error,
     normalize_image_size,
     require_api_key,
@@ -40,6 +41,7 @@ from image_backends.backend_common import (
 
 ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3"
 ARK_AGENT_PLAN_MODEL = "doubao-seedream-5.0-lite"
+DEFAULT_IMAGE_SIZE = "2K"
 FIXED_PROFILE = "ark-agent-plan"
 FIXED_PROVIDER = "volc-ark-agent-plan"
 
@@ -53,65 +55,7 @@ ARK_ASPECT_RATIO_SIZE_MAP = {
     "2:3": (1664, 2496),
     "21:9": (3136, 1344),
 }
-ARK_SIZE_SCALE = {
-    # Ark image profiles enforce a provider-native minimum canvas. PPT Master's
-    # smaller logical presets therefore resolve to the same valid 2K canvas.
-    "512px": 1.0,
-    "1K": 1.0,
-    "2K": 1.0,
-    "4K": 1.0,
-}
-
-ASPECT_RATIO_SIZE_MAP = {
-    "512px": {
-        "1:1": "1024x1024",
-        "2:3": "1024x1536",
-        "3:2": "1536x1024",
-        "3:4": "1024x1365",
-        "4:3": "1365x1024",
-        "4:5": "1024x1280",
-        "5:4": "1280x1024",
-        "9:16": "1024x1820",
-        "16:9": "1820x1024",
-        "21:9": "2048x878",
-    },
-    "1K": {
-        "1:1": "1536x1536",
-        "2:3": "1344x2016",
-        "3:2": "2016x1344",
-        "3:4": "1440x1920",
-        "4:3": "1920x1440",
-        "4:5": "1536x1920",
-        "5:4": "1920x1536",
-        "9:16": "1152x2048",
-        "16:9": "2048x1152",
-        "21:9": "2048x878",
-    },
-    "2K": {
-        "1:1": "2048x2048",
-        "2:3": "1536x2048",
-        "3:2": "2048x1536",
-        "3:4": "1536x2048",
-        "4:3": "2048x1536",
-        "4:5": "1638x2048",
-        "5:4": "2048x1638",
-        "9:16": "1152x2048",
-        "16:9": "2048x1152",
-        "21:9": "2048x878",
-    },
-    "4K": {
-        "1:1": "2048x2048",
-        "2:3": "1536x2048",
-        "3:2": "2048x1536",
-        "3:4": "1536x2048",
-        "4:3": "2048x1536",
-        "4:5": "1638x2048",
-        "5:4": "2048x1638",
-        "9:16": "1152x2048",
-        "16:9": "2048x1152",
-        "21:9": "2048x878",
-    },
-}
+ARK_SIZE_SCALE = {"512px": 1.0, "1K": 1.0, "2K": 1.0, "4K": 1.0}
 
 
 def _resolve_url(base_url: str) -> str:
@@ -124,38 +68,28 @@ def _resolve_url(base_url: str) -> str:
     return base + "/api/v1/images/generations"
 
 
-def _resolve_size(aspect_ratio: str, image_size: str, *, ark_api: bool = False) -> str:
-    """Resolve the target resolution for a ratio and logical size preset."""
+def _resolve_size(aspect_ratio: str, image_size: str) -> str:
+    """Resolve the Agent Plan target resolution for a ratio and size preset."""
     normalized = normalize_image_size(image_size)
-    if ark_api:
-        dimensions = ARK_ASPECT_RATIO_SIZE_MAP.get(aspect_ratio)
-        scale = ARK_SIZE_SCALE.get(normalized)
-        if dimensions and scale:
-            width, height = dimensions
-            return f"{round(width * scale)}x{round(height * scale)}"
-        supported = sorted(ARK_ASPECT_RATIO_SIZE_MAP)
-        raise ValueError(
-            f"Unsupported aspect ratio '{aspect_ratio}' for Ark image generation. "
-            f"Supported: {supported}"
-        )
-    size = (ASPECT_RATIO_SIZE_MAP.get(normalized) or {}).get(aspect_ratio)
-    if not size:
-        supported = sorted(ASPECT_RATIO_SIZE_MAP["1K"])
-        raise ValueError(
-            f"Unsupported aspect ratio '{aspect_ratio}' for Volcengine backend. "
-            f"Supported: {supported}"
-        )
-    return size
+    dimensions = ARK_ASPECT_RATIO_SIZE_MAP.get(aspect_ratio)
+    scale = ARK_SIZE_SCALE.get(normalized)
+    if dimensions and scale:
+        width, height = dimensions
+        return f"{round(width * scale)}x{round(height * scale)}"
+    supported = sorted(ARK_ASPECT_RATIO_SIZE_MAP)
+    raise ValueError(
+        f"Unsupported aspect ratio '{aspect_ratio}' for Ark image generation. "
+        f"Supported: {supported}"
+    )
 
 
 def _generate_image(api_key: str, prompt: str,
-                    aspect_ratio: str = "1:1", image_size: str = "1K",
+                    aspect_ratio: str = "1:1", image_size: str = DEFAULT_IMAGE_SIZE,
                     output_dir: str = None, filename: str = None,
                     model: str = ARK_AGENT_PLAN_MODEL,
-                    base_url: str = ARK_AGENT_PLAN_ENDPOINT,
-                    ark_api: bool = False) -> str:
+                    base_url: str = ARK_AGENT_PLAN_ENDPOINT) -> str:
     """Generate one image with the Volcengine backend."""
-    size = _resolve_size(aspect_ratio, image_size, ark_api=ark_api)
+    size = _resolve_size(aspect_ratio, image_size)
     url = _resolve_url(base_url)
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -200,23 +134,23 @@ def _resolve_profile(model: str = None) -> dict[str, object]:
         "ARK_AGENT_PLAN_API_KEY",
         message="No Agent Plan image key found. Configure ARK_AGENT_PLAN_API_KEY.",
     )
-
     return {
         "profile": FIXED_PROFILE,
         "provider": FIXED_PROVIDER,
         "api_key": api_key,
         "base_url": ARK_AGENT_PLAN_ENDPOINT,
         "model": model or ARK_AGENT_PLAN_MODEL,
-        "ark_api": True,
     }
 
 
 def generate(prompt: str,
-             aspect_ratio: str = "1:1", image_size: str = "1K",
+             aspect_ratio: str = "1:1", image_size: str = DEFAULT_IMAGE_SIZE,
              output_dir: str = None, filename: str = None,
              model: str = None, max_retries: int = MAX_RETRIES) -> str:
     """Generate an image with retries using the Volcengine backend."""
     profile = _resolve_profile(model)
+    normalized_size = normalize_image_size(image_size)
+    _resolve_size(aspect_ratio, normalized_size)
 
     last_error = None
     for attempt in range(max_retries + 1):
@@ -225,15 +159,16 @@ def generate(prompt: str,
                 api_key=str(profile["api_key"]),
                 prompt=prompt,
                 aspect_ratio=aspect_ratio,
-                image_size=image_size,
+                image_size=normalized_size,
                 output_dir=output_dir,
                 filename=filename,
                 model=str(profile["model"]),
                 base_url=str(profile["base_url"]),
-                ark_api=bool(profile["ark_api"]),
             )
         except Exception as exc:
             last_error = exc
+            if is_permanent_error(exc):
+                raise
             if attempt >= max_retries:
                 break
             limited = is_rate_limit_error(exc)

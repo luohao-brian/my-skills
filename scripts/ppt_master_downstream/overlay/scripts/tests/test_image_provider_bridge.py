@@ -55,7 +55,7 @@ class ImageProviderBridgeTests(unittest.TestCase):
 
     def test_agent_plan_uses_cowork_native_size_contract(self) -> None:
         self.assertEqual(
-            backend_volcengine._resolve_size("16:9", "1K", ark_api=True),
+            backend_volcengine._resolve_size("16:9", "1K"),
             "2848x1600",
         )
         self.assertEqual(

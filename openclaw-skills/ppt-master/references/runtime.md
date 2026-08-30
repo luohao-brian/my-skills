@@ -21,6 +21,8 @@ resolves the same way. Never infer the Skill path from CWD.
 
 ## Downstream release gate
 
+## Formal SVG-route publication
+
 Formal SVG-route publication uses the additive orchestrator, not the upstream
 exporter directly:
 
