@@ -43,6 +43,8 @@ python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ar
 
 ## 参考图
 
+Seedream 的 `image` 字段接受 HTTP(S) URL 或图片 Base64。本地路径由脚本转换成 data URL。官方图片生成 schema 不接受 Files API `file_id`，Files API 也不返回公开 URL，因此脚本会明确拒绝 `file-...`。如果工作流需要先分析参考图，使用 `ark-file` 配合 `ark-vision`，再把原始 URL 或本地图片传给生成接口。
+
 `--image` 接受本地路径、HTTP(S) URL 或 Data URL。多图按提示词中的“图一、图二……”顺序重复传入：
 
 ```bash

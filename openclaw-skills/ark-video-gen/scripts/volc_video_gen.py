@@ -151,6 +151,11 @@ def normalize_media_input(value: str, media_kind: str) -> str:
     source = value.strip()
     if not source:
         raise ValueError(f"Empty {media_kind} input")
+    if source.startswith("file-"):
+        raise ValueError(
+            f"Ark video generation does not accept Files API file_id for reference {media_kind}; "
+            "use an HTTP(S) URL, a documented data URL, or asset://"
+        )
     if source.startswith("data:"):
         expected = f"data:{media_kind}/"
         if not source.startswith(expected):
@@ -159,7 +164,10 @@ def normalize_media_input(value: str, media_kind: str) -> str:
     if source.startswith(("http://", "https://", "asset://")):
         return source
     if media_kind == "video":
-        raise ValueError("Local reference videos are not accepted directly; upload the video and pass an HTTP(S) URL or asset:// ID")
+        raise ValueError(
+            "Local reference videos are not accepted directly; provide a provider-readable HTTP(S) URL or asset:// ID. "
+            "Ark Files API file_id is valid for video understanding but is not a Seedance reference URL"
+        )
     return file_to_data_url(source, media_kind=media_kind)
 
 

@@ -40,6 +40,8 @@ Seedance 2.x 不使用 `seed` 或 `camera_fixed`。
 - 视频：HTTP(S) URL 或 `asset://` 素材 ID。Ark 不接受视频 Base64；本地视频需要先上传。
 - 音频：本地 WAV/MP3、HTTP(S) URL、音频 data URL 或 `asset://` 素材 ID。
 
+这里的“上传”必须得到 Seedance 可读取的 HTTP(S) URL 或受信任 `asset://` ID。标准 Ark Files API 只返回推理用 `file_id`，不返回公开 URL；当前视频生成 schema 的 `image_url`、`video_url`、`audio_url` 内部都只接受 `url: string`。因此不要把 `file-...` 填进这些字段。Files API 适合先用 `ark-vision` 分析参考素材，但不是 Seedance 参考素材托管接口。
+
 本地图片必须小于 30 MB，本地音频必须小于 15 MB。图片、视频和音频分别按同类素材的参数顺序编号，提示词编号必须使用相同顺序。
 
 Seedance 2.5 和 2.0 系列不能直接上传普通的真人人脸参考图或视频。需要使用已授权素材、平台预置虚拟人，或同账号有效期内的受信任 Ark 原始产物。

@@ -28,6 +28,7 @@ VIDEO = load_script("ark_video_gen_protocol", "openclaw-skills/ark-video-gen/scr
 STT = load_script("ark_stt_protocol", "openclaw-skills/ark-stt/scripts/volc_stt.py")
 TTS = load_script("ark_tts_protocol", "openclaw-skills/ark-tts/scripts/volc_tts.py")
 VISION = load_script("ark_vision_protocol", "openclaw-skills/ark-vision/scripts/vision_analyze.py")
+ARK_FILE = load_script("ark_file_protocol", "openclaw-skills/ark-file/scripts/ark_file.py")
 SEARCH = load_script("ark_search_protocol", "openclaw-skills/ark-search/scripts/web_search.py")
 PLUGIN_CLI = load_script("hermes_ark_plugin_cli", "hermes-plugins/hermes-ark-plugin/cli.py")
 
@@ -152,6 +153,64 @@ class ArkSkillProtocolTests(unittest.TestCase):
             "image_url": {"url": "https://example.com/frame.png"},
         })
 
+        uploaded_image, image_type = VISION.build_media_content("file-image", "image")
+        self.assertEqual(image_type, "image")
+        self.assertEqual(uploaded_image, {
+            "type": "image_url",
+            "image_url": {"file_id": "file-image"},
+        })
+        uploaded_video, video_type = VISION.build_media_content("file-video", "video")
+        self.assertEqual(video_type, "video")
+        self.assertEqual(uploaded_video, {
+            "type": "video_url",
+            "video_url": {"file_id": "file-video"},
+        })
+        uploaded_pdf, pdf_type = VISION.build_media_content("file-pdf", "pdf")
+        self.assertEqual(pdf_type, "pdf")
+        self.assertEqual(uploaded_pdf, {
+            "type": "file",
+            "file": {"file_id": "file-pdf"},
+        })
+        inline_pdf, inline_pdf_type = VISION.build_media_content(
+            "data:application/pdf;base64,JVBERi0xLjQ=", "pdf",
+        )
+        self.assertEqual(inline_pdf_type, "pdf")
+        self.assertEqual(inline_pdf, {
+            "type": "file",
+            "file": {
+                "file_data": "data:application/pdf;base64,JVBERi0xLjQ=",
+                "filename": "document.pdf",
+            },
+        })
+        remote_pdf, remote_pdf_type = VISION.build_media_content(
+            "https://example.com/document.pdf", "pdf",
+        )
+        self.assertEqual(remote_pdf_type, "pdf")
+        self.assertEqual(remote_pdf, {
+            "type": "file",
+            "file": {"file_url": "https://example.com/document.pdf"},
+        })
+
+    def test_ark_file_lifecycle_contract(self) -> None:
+        self.assertEqual(ARK_FILE.BASE_URL, "https://ark.cn-beijing.volces.com/api/v3")
+        self.assertEqual(ARK_FILE.API_KEY_ENV, "ARK_API_KEY")
+        self.assertEqual(ARK_FILE.PURPOSE, "user_data")
+        self.assertEqual(ARK_FILE.normalize_list(None), {
+            "object": "list",
+            "data": [],
+            "has_more": False,
+        })
+        normalized = ARK_FILE.normalize_list({"data": None, "first_id": None})
+        self.assertEqual(normalized["data"], [])
+        self.assertFalse(normalized["has_more"])
+        self.assertIn(".pdf", ARK_FILE.SUPPORTED_EXTENSIONS)
+        self.assertIn(".mp4", ARK_FILE.SUPPORTED_EXTENSIONS)
+        self.assertNotIn(".html", ARK_FILE.SUPPORTED_EXTENSIONS)
+        with self.assertRaisesRegex(ValueError, "file-"):
+            ARK_FILE.validate_file_id("not-a-file")
+        with self.assertRaisesRegex(ValueError, "1 and 99"):
+            ARK_FILE.list_files(after=None, limit=100, order="desc", purpose="user_data", scope_id=None)
+
     def test_image_size_uses_provider_native_casing(self) -> None:
         self.assertEqual(IMAGE.normalize_size("2k"), "2K")
         self.assertEqual(IMAGE.normalize_size("4K"), "4K")
@@ -214,6 +273,8 @@ class ArkSkillProtocolTests(unittest.TestCase):
             IMAGE.normalize_image_input("https://example.com/reference.png"),
             "https://example.com/reference.png",
         )
+        with self.assertRaisesRegex(ValueError, "does not accept Files API file_id"):
+            IMAGE.normalize_image_input("file-reference")
 
     def test_video_settings_and_terminal_states_match_task_contract(self) -> None:
         settings = VIDEO.build_generation_settings(
@@ -342,6 +403,8 @@ class ArkSkillProtocolTests(unittest.TestCase):
                 "720p",
                 reference_audios=["https://example.com/voice.mp3"],
             )
+        with self.assertRaisesRegex(ValueError, "does not accept Files API file_id"):
+            VIDEO.normalize_media_input("file-reference", "video")
 
     def test_video_success_preserves_remote_result_when_download_fails(self) -> None:
         task = SimpleNamespace(

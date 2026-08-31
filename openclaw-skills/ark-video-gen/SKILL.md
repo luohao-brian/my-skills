@@ -42,6 +42,7 @@ python3 {baseDir}/scripts/volc_video_gen.py "使用图片1中小狗的外形，�
 3. Agent Plan defaults to `doubao-seedance-2.0-fast`; Ark API defaults to `doubao-seedance-2-5-260628`. Use only models listed for the selected backend.
 4. Pass duration, ratio, resolution and audio as structured CLI parameters. Do not append `--dur`, `--ratio` or `--rs` to the prompt. Seedance 2.x does not use `seed` or `camera_fixed`.
 5. Use `--first-frame` and `--last-frame` for strict frames. Repeat `--reference-image`, `--reference-video` and `--reference-audio` in the same order used by the prompt. Strict-frame mode and reference mode are mutually exclusive.
-6. Music `()`, sound effects `<>`, or dialogue `{}` in a Seedance 2.5 prompt require `--audio`; subtitles `【】` do not require audio.
-7. Use `--dry-run` to validate the compiled prompt and payload without credentials or submission. On timeout, use `--resume-task TASK_ID` with the original backend; never create a replacement task automatically.
-8. Expect stdout JSON with `success`, `backend`, `task_id`, `status`, remote and local video locations, actual generation settings, usage, request ID, and warnings. A download failure does not erase a successful remote result.
+6. Reference material fields are URL-string contracts. Images and audio may use documented data URLs; reference videos require HTTP(S) or `asset://`. Ark Files API `file_id` is not a Seedance URL. Use `ark-file` for `ark-vision` analysis, not as an implicit generation upload service.
+7. Music `()`, sound effects `<>`, or dialogue `{}` in a Seedance 2.5 prompt require `--audio`; subtitles `【】` do not require audio.
+8. Use `--dry-run` to validate the compiled prompt and payload without credentials or submission. On timeout, use `--resume-task TASK_ID` with the original backend; never create a replacement task automatically.
+9. Expect stdout JSON with `success`, `backend`, `task_id`, `status`, remote and local video locations, actual generation settings, usage, request ID, and warnings. A download failure does not erase a successful remote result.

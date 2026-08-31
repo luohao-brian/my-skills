@@ -253,9 +253,15 @@ def file_to_data_url(path: str) -> str:
 
 
 def normalize_image_input(value: str) -> str:
-    if value.startswith(("https://", "http://", "data:")):
-        return value
-    return file_to_data_url(value)
+    source = value.strip()
+    if source.startswith("file-"):
+        raise ValueError(
+            "Ark image generation does not accept Files API file_id references; "
+            "use an HTTP(S) image URL or a local image/data URL"
+        )
+    if source.startswith(("https://", "http://", "data:")):
+        return source
+    return file_to_data_url(source)
 
 
 def image_ext(raw: bytes, fallback: str = "png") -> str:
