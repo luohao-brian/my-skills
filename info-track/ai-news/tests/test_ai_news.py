@@ -206,6 +206,57 @@ class TmtpostAdapterTests(unittest.TestCase):
         with mock.patch.object(HTML_INDEX, "fetch_generic_html", return_value=stale_items):
             self.assertEqual(HTML_INDEX.fetch_tmtpost(source, window), [])
 
+    def test_rolling_window_parses_available_dailies_without_page_chrome(self) -> None:
+        source = {"url": "https://www.tmtpost.com/user/7944025"}
+        window = {
+            "start": datetime(2026, 8, 29, 0, 30, tzinfo=TZ),
+            "end": datetime(2026, 9, 1, 0, 30, tzinfo=TZ),
+        }
+        index_items = [
+            {
+                "title": "Edge AI Daily 早报（8月31日）",
+                "source_url": "https://www.tmtpost.com/8122304.html",
+                "published_at": "2026-09-01T00:30:00+08:00",
+                "summary_basis": "Edge AI Daily 早报（8月31日）",
+            },
+            {
+                "title": "Edge AI Daily 早报（8月29日）",
+                "source_url": "https://www.tmtpost.com/8121473.html",
+                "published_at": "2026-09-01T00:30:00+08:00",
+                "summary_basis": "Edge AI Daily 早报（8月29日）",
+            },
+            {
+                "title": "涉企侵权举报须知",
+                "source_url": "https://www.tmtpost.com/about/reporting_notice",
+                "published_at": "2026-09-01T00:30:00+08:00",
+                "summary_basis": "涉企侵权举报须知",
+            },
+        ]
+        daily_pages = {
+            "https://www.tmtpost.com/8122304.html": (
+                "<span>2026.08.31 08:20</span>"
+                "<blockquote>一、8月31日新闻</blockquote><p>摘要。</p>"
+            ),
+            "https://www.tmtpost.com/8121473.html": (
+                "<span>2026.08.29 08:23</span>"
+                "<blockquote>一、8月29日新闻</blockquote><p>摘要。</p>"
+            ),
+        }
+        with (
+            mock.patch.object(HTML_INDEX, "fetch_generic_html", return_value=index_items),
+            mock.patch.object(
+                HTML_INDEX,
+                "fetch_text",
+                side_effect=lambda url: daily_pages[url],
+            ),
+        ):
+            items = HTML_INDEX.fetch_tmtpost(source, window)
+
+        self.assertEqual([item["title"] for item in items], ["8月31日新闻", "8月29日新闻"])
+        self.assertEqual(items[0]["published_at"], "2026-08-31T08:20:00+08:00")
+        self.assertEqual(items[1]["published_at"], "2026-08-29T08:23:00+08:00")
+        self.assertNotIn("reporting_notice", {item["source_url"] for item in items})
+
 
 if __name__ == "__main__":
     unittest.main()

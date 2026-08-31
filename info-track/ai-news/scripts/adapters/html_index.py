@@ -21,6 +21,9 @@ META_DESC_RE = re.compile(
     re.IGNORECASE,
 )
 TITLE_RE = re.compile(r"<title\b[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+TMTPOST_PUBLISHED_RE = re.compile(
+    r"\b(\d{4})\.(\d{2})\.(\d{2})\s+(\d{1,2}):(\d{2})\b"
+)
 
 
 def _page_description(html: str) -> str:
@@ -123,32 +126,33 @@ def fetch_anthropic(source: dict[str, Any], window: dict[str, Any] | None = None
 
 def fetch_tmtpost(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
     items = fetch_generic_html(source, window)
-    date = _date_from_window(window)
-    target = ""
-    if date:
+    daily_items: list[tuple[dict[str, str], str]] = []
+    for date in _dates_from_window(window):
         month = int(date[5:7])
         day = int(date[8:10])
         target = f"{month}月{day}日"
+        daily = next(
+            (
+                item
+                for item in items
+                if "Edge AI Daily" in item["title"]
+                and item["source_url"].endswith(".html")
+                and target in item["title"]
+            ),
+            None,
+        )
+        if daily:
+            daily_items.append((daily, date))
 
-    daily_items = [
-        item
-        for item in items
-        if "Edge AI Daily" in item["title"]
-        and item["source_url"].endswith(".html")
-        and (not target or target in item["title"])
-    ]
-    if not daily_items:
-        if window and window.get("date"):
-            return []
-        return items
-
-    daily = daily_items[0]
-    try:
-        html = fetch_text(daily["source_url"])
-    except Exception:
-        return daily_items
-    parsed = _parse_tmtpost_daily(html, daily["source_url"], daily.get("published_at") or date)
-    return parsed or daily_items
+    parsed_items: list[dict[str, str]] = []
+    for daily, date in daily_items:
+        try:
+            html = fetch_text(daily["source_url"])
+        except Exception:
+            continue
+        published_at = _tmtpost_published_at(html, date)
+        parsed_items.extend(_parse_tmtpost_daily(html, daily["source_url"], published_at))
+    return parsed_items
 
 
 def fetch_maomu(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
@@ -314,6 +318,14 @@ def _parse_tmtpost_daily(html: str, url: str, published_at: str) -> list[dict[st
         )
 
     return items
+
+
+def _tmtpost_published_at(html: str, expected_date: str) -> str:
+    for year, month, day, hour, minute in TMTPOST_PUBLISHED_RE.findall(html):
+        date = f"{year}-{month}-{day}"
+        if date == expected_date:
+            return f"{date}T{int(hour):02d}:{minute}:00+08:00"
+    return expected_date
 
 
 def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[str, str]]:
