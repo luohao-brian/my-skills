@@ -4,16 +4,16 @@
 
 CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来源、版本和配置，不创建第二份同名 skill。删除和状态查询也使用同一个名称。这就是本文所说的幂等部署和管理。
 
-当前环境共使用 **45 个 skill**：
+当前环境共使用 **74 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
-| 直接使用上游 | 27 | CLI 从上游来源安装，本仓库不复制、不打补丁 |
-| 本地维护版本 | 18 | 交付源码位于本仓库，由本仓库校验和发布 |
+| 直接使用上游 | 55 | CLI 从上游来源安装，本仓库不复制、不打补丁 |
+| 本地维护版本 | 19 | 交付源码位于本仓库，由本仓库校验和发布 |
 
 判断标准是最终交付物的所有权，而不是是否存在上游项目。只要本地版本修改了入口、运行时适配、服务提供方、文档或资源，就归入“本地维护版本”。
 
-## 直接使用上游的 skill（27）
+## 直接使用上游的 skill（55）
 
 这些 skill 由部署 CLI 直接安装上游版本。本仓库只记录名称和分组，不保存镜像或补丁。
 
@@ -26,6 +26,40 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 - `opencli-adapter-author`
 - `opencli-autofix`
 - `opencli-sitemap-author`
+
+### Office CLI（1）
+
+- `officecli`
+
+### Lark CLI（27）
+
+- `lark-approval`
+- `lark-apps`
+- `lark-attendance`
+- `lark-base`
+- `lark-calendar`
+- `lark-contact`
+- `lark-doc`
+- `lark-drive`
+- `lark-event`
+- `lark-im`
+- `lark-mail`
+- `lark-markdown`
+- `lark-minutes`
+- `lark-note`
+- `lark-okr`
+- `lark-openapi-explorer`
+- `lark-shared`
+- `lark-sheets`
+- `lark-skill-maker`
+- `lark-slides`
+- `lark-task`
+- `lark-vc`
+- `lark-vc-agent`
+- `lark-whiteboard`
+- `lark-wiki`
+- `lark-workflow-meeting-summary`
+- `lark-workflow-standup-report`
 
 ### 架构图（1）
 
@@ -53,7 +87,7 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 - `slideshow`
 - `figma`
 
-## 本地维护的 skill（18）
+## 本地维护的 skill（19）
 
 以下目录是部署输入。功能、依赖声明、运行时适配和验证规则都随本仓库版本发布。
 
@@ -67,12 +101,13 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 | `ai-oss-models` | [`info-track/ai-oss-models/`](info-track/ai-oss-models/) | 开放模型、数据集与本地部署动态 |
 | `ai-tech-blogs` | [`info-track/ai-tech-blogs/`](info-track/ai-tech-blogs/) | 中文 AI 技术博客聚合 |
 
-### Ark（7）
+### Ark（8）
 
 | Skill | 源码 | 用途 |
 | --- | --- | --- |
 | `ark-search` | [`openclaw-skills/ark-search/`](openclaw-skills/ark-search/) | 网页和图片搜索 |
 | `ark-data-pro` | [`openclaw-skills/ark-data-pro/`](openclaw-skills/ark-data-pro/) | 金融、企业和学术专业数据查询 |
+| `ark-file` | [`openclaw-skills/ark-file/`](openclaw-skills/ark-file/) | 多模态文件上传、查询、等待和删除 |
 | `ark-image-gen` | [`openclaw-skills/ark-image-gen/`](openclaw-skills/ark-image-gen/) | Seedream 图片生成 |
 | `ark-video-gen` | [`openclaw-skills/ark-video-gen/`](openclaw-skills/ark-video-gen/) | Seedance 视频生成 |
 | `ark-tts` | [`openclaw-skills/ark-tts/`](openclaw-skills/ark-tts/) | 文本转语音 |
@@ -90,7 +125,7 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 | `baoyu-infographic` | [`openclaw-skills/baoyu-infographic/`](openclaw-skills/baoyu-infographic/) | 固定上游快照，加本地入口与渐进式加载封装 |
 | `diagram-design` | [`openclaw-skills/diagram-design/`](openclaw-skills/diagram-design/) | 固定上游快照，加本地入口与渐进式加载封装 |
 
-## 不在 45 个标准部署项中的组件
+## 不在 74 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 
