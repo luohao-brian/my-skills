@@ -1,23 +1,21 @@
 # my-skills
 
-本仓库保存本地维护的 skill 与 Hermes 插件源码，并记录实际 Agent 环境的 skill 来源。部署 CLI 不在本仓库中；这里维护的是它使用的目标清单和本地源码。
+这里放自维护的 skill、Hermes 插件，以及当前使用的上游 skill 清单。
 
-CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来源、版本和配置，不创建第二份同名 skill。删除和状态查询也使用同一个名称。这就是本文所说的幂等部署和管理。
-
-当前环境共使用 **74 个 skill**：
+当前环境共使用 **76 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
-| 直接使用上游 | 55 | CLI 从上游来源安装，本仓库不复制、不打补丁 |
+| 直接使用上游 | 57 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
 | 本地维护版本 | 19 | 交付源码位于本仓库，由本仓库校验和发布 |
 
-判断标准是最终交付物的所有权，而不是是否存在上游项目。只要本地版本修改了入口、运行时适配、服务提供方、文档或资源，就归入“本地维护版本”。
+分类以实际使用的版本为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；未经修改则列入“直接使用上游”。
 
-## 直接使用上游的 skill（55）
+## 直接使用上游的 skill（57）
 
-这些 skill 由部署 CLI 直接安装上游版本。本仓库只记录名称和分组，不保存镜像或补丁。
+OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装，仓库地址见分组标题。Archify、AL Site 和 AL Sandbox 单独安装，仓库地址见名称链接。本仓库不保存这些 skill 的副本。
 
-### OpenCLI（7）
+### [OpenCLI](https://github.com/jackwener/opencli)（随 CLI 安装，7）
 
 - `opencli-usage`
 - `smart-search`
@@ -27,11 +25,11 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 - `opencli-autofix`
 - `opencli-sitemap-author`
 
-### Office CLI（1）
+### [Office CLI](https://github.com/iOfficeAI/OfficeCLI)（随 CLI 安装，1）
 
 - `officecli`
 
-### Lark CLI（27）
+### [Lark CLI](https://github.com/larksuite/cli)（随 CLI 安装，27）
 
 - `lark-approval`
 - `lark-apps`
@@ -63,9 +61,9 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 
 ### 架构图（1）
 
-- `archify`
+- [`archify`](https://github.com/tt-a1i/archify)
 
-### HyperFrames（19）
+### [HyperFrames](https://github.com/heygen-com/hyperframes)（随 CLI 安装，19）
 
 - `hyperframes`
 - `hyperframes-core`
@@ -86,6 +84,11 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 - `remotion-to-hyperframes`
 - `slideshow`
 - `figma`
+
+### AL Site 与 Sandbox（2）
+
+- [`al-site`](https://github.com/2B-AL/al-site-skill)
+- [`al-sandbox`](https://github.com/2B-AL/al-sandbox-skill)
 
 ## 本地维护的 skill（19）
 
@@ -125,7 +128,7 @@ CLI 以 skill 名称为稳定标识，重复执行安装或更新时只校正来
 | `baoyu-infographic` | [`openclaw-skills/baoyu-infographic/`](openclaw-skills/baoyu-infographic/) | 固定上游快照，加本地入口与渐进式加载封装 |
 | `diagram-design` | [`openclaw-skills/diagram-design/`](openclaw-skills/diagram-design/) | 固定上游快照，加本地入口与渐进式加载封装 |
 
-## 不在 74 个标准部署项中的组件
+## 不在 76 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 
