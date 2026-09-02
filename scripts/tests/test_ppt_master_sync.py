@@ -60,7 +60,9 @@ class PackagingTransformTests(unittest.TestCase):
             stage = Path(directory)
             quick = stage / "workflows" / "profiles" / "quick-generate.md"
             default = stage / "workflows" / "generate-pptx.md"
+            finalizer = stage / "scripts" / "finalize_svg.py"
             quick.parent.mkdir(parents=True)
+            finalizer.parent.mkdir(parents=True)
             quick.write_text(
                 "```bash\n"
                 "python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate --with-notes  # Speaker Notes enabled\n"
@@ -75,6 +77,15 @@ class PackagingTransformTests(unittest.TestCase):
                 "| Speaker Notes `disabled` | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-notes` |\n",
                 encoding="utf-8",
             )
+            finalizer.write_text(
+                "    if not quiet:\n"
+                "        print()\n"
+                "        safe_print(\"[OK] Done!\")\n"
+                "        print()\n"
+                "        print(\"Next steps:\")\n"
+                "        print(f\"  python scripts/svg_to_pptx.py \\\"{project_dir}\\\"\")\n",
+                encoding="utf-8",
+            )
 
             SYNC._downstream_release_command_owner(stage)
 
@@ -82,6 +93,8 @@ class PackagingTransformTests(unittest.TestCase):
                 transformed = route.read_text(encoding="utf-8")
                 self.assertIn("formal-svg-route-publication", transformed)
                 self.assertNotIn("python3 {baseDir}/scripts/svg_to_pptx.py", transformed)
+            self.assertNotIn("Next steps:", finalizer.read_text(encoding="utf-8"))
+            self.assertNotIn("svg_to_pptx.py", finalizer.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

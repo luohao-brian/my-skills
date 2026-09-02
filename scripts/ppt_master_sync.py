@@ -272,6 +272,19 @@ def _downstream_release_command_owner(stage: Path) -> None:
         raise SyncError("Default formal-export command anchor did not match")
     default.write_text(default_text, encoding="utf-8")
 
+    finalizer = stage / "scripts" / "finalize_svg.py"
+    finalizer_text = finalizer.read_text(encoding="utf-8")
+    finalizer_pattern = re.compile(
+        r"\n\s*print\(\)\n"
+        r"\s*print\(\"Next steps:\"\)\n"
+        r"\s*print\(f\"  python scripts/svg_to_pptx\.py "
+        r"\\\"\{project_dir\}\\\"\"\)"
+    )
+    finalizer_text, finalizer_count = finalizer_pattern.subn("", finalizer_text, count=1)
+    if finalizer_count != 1:
+        raise SyncError("finalize_svg direct-export hint anchor did not match")
+    finalizer.write_text(finalizer_text, encoding="utf-8")
+
 
 def _rename_readmes(stage: Path) -> None:
     readmes = sorted(stage.rglob("README.md"))

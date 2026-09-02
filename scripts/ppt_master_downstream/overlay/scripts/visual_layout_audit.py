@@ -19,6 +19,7 @@ import json
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 import urllib.error
@@ -48,6 +49,51 @@ def _read_json(url: str, timeout: float = 3.0) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _validated_preview_url(project: Path, url: str) -> str | None:
+    normalized = url.rstrip("/")
+    try:
+        health = _read_json(f"{normalized}/api/health")
+        server_project = Path(str(health.get("project") or "")).resolve()
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+    if (
+        health.get("status") != "ok"
+        or health.get("service") != "live_preview"
+        or server_project != project.resolve()
+    ):
+        return None
+    return normalized
+
+
+def _discover_preview_url(project: Path) -> str | None:
+    for lock_path in (project / "live_preview" / "lock.json", project / ".live_preview.lock"):
+        try:
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            port = int(lock.get("port", 0) or 0)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if not 1 <= port <= 65535:
+            continue
+        validated = _validated_preview_url(project, f"http://127.0.0.1:{port}")
+        if validated:
+            return validated
+    return None
+
+
+def _server_log_tail(log_file: Any, limit: int = 4000) -> str:
+    try:
+        log_file.flush()
+        log_file.seek(0)
+        payload = log_file.read()
+    except (OSError, ValueError):
+        return ""
+    if isinstance(payload, bytes):
+        text = payload.decode("utf-8", errors="replace")
+    else:
+        text = str(payload)
+    return text[-limit:].strip()
+
+
 def _wait_ready(url: str, process: subprocess.Popen[bytes], timeout: float = 15.0) -> None:
     deadline = time.monotonic() + timeout
     last_error: Exception | None = None
@@ -67,17 +113,17 @@ def _wait_ready(url: str, process: subprocess.Popen[bytes], timeout: float = 15.
 @contextmanager
 def preview_server(project: Path, supplied_url: str | None) -> Iterator[str]:
     if supplied_url:
-        url = supplied_url.rstrip("/")
-        try:
-            health = _read_json(f"{url}/api/health")
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"preview server unreachable at {url}: {exc}") from exc
-        server_project = Path(str(health.get("project") or "")).resolve()
-        if server_project != project.resolve():
+        url = _validated_preview_url(project, supplied_url)
+        if not url:
             raise RuntimeError(
-                f"preview server serves {server_project}, expected {project.resolve()}"
+                f"preview server is unhealthy or serves another project: {supplied_url.rstrip('/')}"
             )
         yield url
+        return
+
+    existing_url = _discover_preview_url(project)
+    if existing_url:
+        yield existing_url
         return
 
     port = _free_port()
@@ -91,33 +137,39 @@ def preview_server(project: Path, supplied_url: str | None) -> Iterator[str]:
         str(port),
         "--no-browser",
     ]
-    process = subprocess.Popen(  # noqa: S603 - fixed local script + validated args
-        command,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        _wait_ready(url, process)
-        yield url
-    finally:
+    with tempfile.TemporaryFile(mode="w+b") as server_log:
+        process = subprocess.Popen(  # noqa: S603 - fixed local script + validated args
+            command,
+            stdout=server_log,
+            stderr=subprocess.STDOUT,
+        )
         try:
-            request = urllib.request.Request(
-                f"{url}/api/shutdown",
-                data=b'{"reason":"layout-audit-complete"}',
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            urllib.request.urlopen(request, timeout=1.5).read()
-        except Exception:  # noqa: BLE001 - termination fallback below
-            pass
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.terminate()
             try:
-                process.wait(timeout=2)
+                _wait_ready(url, process)
+            except RuntimeError as exc:
+                detail = _server_log_tail(server_log)
+                suffix = f"; preview server output:\n{detail}" if detail else ""
+                raise RuntimeError(f"{exc}{suffix}") from exc
+            yield url
+        finally:
+            try:
+                request = urllib.request.Request(
+                    f"{url}/api/shutdown",
+                    data=b'{"reason":"layout-audit-complete"}',
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(request, timeout=1.5).read()
+            except Exception:  # noqa: BLE001 - termination fallback below
+                pass
+            try:
+                process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                process.kill()
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
 
 
 def _parse_viewports(raw: str) -> list[tuple[int, int]]:

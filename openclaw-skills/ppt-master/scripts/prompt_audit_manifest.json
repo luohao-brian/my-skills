@@ -18,7 +18,7 @@
   "file_budgets": {
     "AGENTS.md": 3250,
     "{baseDir}/SKILL.md": 1750,
-    "{baseDir}/references/executor-base.md": 9750,
+    "{baseDir}/references/executor-base.md": 11000,
     "{baseDir}/references/executor-structured.md": 5500,
     "{baseDir}/references/executor-chart.md": 1750,
     "{baseDir}/references/executor-visualization.md": 1000,
@@ -34,15 +34,15 @@
     "{baseDir}/references/native-data-interface.md": 5000,
     "{baseDir}/references/pptx-structure-interface.md": 3000,
     "{baseDir}/references/preset-shape-vocabulary.md": 2750,
-    "{baseDir}/references/strategist.md": 14000,
+    "{baseDir}/references/strategist.md": 13000,
     "{baseDir}/references/strategist-image.md": 3250,
     "{baseDir}/references/strategist-template.md": 2500,
     "{baseDir}/templates/design_spec_reference.md": 3500,
-    "{baseDir}/templates/spec_lock_reference.md": 2250,
+    "{baseDir}/templates/spec_lock_reference.md": 2500,
     "{baseDir}/templates/charts/chart-vocabulary.md": 1250,
     "{baseDir}/templates/tables/table-vocabulary.md": 500,
     "{baseDir}/templates/sounds/sound-vocabulary.md": 6250,
-    "{baseDir}/workflows/generate-pptx.md": 10000,
+    "{baseDir}/workflows/generate-pptx.md": 11000,
     "{baseDir}/workflows/stages/apply-template-workspace.md": 2750,
     "{baseDir}/references/confirm-surface.md": 3000,
     "{baseDir}/references/video-design.md": 2500,
@@ -198,8 +198,6 @@
         "{baseDir}/references/strategist.md",
         "{baseDir}/references/strategist-image.md",
         "{baseDir}/references/canvas-formats.md",
-        "{baseDir}/references/image-layout-spec.md",
-        "{baseDir}/references/image-layout-patterns.md",
         "{baseDir}/templates/design_spec_reference.md",
         "{baseDir}/templates/spec_lock_reference.md",
         "{baseDir}/references/modes/_index.md",
@@ -252,8 +250,6 @@
         "{baseDir}/references/preset-shape-vocabulary.md",
         "{baseDir}/references/semantic-svg.md",
         "{baseDir}/references/canvas-formats.md",
-        "{baseDir}/references/image-layout-spec.md",
-        "{baseDir}/references/image-layout-patterns.md",
         "{baseDir}/references/modes/_index.md",
         "{baseDir}/references/visual-styles/_index.md",
         "{baseDir}/references/image-renderings/_index.md",
@@ -425,7 +421,7 @@
       "max_tokens": 150000
     },
     "route.generate.planning-image": {
-      "description": "Generate-PPTX planning context after a non-none image source is proposed or confirmed; image decision and layout authorities are already in the fixed planning context. Ceiling raised after BUDGET_LOAD_SET reported 116384 tokens.",
+      "description": "Generate-PPTX planning context after a non-none image source is proposed or confirmed; the image decision authority is already in the fixed planning context (image-layout files are Executor's). Ceiling raised after BUDGET_LOAD_SET reported 116384 tokens.",
       "scope": "cumulative",
       "include": [
         "route.generate.planning"
@@ -443,7 +439,7 @@
       "max_tokens": 130000
     },
     "route.generate.planning-ai": {
-      "description": "Generate-PPTX planning after AI imagery is confirmed; the fixed context already carries image-layout and resource-planning decision authorities. Ceiling raised after BUDGET_LOAD_SET reported 116384 tokens.",
+      "description": "Generate-PPTX planning after AI imagery is confirmed; the fixed context already carries the resource-planning decision authorities (image-layout files are Executor's). Ceiling raised after BUDGET_LOAD_SET reported 116384 tokens.",
       "scope": "cumulative",
       "include": [
         "route.generate.planning-image"
@@ -2070,7 +2066,7 @@
             {
               "path": "{baseDir}/references/executor-base.md",
               "role": "consumer",
-              "fingerprint": "414e605bfaec",
+              "fingerprint": "b63e7a4de45e",
               "reason": "This consumer needs the field contract for deterministic execution."
             },
             {
@@ -2100,7 +2096,7 @@
             {
               "path": "{baseDir}/references/strategist.md",
               "role": "producer",
-              "fingerprint": "f59b7294bcb0",
+              "fingerprint": "0bf67e7eef14",
               "reason": "This producer projects the owner field into the planning contract."
             },
             {

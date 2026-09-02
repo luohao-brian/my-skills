@@ -5,7 +5,7 @@ crop finalization, native picture export, deterministic Morph pairing, authored
 PowerPoint presets, or their planning contracts. It builds one temporary
 two-slide project under the gitignored `projects/_smoke_*` namespace and follows
 the inline-smoke convention from
-[`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v6.0.0/docs/rules/code-style.md) §11; do not turn it into
+[`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v6.1.0/docs/rules/code-style.md) §11; do not turn it into
 a test file or public example deck.
 
 The fixture deliberately closes the full planning and execution chain:

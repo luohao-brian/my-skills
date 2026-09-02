@@ -1,6 +1,6 @@
 # Narration Tools
 
-Tool behavior behind the [`generate-audio`](../../workflows/stages/generate-audio.md) stage: `notes_to_audio.py`, `narration_sync.py`, the narrated `svg_to_pptx.py` export, `powerpoint_video.py`, `video_sound_mix.py`, and `video_subtitles.py`. The stage owns when each runs and what the user confirms; this page owns what the tools do. Model and audio-parameter recommendations live in [`docs/audio-narration.md`](https://github.com/hugohe3/ppt-master/blob/v6.0.0/docs/audio-narration.md).
+Tool behavior behind the [`generate-audio`](../../workflows/stages/generate-audio.md) stage: `notes_to_audio.py`, `narration_sync.py`, the narrated `svg_to_pptx.py` export, `powerpoint_video.py`, `video_sound_mix.py`, and `video_subtitles.py`. The stage owns when each runs and what the user confirms; this page owns what the tools do. Model and audio-parameter recommendations live in [`docs/audio-narration.md`](https://github.com/hugohe3/ppt-master/blob/v6.1.0/docs/audio-narration.md).
 
 ## Prerequisites
 

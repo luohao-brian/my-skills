@@ -177,6 +177,9 @@ def verify_runtime_files(errors: list[str]) -> None:
     )
     if "\\ --dir" in quick_text:
         errors.append("Quick project initialization contains an escaped-space --dir argument")
+    finalizer_text = (SKILL / "scripts" / "finalize_svg.py").read_text(encoding="utf-8")
+    if "Next steps:" in finalizer_text or 'python scripts/svg_to_pptx.py "{project_dir}"' in finalizer_text:
+        errors.append("finalize_svg.py still emits the competing direct-export next step")
     if (SKILL / "scripts" / "attribution_guard.py").exists():
         errors.append("unsupported upstream attribution_guard.py is present")
     for path in sorted((SKILL / "scripts").rglob("*.py")):

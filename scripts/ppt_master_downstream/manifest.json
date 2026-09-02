@@ -2,8 +2,8 @@
   "schema_version": 2,
   "repository": "https://github.com/hugohe3/ppt-master.git",
   "subtree": "skills/ppt-master",
-  "release": "v6.0.0",
-  "release_commit": "e5a05edebe24c7c00c589dbed4f4777cb9855c91",
+  "release": "v6.1.0",
+  "release_commit": "c40bca58e168fcef2facdc7612cc352d1233679b",
   "packaging_transforms": [
     "openclaw_frontmatter",
     "runtime_contract_load_order",
