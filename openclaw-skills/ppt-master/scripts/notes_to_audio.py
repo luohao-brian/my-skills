@@ -1,17 +1,31 @@
 #!/usr/bin/env python3
 """Generate per-slide narration audio from PPT Master notes.
 
-This distribution fixes narration to Ark Agent Plan through the Volcengine
-Seed-TTS adapter. Backend selection is intentionally unavailable.
+This script uses provider backends for the same per-slide output contract on
+macOS, Linux, and Windows. `edge-tts` remains the default no-key backend and
+also writes one compact, word-timed SRT file per slide from the same TTS stream.
+MiniMax and CosyVoice request word timings; ElevenLabs requests character
+alignment. All four apply the same compact, text-faithful cue regrouping.
+Qwen remains audio-only because its current TTS API exposes no timestamps.
 
 Usage:
-    python3 {baseDir}/scripts/notes_to_audio.py <project_path>
-    python3 {baseDir}/scripts/notes_to_audio.py <project_path> --voice-id <voice_id>
-    python3 {baseDir}/scripts/notes_to_audio.py --list-common-voices
-    python3 {baseDir}/scripts/notes_to_audio.py --list-voices --locale zh-CN
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --voice zh-CN-XiaoxiaoNeural
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider elevenlabs --voice-id <voice_id>
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider ark-agent-plan
+    python3 skills/ppt-master/scripts/notes_to_audio.py --list-common-voices
+    python3 skills/ppt-master/scripts/notes_to_audio.py --list-voices --locale zh-CN
 
 Dependencies:
-    ARK_AGENT_PLAN_API_KEY=<key>
+    python3 -m pip install edge-tts
+    ELEVENLABS_API_KEY=<key> for --provider elevenlabs
+    MINIMAX_API_KEY=<key> for --provider minimax
+    QWEN_API_KEY or DASHSCOPE_API_KEY=<key> for --provider qwen
+    COSYVOICE_API_KEY or DASHSCOPE_API_KEY=<key> for --provider cosyvoice
+    ARK_AGENT_PLAN_API_KEY=<key> for --provider ark-agent-plan
+    TTS_PROVIDER=<provider> sets the default; --provider overrides it
 """
 
 from __future__ import annotations
@@ -76,7 +90,15 @@ class AudioJob:
 
 def _load_tts_env_file() -> None:
     """Load TTS-related keys from the first .env file, without overriding shell env."""
-    load_prefixed_env_file(("ARK_AGENT_PLAN_", "TTS_VOICE"))
+    load_prefixed_env_file((
+        "ELEVENLABS_",
+        "MINIMAX_",
+        "QWEN_",
+        "DASHSCOPE_",
+        "COSYVOICE_",
+        "TTS_",
+        "ARK_AGENT_PLAN_",
+    ))
 
 
 def spoken_text(markdown: str) -> str:
@@ -400,12 +422,30 @@ async def _generate_edge_jobs(
 def main() -> int:
     _load_tts_env_file()
 
+    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "edge"
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("project_path", type=Path, nargs="?")
     parser.add_argument("-o", "--output", type=Path, default=None)
+    parser.add_argument(
+        "--provider",
+        choices=[
+            "edge",
+            "elevenlabs",
+            "minimax",
+            "qwen",
+            "cosyvoice",
+            *backend_volcengine.SUPPORTED_PROFILES,
+        ],
+        default=default_provider,
+        help=(
+            "audio generation backend (default: TTS_PROVIDER, "
+            "otherwise edge)"
+        ),
+    )
     parser.add_argument(
         "--voice",
         default=None,
@@ -552,7 +592,8 @@ def main() -> int:
     parser.add_argument("--list-voices", action="store_true", help="query provider voices and exit")
     parser.add_argument("--locale", default=None, help='filter --list-voices by locale, e.g. "zh-CN"')
     args = parser.parse_args()
-    args.provider = backend_volcengine.FIXED_PROFILE
+    if args.provider not in {"edge", "elevenlabs", "minimax", "qwen", "cosyvoice", *backend_volcengine.SUPPORTED_PROFILES}:
+        parser.error(f"unknown TTS_PROVIDER: {args.provider}")
 
     if args.list_common_voices:
         backend_edge.print_common_voices()
@@ -592,7 +633,7 @@ def main() -> int:
     if args.provider == "edge" and not args.voice:
         parser.error(
             "--voice is required for --provider edge. Run --list-voices --locale <locale> to discover voices "
-            "(e.g. --locale zh-CN), or follow {baseDir}/workflows/stages/generate-audio.md "
+            "(e.g. --locale zh-CN), or follow skills/ppt-master/workflows/stages/generate-audio.md "
             "for an AI-curated recommendation."
         )
         raise AssertionError("unreachable")
@@ -871,7 +912,7 @@ def main() -> int:
                         output_path,
                         profile=backend_volcengine.TtsProfile(
                             name=backend.provider,
-                            provider=backend_volcengine.FIXED_PROVIDER,
+                            provider=backend_volcengine.PROVIDER_NAME,
                             api_key=backend.api_key,
                             base_url=backend.base_url,
                             model=backend.model,

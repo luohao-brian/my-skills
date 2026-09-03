@@ -269,8 +269,8 @@ def _run_sync(argv: list[str]) -> int:
         for sound_id in missing:
             print(f"     x {sound_id}", file=sys.stderr)
         print(
-            "Review `{baseDir}/templates/sounds/sound-vocabulary.md`, then "
-            "optionally run `python3 {baseDir}/scripts/sound_sync.py list "
+            "Review `skills/ppt-master/templates/sounds/sound-vocabulary.md`, then "
+            "optionally run `python3 skills/ppt-master/scripts/sound_sync.py list "
             "--query <term>` to locate an exact ID.",
             file=sys.stderr,
         )

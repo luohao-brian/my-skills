@@ -405,6 +405,9 @@ def finalize_project(
     if not quiet:
         print()
         safe_print("[OK] Done!")
+        print()
+        print("Next steps:")
+        print(f"  python scripts/svg_to_pptx.py \"{project_dir}\"")
 
     return True
 

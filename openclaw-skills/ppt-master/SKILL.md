@@ -1,7 +1,7 @@
 ---
 name: ppt-master
 description: 将 PDF、DOCX、PPTX、网页、Markdown、新闻或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。
-metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master","primaryEnv":"ARK_AGENT_PLAN_API_KEY","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]}}}
+metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master","primaryEnv":"ARK_AGENT_PLAN_API_KEY","requires":{"anyBins":["python3","python"]}}}
 ---
 
 
@@ -11,12 +11,12 @@ PPT Master is a routed presentation workflow. This entry owns global execution d
 
 ## Downstream Runtime Boundary
 
-This OpenClaw/Hermes distribution keeps upstream workflow semantics and routes while delegating environment-specific behavior to [`references/runtime.md`](references/runtime.md). The runtime contract has precedence only for project directories, target-host fonts, dependency/capability discovery, and the downstream release gate.
+This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Agent Plan media execution.
 
 ## Mandatory Load Order
 
 1. Read this file.
-2. Read [`references/runtime.md`](references/runtime.md); its Directory, Font, and Dependency contracts are mandatory for every route.
+2. Read [`references/runtime.md`](references/runtime.md) for the environment and media contracts.
 3. Read [`workflows/routing.md`](workflows/routing.md).
 4. Select exactly one top-level route and its active profile from the routing authority.
 5. Read only the resulting runtime authority and its explicitly triggered supporting documents.

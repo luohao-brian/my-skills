@@ -171,6 +171,8 @@ python3 scripts/sync-vendored-skills.py all --ref <tag-or-commit> --apply
 
 PPT Master 使用 `scripts/ppt_master_downstream/manifest.json` 固定上游发布版本。发布目录由上游整树、确定性打包转换、附加覆盖层和小型补丁队列重新生成。
 
+本地 diff 以最小化为目标：保留打包、调用方工作目录、运行时依赖和方舟 Agent Plan 接入适配；PPT 创作、字体转换、质量检查与导出流程沿用上游。新增本地改动前先确认上游是否已提供所需能力，避免维护第二套制作或验收规则。
+
 检查当前发布目录是否可以由 manifest 完整重建：
 
 ```bash

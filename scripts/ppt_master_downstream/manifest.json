@@ -10,40 +10,22 @@
     "disable_runtime_identity_guard",
     "portable_base_dir_paths",
     "portable_project_init",
-    "downstream_release_command_owner",
     "readme_to_progressive_index",
-    "external_upstream_links",
-    "text_whitespace_normalization"
+    "external_upstream_links"
   ],
   "additive_overlays": [
-    ".env.example",
     "references/runtime.md",
     "references/runtime-directory.md",
-    "references/runtime-fonts.md",
     "references/runtime-dependencies.md",
     "references/runtime-media.md",
-    "scripts/audio_duration.py",
-    "scripts/audio_manifest.py",
-    "scripts/downstream_release.py",
-    "scripts/downstream_svg_checker.py",
-    "scripts/font_preflight.py",
-    "scripts/pptx_layout_audit.py",
-    "scripts/visual_layout_audit.py",
-    "scripts/tests/test_downstream_svg_checker.py",
-    "scripts/tests/test_font_preflight.py",
-    "scripts/tests/test_font_resolution.py",
     "scripts/tests/test_image_provider_bridge.py",
     "scripts/tts_backends/backend_volcengine.py",
-    "scripts/tests/test_tts_provider_bridge.py",
-    "scripts/tests/test_pptx_layout_audit.py",
-    "scripts/tests/test_runtime_media_manifests.py",
-    "scripts/tests/test_visual_layout_audit.py"
+    "scripts/tests/test_tts_provider_bridge.py"
   ],
   "core_patches": [
     "tts-provider-bridge.patch",
-    "agent-plan-media-only.patch",
-    "directory-cli-required.patch",
-    "target-host-fonts.patch"
+    "image-provider-bridge.patch",
+    "runtime-script-path.patch"
   ],
   "subsumed_by_upstream": [
     "formal release export requires a current passing final SVG quality report"

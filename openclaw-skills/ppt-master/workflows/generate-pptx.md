@@ -320,12 +320,10 @@ python3 {baseDir}/scripts/finalize_svg.py <project_path>
 
 #### Step 7.3 — Export the Native PPTX
 
-Use the [downstream formal SVG-route publication command](../references/runtime.md#formal-svg-route-publication) with the upstream exporter arguments below:
-
-| Effective decision | Upstream exporter arguments |
+| Effective decision | Command |
 |---|---|
-| Speaker Notes `enabled` | _(none)_ |
-| Speaker Notes `disabled` | `--no-notes` |
+| Speaker Notes `enabled` | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path>` |
+| Speaker Notes `disabled` | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-notes` |
 
 Append `--native-charts-and-tables` only for an explicit editable Chart/Table delivery decision (markers, templates, semantic tables, and imported charts never activate it; formulas are always native). Motion: with a preserved or produced `animations.json`, keep the base command — the exporter reads the sidecar; append the resolved [`animations.md`](../references/animations.md) flags for a deck-wide setting — explicit flags override the corresponding sidecar default/slide fields while group overrides remain; an explicit Custom Animations disable keeps the sidecar and appends `-a none`, an explicit all-motion disable uses `--no-animations`, and final Stage-2 `false` does neither. Sound: after the motion solution is final, run the optional pass in `animations.md` §2.2 — no cue creates no `sounds/`; a selected cue is synced with `sound_sync.py` (never read from `templates/sounds/` directly) and referenced from the validated sidecar. For a narrated MP4, [`generate-audio`](stages/generate-audio.md) owns the delivery choice; do not add `--conversion-trace` to every base export; an explicit `--conversion-trace <path>` writes to that destination instead of the default.
 

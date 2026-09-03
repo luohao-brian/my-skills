@@ -1108,11 +1108,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Registered canvas format; omit to determine the canvas during authoring",
     )
-    init.add_argument(
-        "--dir",
-        required=True,
-        help="Absolute caller-selected base directory for the project",
-    )
+    init.add_argument("--dir", default=None, help="Base directory for the project")
     init.add_argument(
         "--quick-generate",
         action="store_true",

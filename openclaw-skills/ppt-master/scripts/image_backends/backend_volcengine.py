@@ -3,7 +3,10 @@
 Volcengine Seedream image generation backend.
 
 Configuration keys:
-  ARK_AGENT_PLAN_API_KEY             (required)
+  LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY   (required)
+  VOLCENGINE_BASE_URL                (optional)
+  VOLCENGINE_MODEL                   (optional; Seedream 4.5 only)
+  With IMAGE_BACKEND=ark-agent-plan, use ARK_AGENT_PLAN_API_KEY instead.
 """
 
 import sys
@@ -19,9 +22,10 @@ configure_utf8_stdio()
 
 if __name__ == "__main__":
     print(__doc__)
-    print("Use via: python3 {baseDir}/scripts/image_gen.py \"prompt\"")
+    print("Use via: python3 skills/ppt-master/scripts/image_gen.py \"prompt\" --backend volcengine")
     raise SystemExit(0 if any(arg in {"-h", "--help", "help"} for arg in sys.argv[1:]) else 1)
 
+import os
 import time
 
 import requests
@@ -39,23 +43,50 @@ from image_backends.backend_common import (
 )
 
 
-ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3"
+DEFAULT_ENDPOINT = "https://operator.las.cn-beijing.volces.com/api/v1/images/generations"
+DEFAULT_MODEL = "doubao-seedream-4-5-251128"
+ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
 ARK_AGENT_PLAN_MODEL = "doubao-seedream-5.0-lite"
 DEFAULT_IMAGE_SIZE = "2K"
-FIXED_PROFILE = "ark-agent-plan"
-FIXED_PROVIDER = "volc-ark-agent-plan"
+SUPPORTED_MODELS = {DEFAULT_MODEL}
 
-ARK_ASPECT_RATIO_SIZE_MAP = {
-    "1:1": (2048, 2048),
-    "3:4": (1728, 2304),
-    "4:3": (2304, 1728),
-    "16:9": (2848, 1600),
-    "9:16": (1600, 2848),
-    "3:2": (2496, 1664),
-    "2:3": (1664, 2496),
-    "21:9": (3136, 1344),
+ASPECT_RATIO_SIZE_MAP = {
+    "2K": {
+        "1:1": "2048x2048",
+        "2:3": "1664x2496",
+        "3:2": "2496x1664",
+        "3:4": "1728x2304",
+        "4:3": "2304x1728",
+        "9:16": "1600x2848",
+        "16:9": "2848x1600",
+        "21:9": "3136x1344",
+    },
+    "4K": {
+        "1:1": "4096x4096",
+        "2:3": "3328x4992",
+        "3:2": "4992x3328",
+        "3:4": "3520x4704",
+        "4:3": "4704x3520",
+        "9:16": "3040x5504",
+        "16:9": "5504x3040",
+        "21:9": "6240x2656",
+    },
 }
-ARK_SIZE_SCALE = {"512px": 1.0, "1K": 1.0, "2K": 1.0, "4K": 1.0}
+
+
+def _validate_model(model: str) -> str:
+    """Validate the model for the selected Volcengine service."""
+    supported = (
+        {ARK_AGENT_PLAN_MODEL}
+        if os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
+        else SUPPORTED_MODELS
+    )
+    resolved = model.strip()
+    if resolved not in supported:
+        raise ValueError(
+            f"Unsupported Volcengine model '{model}'. Supported: {sorted(supported)}"
+        )
+    return resolved
 
 
 def _resolve_url(base_url: str) -> str:
@@ -63,32 +94,37 @@ def _resolve_url(base_url: str) -> str:
     base = base_url.rstrip("/")
     if base.endswith("/images/generations"):
         return base
-    if base.endswith(("/api/v3", "/api/plan/v3")):
+    if base.endswith("/api/v1"):
         return base + "/images/generations"
     return base + "/api/v1/images/generations"
 
 
 def _resolve_size(aspect_ratio: str, image_size: str) -> str:
-    """Resolve the Agent Plan target resolution for a ratio and size preset."""
+    """Resolve the target resolution for a ratio and logical size preset."""
     normalized = normalize_image_size(image_size)
-    dimensions = ARK_ASPECT_RATIO_SIZE_MAP.get(aspect_ratio)
-    scale = ARK_SIZE_SCALE.get(normalized)
-    if dimensions and scale:
-        width, height = dimensions
-        return f"{round(width * scale)}x{round(height * scale)}"
-    supported = sorted(ARK_ASPECT_RATIO_SIZE_MAP)
-    raise ValueError(
-        f"Unsupported aspect ratio '{aspect_ratio}' for Ark image generation. "
-        f"Supported: {supported}"
-    )
+    sizes = ASPECT_RATIO_SIZE_MAP.get(normalized)
+    if sizes is None:
+        supported_sizes = ", ".join(ASPECT_RATIO_SIZE_MAP)
+        raise ValueError(
+            f"Unsupported image size '{image_size}' for Volcengine backend. "
+            f"Seedream 4.5 supports these sizes: {supported_sizes}."
+        )
+    size = sizes.get(aspect_ratio)
+    if not size:
+        supported = sorted(sizes)
+        raise ValueError(
+            f"Unsupported aspect ratio '{aspect_ratio}' for Volcengine backend. "
+            f"Supported: {supported}"
+        )
+    return size
 
 
 def _generate_image(api_key: str, prompt: str,
                     aspect_ratio: str = "1:1", image_size: str = DEFAULT_IMAGE_SIZE,
                     output_dir: str = None, filename: str = None,
-                    model: str = ARK_AGENT_PLAN_MODEL,
-                    base_url: str = ARK_AGENT_PLAN_ENDPOINT) -> str:
+                    model: str = DEFAULT_MODEL, base_url: str = DEFAULT_ENDPOINT) -> str:
     """Generate one image with the Volcengine backend."""
+    model = _validate_model(model)
     size = _resolve_size(aspect_ratio, image_size)
     url = _resolve_url(base_url)
     headers = {
@@ -128,42 +164,46 @@ def _generate_image(api_key: str, prompt: str,
     return download_image(image_url, path)
 
 
-def _resolve_profile(model: str = None) -> dict[str, object]:
-    """Resolve the fixed Ark Agent Plan image profile."""
-    api_key = require_api_key(
-        "ARK_AGENT_PLAN_API_KEY",
-        message="No Agent Plan image key found. Configure ARK_AGENT_PLAN_API_KEY.",
-    )
-    return {
-        "profile": FIXED_PROFILE,
-        "provider": FIXED_PROVIDER,
-        "api_key": api_key,
-        "base_url": ARK_AGENT_PLAN_ENDPOINT,
-        "model": model or ARK_AGENT_PLAN_MODEL,
-    }
-
-
 def generate(prompt: str,
              aspect_ratio: str = "1:1", image_size: str = DEFAULT_IMAGE_SIZE,
              output_dir: str = None, filename: str = None,
              model: str = None, max_retries: int = MAX_RETRIES) -> str:
     """Generate an image with retries using the Volcengine backend."""
-    profile = _resolve_profile(model)
+    agent_plan = os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
+    resolved_model = model or (
+        ARK_AGENT_PLAN_MODEL if agent_plan else os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
+    )
+    _validate_model(resolved_model)
     normalized_size = normalize_image_size(image_size)
     _resolve_size(aspect_ratio, normalized_size)
+    api_key = require_api_key(
+        *(("ARK_AGENT_PLAN_API_KEY",) if agent_plan else (
+            "LAS_API_KEY", "VOLCENGINE_API_KEY", "ARK_API_KEY",
+        )),
+        message=(
+            "No Agent Plan image key found. Set ARK_AGENT_PLAN_API_KEY."
+            if agent_plan else
+            "No API key found. Set LAS_API_KEY, VOLCENGINE_API_KEY, or "
+            "ARK_API_KEY in the current environment or a .env file."
+        ),
+    )
+    base_url = (
+        ARK_AGENT_PLAN_ENDPOINT if agent_plan
+        else os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
+    )
 
     last_error = None
     for attempt in range(max_retries + 1):
         try:
             return _generate_image(
-                api_key=str(profile["api_key"]),
+                api_key=api_key,
                 prompt=prompt,
                 aspect_ratio=aspect_ratio,
                 image_size=normalized_size,
                 output_dir=output_dir,
                 filename=filename,
-                model=str(profile["model"]),
-                base_url=str(profile["base_url"]),
+                model=resolved_model,
+                base_url=base_url,
             )
         except Exception as exc:
             last_error = exc

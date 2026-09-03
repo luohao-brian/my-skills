@@ -12,8 +12,8 @@ Usage:
     python3 scripts/prompt_audit.py --root /path/to/ppt-master
 
 Examples:
-    python3 {baseDir}/scripts/prompt_audit.py
-    python3 {baseDir}/scripts/prompt_audit.py --json | python3 -m json.tool
+    python3 skills/ppt-master/scripts/prompt_audit.py
+    python3 skills/ppt-master/scripts/prompt_audit.py --json | python3 -m json.tool
 
 Dependencies:
     tiktoken (o200k_base encoding)
@@ -1789,7 +1789,7 @@ def audit_schema_grammars(
             fields = sorted(str(item) for item in configured_fields)
         else:
             raise AuditError("schema_grammars fields must be a list when present")
-        scan_patterns = config.get("scan", ["{baseDir}/**/*.md"])
+        scan_patterns = config.get("scan", ["skills/ppt-master/**/*.md"])
         accepted_by_field = {
             str(entry["field"]): entry for entry in config.get("accepted", [])
         }

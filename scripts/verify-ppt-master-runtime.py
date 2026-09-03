@@ -138,10 +138,7 @@ def verify_runtime_files(errors: list[str]) -> None:
     required = (
         "references/runtime.md",
         "references/runtime-directory.md",
-        "references/runtime-fonts.md",
         "references/runtime-dependencies.md",
-        "scripts/downstream_release.py",
-        "scripts/downstream_svg_checker.py",
     )
     for relative in required:
         if not (SKILL / relative).is_file():
@@ -153,33 +150,19 @@ def verify_runtime_files(errors: list[str]) -> None:
         errors.append("SKILL.md does not contain single-line OpenClaw metadata")
     if '\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\"' not in skill_text:
         errors.append("SKILL.md does not expose the default Agent Plan credential as primaryEnv")
-    if '\"env\":[\"ARK_AGENT_PLAN_API_KEY\"]' not in skill_text:
-        errors.append("SKILL.md does not declare the fixed Agent Plan credential dependency")
+    metadata_line = next(line for line in skill_text.splitlines() if line.startswith("metadata: "))
+    metadata = json.loads(metadata_line.removeprefix("metadata: "))
+    if "ARK_AGENT_PLAN_API_KEY" in metadata["openclaw"].get("requires", {}).get("env", []):
+        errors.append("optional Agent Plan credential is required for the whole skill")
     runtime_text = (SKILL / "references" / "runtime.md").read_text(encoding="utf-8")
-    for name in ("runtime-directory.md", "runtime-fonts.md", "runtime-dependencies.md"):
+    for name in ("runtime-directory.md", "runtime-dependencies.md"):
         if name not in runtime_text:
             errors.append(f"runtime.md does not load {name}")
-    if "downstream_release.py" not in runtime_text:
-        errors.append("runtime.md does not route formal export through downstream_release.py")
-    if "Direct `svg_to_pptx.py` calls are diagnostic" not in runtime_text:
-        errors.append("runtime.md does not classify direct exporter calls as diagnostic")
-    for relative in (
-        "workflows/generate-pptx.md",
-        "workflows/profiles/quick-generate.md",
-    ):
-        route_text = (SKILL / relative).read_text(encoding="utf-8")
-        if "formal-svg-route-publication" not in route_text:
-            errors.append(f"{relative} does not reference the formal release command owner")
-        if re.search(r"python3\s+\{baseDir\}/scripts/svg_to_pptx\.py", route_text):
-            errors.append(f"{relative} still declares a competing formal exporter command")
     quick_text = (SKILL / "workflows" / "profiles" / "quick-generate.md").read_text(
         encoding="utf-8"
     )
     if "\\ --dir" in quick_text:
         errors.append("Quick project initialization contains an escaped-space --dir argument")
-    finalizer_text = (SKILL / "scripts" / "finalize_svg.py").read_text(encoding="utf-8")
-    if "Next steps:" in finalizer_text or 'python scripts/svg_to_pptx.py "{project_dir}"' in finalizer_text:
-        errors.append("finalize_svg.py still emits the competing direct-export next step")
     if (SKILL / "scripts" / "attribution_guard.py").exists():
         errors.append("unsupported upstream attribution_guard.py is present")
     for path in sorted((SKILL / "scripts").rglob("*.py")):
@@ -200,7 +183,8 @@ def verify_markdown(errors: list[str]) -> None:
             line_start = text.rfind("\n", 0, match.start()) + 1
             line_end = text.find("\n", match.end())
             line = text[line_start : None if line_end < 0 else line_end]
-            if "https://" in line or path.name == "upstream-source.md":
+            # runtime.md defines how to resolve the unchanged upstream help paths.
+            if "https://" in line or path.name in {"upstream-source.md", "runtime.md"}:
                 continue
             report(errors, path, line_number(text, match.start()), "installation-relative skills/ppt-master path")
         for match in re.finditer(r"/(?:Users|home)/[^/\s]+/", text):
@@ -228,14 +212,6 @@ def verify_markdown(errors: list[str]) -> None:
 
 
 def verify_patch_effects(errors: list[str]) -> None:
-    project_cli = (SKILL / "scripts" / "project_management" / "cli.py").read_text(encoding="utf-8")
-    if not re.search(r'"--dir",\s*\n\s*required=True,', project_cli):
-        errors.append("Directory core patch is not active")
-    font_utils = (SKILL / "scripts" / "svg_to_pptx" / "drawingml" / "utils.py").read_text(encoding="utf-8")
-    if "ea_font = ea_font or win_font" in font_utils:
-        errors.append("target-host font patch is not active")
-    if "return {'latin': ea, 'ea': ea, 'cs': ea}" not in font_utils:
-        errors.append("East Asian run pinning patch is not active")
     exporter = (SKILL / "scripts" / "svg_to_pptx" / "pptx_package" / "cli.py").read_text(encoding="utf-8")
     if not re.search(
         r"release_quality_gate\s*=\s*\(\s*args\.quick_generate\s*"
@@ -244,27 +220,21 @@ def verify_patch_effects(errors: list[str]) -> None:
     ):
         errors.append("upstream formal release fail-closed gate is missing")
     image_gen = (SKILL / "scripts" / "image_gen.py").read_text(encoding="utf-8")
-    if 'FIXED_IMAGE_BACKEND = "volcengine"' not in image_gen:
-        errors.append("fixed Agent Plan image backend patch is not active")
+    if '"ark-agent-plan": {' not in image_gen:
+        errors.append("optional Agent Plan image backend is missing")
     volcengine = (SKILL / "scripts" / "image_backends" / "backend_volcengine.py").read_text(encoding="utf-8")
     for marker in ("ARK_AGENT_PLAN_ENDPOINT", "ARK_AGENT_PLAN_API_KEY"):
         if marker not in volcengine:
             errors.append(f"Volcengine image profile patch is missing {marker}")
-    for forbidden in ("ARK_API_KEY", "VOLCENGINE_API_KEY", 'os.environ.get("IMAGE_BACKEND"'):
-        if forbidden in volcengine:
-            errors.append(f"fixed Agent Plan image backend still exposes {forbidden}")
     notes_to_audio = (SKILL / "scripts" / "notes_to_audio.py").read_text(encoding="utf-8")
     if "backend_volcengine.SUPPORTED_PROFILES" not in notes_to_audio:
         errors.append("provider TTS bridge core patch is not active")
     tts_volcengine = (
         SKILL / "scripts" / "tts_backends" / "backend_volcengine.py"
     ).read_text(encoding="utf-8")
-    for marker in ("FIXED_PROFILE", "ark-agent-plan", "ARK_AGENT_PLAN_API_KEY"):
+    for marker in ("ark-agent-plan", "ARK_AGENT_PLAN_API_KEY"):
         if marker not in tts_volcengine:
             errors.append(f"Volcengine TTS profile adapter is missing {marker}")
-    for forbidden in ("ARK_TTS_API_KEY", "ARK_API_KEY", 'os.environ.get("TTS_BACKEND"'):
-        if forbidden in tts_volcengine:
-            errors.append(f"fixed Agent Plan TTS backend still exposes {forbidden}")
 
 
 def main() -> int:

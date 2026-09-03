@@ -2,9 +2,41 @@
 """
 Unified Image Generation Tool
 
-This distribution fixes image generation to the Ark Agent Plan profile through
-the upstream Volcengine backend. The only credential is
-`ARK_AGENT_PLAN_API_KEY`; backend selection is intentionally unavailable.
+Dispatches to the appropriate backend based on explicit provider configuration.
+
+Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment):
+  IMAGE_BACKEND=gemini      -> Gemini backend (google-genai SDK)
+  IMAGE_BACKEND=openai      -> OpenAI-compatible backend (raw HTTP via requests)
+  IMAGE_BACKEND=minimax     -> MiniMax image backend
+  IMAGE_BACKEND=stability   -> Stability AI backend
+  IMAGE_BACKEND=bfl         -> Black Forest Labs FLUX backend
+  IMAGE_BACKEND=ideogram    -> Ideogram backend
+  IMAGE_BACKEND=qwen        -> Alibaba Qwen image backend
+  IMAGE_BACKEND=zhipu       -> Zhipu GLM-Image backend
+  IMAGE_BACKEND=volcengine  -> Volcengine Seedream backend
+  IMAGE_BACKEND=ark-agent-plan -> Ark Agent Plan Seedream backend
+  IMAGE_BACKEND=modelscope  -> ModelScope backend
+  IMAGE_BACKEND=siliconflow -> SiliconFlow backend
+  IMAGE_BACKEND=fal         -> fal.ai backend
+  IMAGE_BACKEND=replicate   -> Replicate backend
+  IMAGE_BACKEND=openrouter  -> OpenRouter backend
+
+Configuration source (process env wins, `.env` is the fallback layer):
+  1. Current process environment variables
+  2. The first `.env` found among:
+     - Current working directory
+     - Skill directory (e.g. `~/.agents/skills/ppt-master/.env`)
+     - Repo root (when running from a clone)
+     - `~/.ppt-master/.env` (user-level config)
+
+Supported keys:
+  IMAGE_BACKEND    (required) backend name
+
+  Provider-specific keys are used for credentials and overrides, for example:
+    GEMINI_API_KEY / GEMINI_MODEL / GEMINI_BASE_URL
+    OPENAI_API_KEY / OPENAI_MODEL / OPENAI_BASE_URL
+    QWEN_API_KEY / QWEN_MODEL / QWEN_BASE_URL
+    ZHIPU_API_KEY / ZHIPU_MODEL / ZHIPU_BASE_URL
 
 Usage:
   python3 image_gen.py "prompt" --aspect_ratio 16:9 --image_size 1K -o images/
@@ -30,7 +62,32 @@ from config import load_prefixed_env_file, resolve_env_path
 configure_utf8_stdio()
 
 ENV_PATH = resolve_env_path()
-IMAGE_ENV_PREFIXES = ("ARK_AGENT_PLAN_", "IMAGE_CONCURRENCY")
+IMAGE_ENV_PREFIXES = (
+    "IMAGE_",
+    "GEMINI_",
+    "OPENAI_",
+    "MINIMAX_",
+    "STABILITY_",
+    "BFL_",
+    "IDEOGRAM_",
+    "QWEN_",
+    "DASHSCOPE_",
+    "ZHIPU_",
+    "BIGMODEL_",
+    "VOLCENGINE_",
+    "LAS_",
+    "ARK_",
+    "MODELSCOPE_",
+    "SILICONFLOW_",
+    "FAL_",
+    "REPLICATE_",
+    "OPENROUTER_",
+)
+DEPRECATED_IMAGE_KEYS = {
+    "IMAGE_API_KEY",
+    "IMAGE_MODEL",
+    "IMAGE_BASE_URL",
+}
 
 # All aspect ratios accepted by the unified CLI
 # (each backend validates its own subset internally)
@@ -93,10 +150,18 @@ BACKEND_REGISTRY = {
         "module": "backend_volcengine",
         "tier": "core",
         "label": "Volcengine Seedream",
+        "default_model": "doubao-seedream-4-5-251128",
+        "default_image_size": "2K",
+        "key_hint": "LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY",
+        "aliases": ["ark", "doubao", "seedream"],
+    },
+    "ark-agent-plan": {
+        "module": "backend_volcengine",
+        "tier": "core",
+        "label": "Ark Agent Plan Seedream",
         "default_model": "doubao-seedream-5.0-lite",
         "default_image_size": "2K",
         "key_hint": "ARK_AGENT_PLAN_API_KEY",
-        "aliases": ["ark-agent-plan", "doubao", "seedream"],
     },
     "modelscope": {
         "module": "backend_modelscope",
@@ -172,16 +237,47 @@ BACKEND_REGISTRY = {
 
 TIER_ORDER = {"core": 0, "extended": 1, "experimental": 2}
 SUPPORTED_BACKENDS = tuple(sorted(BACKEND_REGISTRY))
-FIXED_IMAGE_BACKEND = "volcengine"
 
 
 def _load_image_env_file() -> Path | None:
-    """Load only the fixed Agent Plan credential and operational concurrency."""
-    return load_prefixed_env_file(IMAGE_ENV_PREFIXES)
+    """
+    Load image generation config from the resolved `.env` as a fallback layer.
+
+    Existing process environment variables win over `.env`.
+    """
+    replacements = {
+        "IMAGE_API_KEY": "GEMINI_API_KEY / OPENAI_API_KEY / QWEN_API_KEY / ZHIPU_API_KEY / ...",
+        "IMAGE_MODEL": "GEMINI_MODEL / OPENAI_MODEL / QWEN_MODEL / ZHIPU_MODEL / ...",
+        "IMAGE_BASE_URL": "GEMINI_BASE_URL / OPENAI_BASE_URL / QWEN_BASE_URL / ZHIPU_BASE_URL / ...",
+    }
+    deprecated_messages = {
+        key: (
+            "Global image config keys have been removed.\n"
+            f"Use IMAGE_BACKEND plus provider-specific keys instead, such as {replacement}."
+        )
+        for key, replacement in replacements.items()
+    }
+    return load_prefixed_env_file(
+        IMAGE_ENV_PREFIXES,
+        deprecated_keys=deprecated_messages,
+    )
 
 
 def _validate_runtime_config() -> None:
-    """The fixed backend ignores unrelated image-provider configuration."""
+    """Reject deprecated global image variables from any configuration source."""
+    for key in DEPRECATED_IMAGE_KEYS:
+        if key not in os.environ:
+            continue
+        replacement = {
+            "IMAGE_API_KEY": "GEMINI_API_KEY / OPENAI_API_KEY / QWEN_API_KEY / ZHIPU_API_KEY / ...",
+            "IMAGE_MODEL": "GEMINI_MODEL / OPENAI_MODEL / QWEN_MODEL / ZHIPU_MODEL / ...",
+            "IMAGE_BASE_URL": "GEMINI_BASE_URL / OPENAI_BASE_URL / QWEN_BASE_URL / ZHIPU_BASE_URL / ...",
+        }[key]
+        raise ValueError(
+            f"Unsupported image config key: {key}\n"
+            "Global image config keys have been removed.\n"
+            f"Use IMAGE_BACKEND plus provider-specific keys instead, such as {replacement}."
+        )
 
 
 def _build_backend_aliases() -> dict[str, str]:
@@ -221,26 +317,105 @@ def _load_backend(canonical_name: str) -> tuple[object, str]:
 
 
 def _print_backend_resolution() -> None:
-    """Print the fixed Path A backend without exposing credentials."""
-    print("Resolved backend: volcengine (ark-agent-plan)")
-    print("Configuration source: fixed downstream profile")
+    """Print the effective Path A backend without exposing credentials."""
+    backend_from_process = "IMAGE_BACKEND" in os.environ
+    try:
+        env_path = _load_image_env_file()
+    except ValueError as exc:
+        print("Resolved backend: invalid configuration")
+        print(f"Configuration source: {ENV_PATH}")
+        print(f"Configuration error: {exc}")
+        return
+
+    try:
+        _validate_runtime_config()
+    except ValueError as exc:
+        print("Resolved backend: invalid configuration")
+        print("Configuration source: process environment")
+        print(f"Configuration error: {exc}")
+        return
+
+    backend_name = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    if not backend_name:
+        if backend_from_process:
+            source = "process environment (empty)"
+        elif env_path is not None:
+            source = f"none (checked {env_path})"
+        else:
+            source = "none (no .env found)"
+        print("Resolved backend: not configured (Path A unavailable)")
+        print(f"Configuration source: {source}")
+        return
+
+    canonical = BACKEND_ALIASES.get(backend_name)
+    resolved = canonical or f"invalid ({backend_name})"
+    source = "process environment" if backend_from_process else str(env_path or ENV_PATH)
+    print(f"Resolved backend: {resolved}")
+    print(f"Configuration source: {source}")
 
 
 def _print_backend_list() -> None:
-    """Print the single supported downstream image profile."""
-    print("Supported image backend: ark-agent-plan")
-    print("Credential: ARK_AGENT_PLAN_API_KEY")
+    """Print supported backends grouped by support tier."""
+    print("Supported image backends:\n")
+    tiers = ("core", "extended", "experimental")
+    for tier in tiers:
+        print(f"{tier.upper()}:")
+        for name, info in sorted(
+            BACKEND_REGISTRY.items(),
+            key=lambda item: (TIER_ORDER[item[1]["tier"]], item[0]),
+        ):
+            if info["tier"] != tier:
+                continue
+            if info["default_model"]:
+                model_label = f"default={info['default_model']}"
+            else:
+                model_label = f"model=required via {info['model_hint']}"
+            print(
+                f"  {name:<12} {info['label']} | "
+                f"{model_label} | "
+                f"size={info['default_image_size']} | keys={info['key_hint']}"
+            )
+        print()
+    print("Recommendation: prefer CORE backends for everyday PPT generation.")
     _print_backend_resolution()
 
 
 def _resolve_backend() -> tuple[object, str]:
     """
-    Return the fixed Ark Agent Plan implementation.
+    Determine which backend to use from explicit configuration.
 
     Returns:
         A backend module with a generate() function.
     """
-    return _load_backend(FIXED_IMAGE_BACKEND)
+    backend_name = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    if backend_name:
+        canonical = BACKEND_ALIASES.get(backend_name)
+        if not canonical:
+            supported = ", ".join(SUPPORTED_BACKENDS)
+            print(f"Error: Unknown IMAGE_BACKEND='{backend_name}'. Supported: {supported}")
+            sys.exit(1)
+        return _load_backend(canonical)
+
+    supported = ", ".join(SUPPORTED_BACKENDS)
+    print(
+        "Error: No image backend configured for Path A (image_gen.py).\n"
+        "\n"
+        "If your host (Codex / Antigravity / Claude Code / etc.) has a native image\n"
+        "generation tool, do NOT run this script — switch to Path B: invoke the host's\n"
+        "image tool directly with the prompts from images/image_prompts.json and save\n"
+        "the outputs to images/<filename>. See references/image-generator.md §7 Path B.\n"
+        "\n"
+        "To use Path A instead, set IMAGE_BACKEND in one of these places:\n"
+        f"  1. Current process environment\n"
+        f"  2. {ENV_PATH}\n"
+        "\n"
+        f"Supported backends: {supported}\n"
+        "\n"
+        "Example:\n"
+        "  IMAGE_BACKEND=openai\n"
+        "  OPENAI_API_KEY=sk-xxx\n"
+    )
+    sys.exit(1)
 
 
 _AI_IMAGE_PATH_ROW_RE = re.compile(
@@ -1069,6 +1244,10 @@ def main() -> None:
         help="Model name. Default depends on backend."
     )
     parser.add_argument(
+        "--backend", "-b", default=None, choices=SUPPORTED_BACKENDS,
+        help="Override IMAGE_BACKEND env var."
+    )
+    parser.add_argument(
         "--list-backends", action="store_true",
         help="List available backends grouped by support tier and exit."
     )
@@ -1182,6 +1361,10 @@ def main() -> None:
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+    # CLI --backend overrides the value loaded from .env
+    if args.backend:
+        os.environ["IMAGE_BACKEND"] = args.backend
 
     backend, backend_name = _resolve_backend()
     image_size = (

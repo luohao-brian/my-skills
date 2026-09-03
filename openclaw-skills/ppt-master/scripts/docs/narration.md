@@ -5,7 +5,7 @@ Tool behavior behind the [`generate-audio`](../../workflows/stages/generate-audi
 ## Prerequisites
 
 - `edge-tts` for the default backend (`python3 -m pip install edge-tts`); `ffprobe` for recorded-narration export (slide timings come from actual audio duration); `ffmpeg` plus `numpy` for post-export video calibration and the sound mix.
-- Cloud keys: ElevenLabs `ELEVENLABS_API_KEY`; MiniMax `MINIMAX_API_KEY` (China endpoint by default; `MINIMAX_TTS_BASE_URL=https://api.minimax.io/v1/t2a_v2` for overseas); Qwen `QWEN_API_KEY` or `DASHSCOPE_API_KEY`; CosyVoice `COSYVOICE_API_KEY` or `DASHSCOPE_API_KEY`. Keys come from the process environment or the first `.env` found in: current working directory, skill directory (e.g. `~/.agents/{baseDir}/.env`), clone repo root, `~/.ppt-master/.env`.
+- Cloud keys: ElevenLabs `ELEVENLABS_API_KEY`; MiniMax `MINIMAX_API_KEY` (China endpoint by default; `MINIMAX_TTS_BASE_URL=https://api.minimax.io/v1/t2a_v2` for overseas); Qwen `QWEN_API_KEY` or `DASHSCOPE_API_KEY`; CosyVoice `COSYVOICE_API_KEY` or `DASHSCOPE_API_KEY`. Keys come from the process environment or the first `.env` found in: current working directory, skill directory (e.g. `{baseDir}/.env`), clone repo root, `~/.ppt-master/.env`.
 - Automatic video export requires Windows PowerPoint 2016+. macOS PowerPoint has no `CreateVideo` automation contract and its manual movie export drops animation effects; UI scripting is not a substitute.
 
 ## `notes_to_audio.py`

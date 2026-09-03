@@ -125,7 +125,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         "PPT Master is a routed presentation workflow. This entry owns global execution discipline and route selection only; each selected route owns its procedure.\n",
         "PPT Master is a routed presentation workflow. This entry owns global execution discipline and route selection only; each selected route owns its procedure.\n\n"
         "## Downstream Runtime Boundary\n\n"
-        "This OpenClaw/Hermes distribution keeps upstream workflow semantics and routes while delegating environment-specific behavior to [`references/runtime.md`](references/runtime.md). The runtime contract has precedence only for project directories, target-host fonts, dependency/capability discovery, and the downstream release gate.\n",
+        "This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Agent Plan media execution.\n",
         1,
     )
     load_pattern = re.compile(
@@ -135,7 +135,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
     )
     replacement = (
         "1. Read this file.\n"
-        "2. Read [`references/runtime.md`](references/runtime.md); its Directory, Font, and Dependency contracts are mandatory for every route.\n"
+        "2. Read [`references/runtime.md`](references/runtime.md) for the environment and media contracts.\n"
         "3. Read [`workflows/routing.md`](workflows/routing.md).\n"
         "4. Select exactly one top-level route and its active profile from the routing authority.\n"
         "5. Read only the resulting runtime authority and its explicitly triggered supporting documents.\n\n"
@@ -147,7 +147,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         "---\n"
         "name: ppt-master\n"
         "description: 将 PDF、DOCX、PPTX、网页、Markdown、新闻或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。\n"
-        "metadata: {\"openclaw\":{\"skillKey\":\"ppt-master\",\"emoji\":\"📊\",\"homepage\":\"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master\",\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\",\"requires\":{\"anyBins\":[\"python3\",\"python\"],\"env\":[\"ARK_AGENT_PLAN_API_KEY\"]}}}\n"
+        "metadata: {\"openclaw\":{\"skillKey\":\"ppt-master\",\"emoji\":\"📊\",\"homepage\":\"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master\",\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\",\"requires\":{\"anyBins\":[\"python3\",\"python\"]}}}\n"
         "---\n\n"
     )
     skill_path.write_text(frontmatter + body, encoding="utf-8")
@@ -185,14 +185,11 @@ def _disable_identity_guard(stage: Path) -> None:
 
 
 def _portable_paths(stage: Path) -> None:
-    for path in sorted(stage.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in {".md", ".py", ".json"}:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        updated = text.replace("skills/ppt-master", "{baseDir}")
+    # {baseDir} is an agent-facing placeholder, not a Python variable or data path.
+    for path in sorted(stage.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        updated = text.replace("~/.agents/skills/ppt-master", "{baseDir}")
+        updated = updated.replace("skills/ppt-master", "{baseDir}")
         updated = updated.replace("${SKILL_DIR}", "{baseDir}")
         if updated != text:
             path.write_text(updated, encoding="utf-8")
@@ -222,68 +219,6 @@ def _portable_project_init(stage: Path) -> None:
         updated = fence.sub(update_fence, text)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
-
-
-def _downstream_release_command_owner(stage: Path) -> None:
-    """Keep formal SVG-route publication owned by the downstream runtime."""
-    quick = stage / "workflows" / "profiles" / "quick-generate.md"
-    quick_text = quick.read_text(encoding="utf-8")
-    quick_pattern = re.compile(
-        r"```bash\n"
-        r"python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --quick-generate --with-notes\s+# Speaker Notes enabled\n"
-        r"python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --quick-generate --no-notes\s+# Speaker Notes disabled\n"
-        r"```"
-    )
-    quick_replacement = (
-        "Use the [downstream formal SVG-route publication command]"
-        "(../../references/runtime.md#formal-svg-route-publication), passing exactly one "
-        "of these upstream exporter argument sets:\n\n"
-        "- Speaker Notes enabled: `--quick-generate --with-notes`\n"
-        "- Speaker Notes disabled: `--quick-generate --no-notes`"
-    )
-    quick_text, quick_count = quick_pattern.subn(quick_replacement, quick_text, count=1)
-    if quick_count != 1:
-        raise SyncError("Quick formal-export command anchor did not match")
-    quick.write_text(quick_text, encoding="utf-8")
-
-    default = stage / "workflows" / "generate-pptx.md"
-    default_text = default.read_text(encoding="utf-8")
-    default_pattern = re.compile(
-        r"\| Effective decision \| Command \|\n"
-        r"\|---\|---\|\n"
-        r"\| Speaker Notes `enabled` \| `python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path>` \|\n"
-        r"\| Speaker Notes `disabled` \| `python3 \{baseDir\}/scripts/svg_to_pptx\.py <project_path> --no-notes` \|"
-    )
-    default_replacement = (
-        "Use the [downstream formal SVG-route publication command]"
-        "(../references/runtime.md#formal-svg-route-publication) with the upstream "
-        "exporter arguments below:\n\n"
-        "| Effective decision | Upstream exporter arguments |\n"
-        "|---|---|\n"
-        "| Speaker Notes `enabled` | _(none)_ |\n"
-        "| Speaker Notes `disabled` | `--no-notes` |"
-    )
-    default_text, default_count = default_pattern.subn(
-        default_replacement,
-        default_text,
-        count=1,
-    )
-    if default_count != 1:
-        raise SyncError("Default formal-export command anchor did not match")
-    default.write_text(default_text, encoding="utf-8")
-
-    finalizer = stage / "scripts" / "finalize_svg.py"
-    finalizer_text = finalizer.read_text(encoding="utf-8")
-    finalizer_pattern = re.compile(
-        r"\n\s*print\(\)\n"
-        r"\s*print\(\"Next steps:\"\)\n"
-        r"\s*print\(f\"  python scripts/svg_to_pptx\.py "
-        r"\\\"\{project_dir\}\\\"\"\)"
-    )
-    finalizer_text, finalizer_count = finalizer_pattern.subn("", finalizer_text, count=1)
-    if finalizer_count != 1:
-        raise SyncError("finalize_svg direct-export hint anchor did not match")
-    finalizer.write_text(finalizer_text, encoding="utf-8")
 
 
 def _rename_readmes(stage: Path) -> None:
@@ -392,24 +327,9 @@ def _write_provenance(stage: Path, manifest: dict[str, object], commit: str) -> 
         f"[`{manifest['release']}`]({str(manifest['repository']).removesuffix('.git')}/tree/{manifest['release']}/{manifest['subtree']}) "
         f"at commit `{commit}`.\n\n"
         "The release tree is not reconstructed by skipping commits. Deterministic packaging transforms, additive runtime adapters, and the small patch queue listed in `../upstream.lock.json` are applied to the fixed release tree. Unsupported upstream features are provenance records only and never alter Git history.\n\n"
-        "Directory, Font, and Dependency behavior is owned by `runtime.md`; upstream workflow content remains authoritative everywhere else.\n",
+        "Project directories, dependency discovery, and Agent Plan media execution are owned by `runtime.md`; authoring, font selection, validation, and export follow upstream.\n",
         encoding="utf-8",
     )
-
-
-def _normalize_text_whitespace(stage: Path) -> None:
-    """Remove upstream/editor whitespace noise from materialized text files."""
-    for path in sorted(stage.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in {".md", ".py", ".json"}:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        normalized = "\n".join(line.rstrip(" \t") for line in text.splitlines())
-        normalized = normalized.rstrip("\n") + "\n"
-        if normalized != text:
-            path.write_text(normalized, encoding="utf-8")
 
 
 def _validate_stage(stage: Path) -> None:
@@ -488,11 +408,9 @@ def main() -> int:
             _rename_readmes(stage)
             _rewrite_escaping_links(stage, manifest)
             _write_openclaw_skill(stage / "SKILL.md")
-            _downstream_release_command_owner(stage)
             _copy_overlays(stage, manifest)
             _apply_patches(stage, manifest)
             _write_provenance(stage, manifest, commit)
-            _normalize_text_whitespace(stage)
             _validate_stage(stage)
             target = args.target.expanduser().resolve()
             if args.check:

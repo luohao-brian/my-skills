@@ -44,7 +44,7 @@ class ImageRotator:
 
     @staticmethod
     def _repo_root() -> Path:
-        # scripts/rotate_images.py -> {baseDir}/
+        # scripts/rotate_images.py -> skills/ppt-master/
         return Path(__file__).resolve().parent.parent
 
     @staticmethod

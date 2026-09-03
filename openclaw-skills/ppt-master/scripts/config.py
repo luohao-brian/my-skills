@@ -493,14 +493,14 @@ LAYOUT_MARGINS = {
 # Keep the exported authority key as the compatibility router for existing
 # config consumers.
 SVG_CONSTRAINTS = {
-    'authority': '{baseDir}/references/shared-standards.md',
-    'core_authority': '{baseDir}/references/shared-standards-core.md',
+    'authority': 'skills/ppt-master/references/shared-standards.md',
+    'core_authority': 'skills/ppt-master/references/shared-standards-core.md',
     'conditional_authorities': {
-        'effects': '{baseDir}/references/svg-effects.md',
-        'native_data': '{baseDir}/references/native-data-interface.md',
-        'pptx_structure': '{baseDir}/references/pptx-structure-interface.md',
+        'effects': 'skills/ppt-master/references/svg-effects.md',
+        'native_data': 'skills/ppt-master/references/native-data-interface.md',
+        'pptx_structure': 'skills/ppt-master/references/pptx-structure-interface.md',
     },
-    'validator': '{baseDir}/scripts/svg_quality_checker.py',
+    'validator': 'skills/ppt-master/scripts/svg_quality_checker.py',
 }
 
 

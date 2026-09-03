@@ -204,10 +204,10 @@ python3 {baseDir}/scripts/total_md_split.py <project_path>
 
 **Motion and sound**: run [`customize-animations`](../stages/customize-animations.md) after the notes pass when the §1 outcome or an existing sidecar triggers it; deck-wide-only motion uses exporter flags. Quick video delivery completes the Custom Animations stage and validates `animations.json` before export unless the user asked for static or transition-only playback; direct narrated video derives cue timing only when narration governs groups. After motion is final, sync a selected cue per [`animations.md`](../../references/animations.md) §2.2 (no cue → no `sounds/`; never `templates/sounds/`); `generate-audio` completes narrated MP4 delivery through the verified native mix or an explicit slideshow capture, never both.
 
-Use the [downstream formal SVG-route publication command](../../references/runtime.md#formal-svg-route-publication), passing exactly one of these upstream exporter argument sets:
-
-- Speaker Notes enabled: `--quick-generate --with-notes`
-- Speaker Notes disabled: `--quick-generate --no-notes`
+```bash
+python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate --with-notes   # Speaker Notes enabled
+python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate --no-notes     # Speaker Notes disabled
+```
 
 `--quick-generate` reads `svg_output/`, resolves project-local assets, infers one canvas and one all-page structure mode (no metadata → flat; complete Master/Layout/slot metadata → structured), and needs no lock. Notes, Custom Animations, and narration stay off unless the agent enabled them or the video rule requires them; append `--native-charts-and-tables` only for an explicit native Chart/Table delivery decision. Never run `finalize_svg.py`. The exporter requires a passing `final` report whose fingerprint matches the current `svg_output/`; the default output path keeps backup and postflight, an explicit `-o <path>.pptx` skips backup. On failure repair the owning SVG, resource, or capability input, rerun the checker, and export again — never create a Design Spec or lock. When Narration Audio is enabled, run [`generate-audio`](../stages/generate-audio.md) after the validated export (page audio/SRT, narrated PPTX, optional raw MP4, final mixed or captured MP4, or the capture-ready handoff).
 

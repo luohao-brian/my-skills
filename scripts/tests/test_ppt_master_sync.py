@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +39,48 @@ class PublishTests(unittest.TestCase):
 
 
 class PackagingTransformTests(unittest.TestCase):
+    def test_missing_preview_server_reports_a_runnable_start_command(self) -> None:
+        scripts = ROOT / "openclaw-skills" / "ppt-master" / "scripts"
+        with patch.object(sys, "path", [str(scripts), *sys.path]):
+            import visual_review
+        playwright = types.ModuleType("playwright.sync_api")
+        playwright.sync_playwright = object()
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            sys.modules, {"playwright.sync_api": playwright}
+        ), patch.object(sys, "argv", ["visual_review.py", directory]), contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertEqual(visual_review.main(), 2)
+        self.assertIn(str(scripts / "svg_editor" / "server.py"), error.getvalue())
+        self.assertIn("start it with:", error.getvalue())
+
+    def test_project_directory_remains_optional_in_upstream_cli(self) -> None:
+        scripts = ROOT / "openclaw-skills" / "ppt-master" / "scripts"
+        with patch.object(sys, "path", [str(scripts), *sys.path]):
+            from project_management.cli import build_parser
+        parser = build_parser()
+        self.assertIsNone(parser.parse_args(["init", "demo"]).dir)
+        self.assertEqual(parser.parse_args(["init", "demo", "--dir", "workspace"]).dir, "workspace")
+
+    def test_portable_paths_preserves_code_data_and_markdown_whitespace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            script = stage / "preview.py"
+            script_source = "hint = f'python3 skills/ppt-master/server.py {42}'\n"
+            script.write_text(script_source, encoding="utf-8")
+            manifest = stage / "manifest.json"
+            manifest_source = '{"scan": ["skills/ppt-master/**/*.md"]}\n'
+            manifest.write_text(manifest_source, encoding="utf-8")
+            guide = stage / "guide.md"
+            guide.write_text("python3 skills/ppt-master/server.py  \n`~/.agents/skills/ppt-master/.env`\n\n", encoding="utf-8")
+
+            SYNC._portable_paths(stage)
+
+            self.assertEqual(script.read_text(), script_source)
+            self.assertEqual(manifest.read_text(), manifest_source)
+            namespace = {}
+            exec(script.read_text(), namespace)
+            self.assertEqual(namespace["hint"], "python3 skills/ppt-master/server.py 42")
+            self.assertEqual(guide.read_text(), "python3 {baseDir}/server.py  \n`{baseDir}/.env`\n\n")
+
     def test_project_init_inserts_dir_before_line_continuation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
@@ -54,47 +101,6 @@ class PackagingTransformTests(unittest.TestCase):
                 transformed,
             )
             self.assertNotIn("\\ --dir", transformed)
-
-    def test_release_routes_reference_runtime_owner(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            stage = Path(directory)
-            quick = stage / "workflows" / "profiles" / "quick-generate.md"
-            default = stage / "workflows" / "generate-pptx.md"
-            finalizer = stage / "scripts" / "finalize_svg.py"
-            quick.parent.mkdir(parents=True)
-            finalizer.parent.mkdir(parents=True)
-            quick.write_text(
-                "```bash\n"
-                "python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate --with-notes  # Speaker Notes enabled\n"
-                "python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --quick-generate --no-notes    # Speaker Notes disabled\n"
-                "```\n",
-                encoding="utf-8",
-            )
-            default.write_text(
-                "| Effective decision | Command |\n"
-                "|---|---|\n"
-                "| Speaker Notes `enabled` | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path>` |\n"
-                "| Speaker Notes `disabled` | `python3 {baseDir}/scripts/svg_to_pptx.py <project_path> --no-notes` |\n",
-                encoding="utf-8",
-            )
-            finalizer.write_text(
-                "    if not quiet:\n"
-                "        print()\n"
-                "        safe_print(\"[OK] Done!\")\n"
-                "        print()\n"
-                "        print(\"Next steps:\")\n"
-                "        print(f\"  python scripts/svg_to_pptx.py \\\"{project_dir}\\\"\")\n",
-                encoding="utf-8",
-            )
-
-            SYNC._downstream_release_command_owner(stage)
-
-            for route in (quick, default):
-                transformed = route.read_text(encoding="utf-8")
-                self.assertIn("formal-svg-route-publication", transformed)
-                self.assertNotIn("python3 {baseDir}/scripts/svg_to_pptx.py", transformed)
-            self.assertNotIn("Next steps:", finalizer.read_text(encoding="utf-8"))
-            self.assertNotIn("svg_to_pptx.py", finalizer.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

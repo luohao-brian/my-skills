@@ -1,4 +1,4 @@
-"""Volcengine Seed-TTS backend with Ark API and Agent Plan profiles."""
+"""Optional Ark Agent Plan backend for upstream narration orchestration."""
 
 from __future__ import annotations
 
@@ -30,17 +30,17 @@ class TtsProfile:
     model: str
 
 
-FIXED_PROFILE = "ark-agent-plan"
-FIXED_PROVIDER = "volc-ark-agent-plan"
-FIXED_ENDPOINT = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
-SUPPORTED_PROFILES = (FIXED_PROFILE,)
+PROFILE_NAME = "ark-agent-plan"
+PROVIDER_NAME = "volc-ark-agent-plan"
+DEFAULT_ENDPOINT = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
+SUPPORTED_PROFILES = (PROFILE_NAME,)
 
 
 def resolve_profile(profile_name: str | None = None) -> TtsProfile:
-    name = (profile_name or FIXED_PROFILE).strip().lower()
-    if name != FIXED_PROFILE:
+    name = (profile_name or PROFILE_NAME).strip().lower()
+    if name != PROFILE_NAME:
         raise RuntimeError(
-            f"PPT Master TTS is fixed to {FIXED_PROFILE}; received '{name}'."
+            f"Unsupported Agent Plan TTS profile: '{name}'."
         )
     api_key = os.environ.get("ARK_AGENT_PLAN_API_KEY", "").strip()
     if not api_key:
@@ -48,9 +48,9 @@ def resolve_profile(profile_name: str | None = None) -> TtsProfile:
 
     return TtsProfile(
         name=name,
-        provider=FIXED_PROVIDER,
+        provider=PROVIDER_NAME,
         api_key=api_key,
-        base_url=FIXED_ENDPOINT,
+        base_url=DEFAULT_ENDPOINT,
         model=DEFAULT_MODEL,
     )
 

@@ -7,8 +7,7 @@ project directory.
 
 - Prefer a user-selected output directory. Otherwise create a dedicated
   projects root inside the current runtime workspace.
-- `project_manager.py init` must receive `--dir <absolute-projects-root>`; the
-  packaged CLI rejects omission.
+- Pass `--dir <absolute-projects-root>` when invoking `project_manager.py init`.
 - Pass the returned absolute project path to every later command.
 - Never write projects, previews, backups, exports, or dependency environments
   under `{baseDir}`, the source repository, a relative `projects/`, `$HOME`, or

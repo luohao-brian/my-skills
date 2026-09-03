@@ -1,0 +1,113 @@
+diff --git a/scripts/image_gen.py b/scripts/image_gen.py
+--- a/scripts/image_gen.py
++++ b/scripts/image_gen.py
+@@ -14,6 +14,7 @@
+   IMAGE_BACKEND=qwen        -> Alibaba Qwen image backend
+   IMAGE_BACKEND=zhipu       -> Zhipu GLM-Image backend
+   IMAGE_BACKEND=volcengine  -> Volcengine Seedream backend
++  IMAGE_BACKEND=ark-agent-plan -> Ark Agent Plan Seedream backend
+   IMAGE_BACKEND=modelscope  -> ModelScope backend
+   IMAGE_BACKEND=siliconflow -> SiliconFlow backend
+   IMAGE_BACKEND=fal         -> fal.ai backend
+@@ -153,6 +154,14 @@
+         "default_image_size": "2K",
+         "key_hint": "LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY",
+         "aliases": ["ark", "doubao", "seedream"],
++    },
++    "ark-agent-plan": {
++        "module": "backend_volcengine",
++        "tier": "core",
++        "label": "Ark Agent Plan Seedream",
++        "default_model": "doubao-seedream-5.0-lite",
++        "default_image_size": "2K",
++        "key_hint": "ARK_AGENT_PLAN_API_KEY",
+     },
+     "modelscope": {
+         "module": "backend_modelscope",
+diff --git a/scripts/image_backends/backend_volcengine.py b/scripts/image_backends/backend_volcengine.py
+--- a/scripts/image_backends/backend_volcengine.py
++++ b/scripts/image_backends/backend_volcengine.py
+@@ -6,6 +6,7 @@
+   LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY   (required)
+   VOLCENGINE_BASE_URL                (optional)
+   VOLCENGINE_MODEL                   (optional; Seedream 4.5 only)
++  With IMAGE_BACKEND=ark-agent-plan, use ARK_AGENT_PLAN_API_KEY instead.
+ """
+
+ import sys
+@@ -44,6 +45,8 @@
+
+ DEFAULT_ENDPOINT = "https://operator.las.cn-beijing.volces.com/api/v1/images/generations"
+ DEFAULT_MODEL = "doubao-seedream-4-5-251128"
++ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
++ARK_AGENT_PLAN_MODEL = "doubao-seedream-5.0-lite"
+ DEFAULT_IMAGE_SIZE = "2K"
+ SUPPORTED_MODELS = {DEFAULT_MODEL}
+
+@@ -72,11 +75,16 @@
+
+
+ def _validate_model(model: str) -> str:
+-    """Limit the backend to the Seedream 4.5 contract implemented below."""
++    """Validate the model for the selected Volcengine service."""
++    supported = (
++        {ARK_AGENT_PLAN_MODEL}
++        if os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
++        else SUPPORTED_MODELS
++    )
+     resolved = model.strip()
+-    if resolved not in SUPPORTED_MODELS:
++    if resolved not in supported:
+         raise ValueError(
+-            f"Unsupported Volcengine model '{model}'. Supported: {sorted(SUPPORTED_MODELS)}"
++            f"Unsupported Volcengine model '{model}'. Supported: {sorted(supported)}"
+         )
+     return resolved
+
+@@ -161,20 +169,28 @@
+              output_dir: str = None, filename: str = None,
+              model: str = None, max_retries: int = MAX_RETRIES) -> str:
+     """Generate an image with retries using the Volcengine backend."""
+-    resolved_model = model or os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
++    agent_plan = os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
++    resolved_model = model or (
++        ARK_AGENT_PLAN_MODEL if agent_plan else os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
++    )
+     _validate_model(resolved_model)
+     normalized_size = normalize_image_size(image_size)
+     _resolve_size(aspect_ratio, normalized_size)
+     api_key = require_api_key(
+-        "LAS_API_KEY",
+-        "VOLCENGINE_API_KEY",
+-        "ARK_API_KEY",
++        *(("ARK_AGENT_PLAN_API_KEY",) if agent_plan else (
++            "LAS_API_KEY", "VOLCENGINE_API_KEY", "ARK_API_KEY",
++        )),
+         message=(
++            "No Agent Plan image key found. Set ARK_AGENT_PLAN_API_KEY."
++            if agent_plan else
+             "No API key found. Set LAS_API_KEY, VOLCENGINE_API_KEY, or "
+             "ARK_API_KEY in the current environment or a .env file."
+         ),
+     )
+-    base_url = os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
++    base_url = (
++        ARK_AGENT_PLAN_ENDPOINT if agent_plan
++        else os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
++    )
+
+     last_error = None
+     for attempt in range(max_retries + 1):
+diff --git a/.env.example b/.env.example
+--- a/.env.example
++++ b/.env.example
+@@ -207,3 +207,9 @@
+ # PEXELS_API_KEY=your-pexels-key
+ # Sign up: https://pixabay.com/api/docs/
+ # PIXABAY_API_KEY=your-pixabay-key
++
++# Optional Ark Agent Plan image and narration service / 可选方舟 Agent Plan
++# Other upstream backends remain selectable; keys are required only when used.
++# IMAGE_BACKEND=ark-agent-plan
++# TTS_PROVIDER=ark-agent-plan
++# ARK_AGENT_PLAN_API_KEY=your-agent-plan-api-key

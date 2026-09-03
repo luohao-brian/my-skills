@@ -1,25 +1,24 @@
 diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
 --- a/scripts/notes_to_audio.py
 +++ b/scripts/notes_to_audio.py
-@@ -14,6 +14,8 @@
-     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
-     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
-     python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
-+    python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider ark-api
-+    python3 {baseDir}/scripts/notes_to_audio.py <project_path> --provider ark-agent-plan
-     python3 {baseDir}/scripts/notes_to_audio.py --list-common-voices
-     python3 {baseDir}/scripts/notes_to_audio.py --list-voices --locale zh-CN
+@@ -14,6 +14,7 @@
+     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
+     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
+     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
++    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider ark-agent-plan
+     python3 skills/ppt-master/scripts/notes_to_audio.py --list-common-voices
+     python3 skills/ppt-master/scripts/notes_to_audio.py --list-voices --locale zh-CN
 
-@@ -23,6 +25,8 @@
+@@ -23,6 +24,8 @@
      MINIMAX_API_KEY=<key> for --provider minimax
      QWEN_API_KEY or DASHSCOPE_API_KEY=<key> for --provider qwen
      COSYVOICE_API_KEY or DASHSCOPE_API_KEY=<key> for --provider cosyvoice
-+    ARK_TTS_API_KEY=<Doubao Speech X-Api-Key> for --provider ark-api
 +    ARK_AGENT_PLAN_API_KEY=<key> for --provider ark-agent-plan
++    TTS_PROVIDER=<provider> sets the default; --provider overrides it
  """
 
  from __future__ import annotations
-@@ -47,6 +51,7 @@
+@@ -52,6 +55,7 @@
      backend_elevenlabs,
      backend_minimax,
      backend_qwen,
@@ -27,7 +26,7 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
  )
  from tts_backends.backend_common import temporary_path
 
-@@ -62,6 +67,8 @@
+@@ -67,6 +71,8 @@
      extension: str
      api_key: str = ""
      voice_id: str = ""
@@ -36,17 +35,16 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
 
 
  @dataclass(frozen=True)
-@@ -85,6 +92,9 @@
+@@ -90,6 +96,8 @@
          "QWEN_",
          "DASHSCOPE_",
          "COSYVOICE_",
 +        "TTS_",
-+        "ARK_TTS_",
 +        "ARK_AGENT_PLAN_",
      ))
 
 
-@@ -259,6 +269,10 @@
+@@ -305,6 +313,10 @@
              "optimize_instructions": args.qwen_optimize_instructions,
              "custom_instructions": True if args.qwen_instructions else None,
          }
@@ -57,16 +55,16 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
      return args.cosyvoice_model, {
          "volume": args.cosyvoice_volume,
          "rate": args.cosyvoice_rate,
-@@ -364,6 +378,8 @@
+@@ -410,6 +422,8 @@
  def main() -> int:
      _load_tts_env_file()
 
-+    default_provider = backend_volcengine.configured_profile("edge") or "edge"
++    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "edge"
 +
      parser = argparse.ArgumentParser(
          description=__doc__,
          formatter_class=argparse.RawDescriptionHelpFormatter,
-@@ -372,9 +388,19 @@
+@@ -418,9 +432,19 @@
      parser.add_argument("-o", "--output", type=Path, default=None)
      parser.add_argument(
          "--provider",
@@ -83,13 +81,13 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
 +        ],
 +        default=default_provider,
 +        help=(
-+            "audio generation backend (default: TTS_BACKEND/TTS_PROVIDER, "
++            "audio generation backend (default: TTS_PROVIDER, "
 +            "otherwise edge)"
 +        ),
      )
      parser.add_argument(
          "--voice",
-@@ -511,6 +537,13 @@
+@@ -557,10 +581,19 @@
              "support them"
          ),
      )
@@ -103,7 +101,13 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
      parser.add_argument("--list-common-voices", action="store_true", help="print a curated voice list and exit")
      parser.add_argument("--list-voices", action="store_true", help="query provider voices and exit")
      parser.add_argument("--locale", default=None, help='filter --list-voices by locale, e.g. "zh-CN"')
-@@ -532,6 +565,8 @@
+     args = parser.parse_args()
++    if args.provider not in {"edge", "elevenlabs", "minimax", "qwen", "cosyvoice", *backend_volcengine.SUPPORTED_PROFILES}:
++        parser.error(f"unknown TTS_PROVIDER: {args.provider}")
+
+     if args.list_common_voices:
+         backend_edge.print_common_voices()
+@@ -578,6 +611,8 @@
                  backend_qwen.print_voices()
              elif args.provider == "cosyvoice":
                  backend_cosyvoice.print_voices()
@@ -112,7 +116,7 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
              else:
                  asyncio.run(backend_edge.print_voices(args.locale))
          except Exception as exc:
-@@ -543,6 +578,11 @@
+@@ -589,6 +624,11 @@
          parser.error("project_path is required unless --list-voices or --list-common-voices is used")
 
      voice_id = args.voice_id or args.voice
@@ -124,10 +128,11 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
 
      if args.provider == "edge" and not args.voice:
          parser.error(
-@@ -642,6 +682,21 @@
+@@ -687,6 +727,21 @@
+             extension=extension,
              api_key=api_key,
              voice_id=voice_id,
-         )
++        )
 +    elif args.provider in backend_volcengine.SUPPORTED_PROFILES:
 +        try:
 +            profile = backend_volcengine.resolve_profile(args.provider)
@@ -142,30 +147,27 @@ diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
 +            voice_id=voice_id,
 +            base_url=profile.base_url,
 +            model=profile.model,
-+        )
+         )
      else:
          backend = AudioBackend(
-             provider=args.provider,
-@@ -804,6 +859,22 @@
-                         base_url=args.cosyvoice_base_url,
+@@ -851,6 +906,20 @@
                          subtitle_path=subtitle_path,
                          subtitle_max_chars=args.subtitle_max_chars,
-+                    )
+                     )
 +                elif backend.provider in backend_volcengine.SUPPORTED_PROFILES:
 +                    backend_volcengine.generate(
 +                        text,
 +                        output_path,
 +                        profile=backend_volcengine.TtsProfile(
 +                            name=backend.provider,
-+                            provider=backend_volcengine.TTS_BACKEND_PROFILES[
-+                                backend.provider
-+                            ]["provider"],
++                            provider=backend_volcengine.PROVIDER_NAME,
 +                            api_key=backend.api_key,
 +                            base_url=backend.base_url,
 +                            model=backend.model,
 +                        ),
 +                        voice_id=backend.voice_id,
 +                        sample_rate=args.volcengine_sample_rate,
-                     )
++                    )
                  _remove_stale_audio_variants(output_path)
                  if not writes_subtitles:
+                     output_path.with_suffix(".srt").unlink(missing_ok=True)
