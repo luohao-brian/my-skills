@@ -171,6 +171,14 @@ def verify_runtime_files(errors: list[str]) -> None:
             errors.append(f"{path.relative_to(ROOT)}: active attribution guard import survived packaging")
         if re.search(r"^\s*require_skill_integrity\(\)\s*$", text, re.MULTILINE):
             errors.append(f"{path.relative_to(ROOT)}: active attribution guard call survived packaging")
+        if re.search(
+            r"^\s*_require_official_distribution_identity\(\)\s*$",
+            text,
+            re.MULTILINE,
+        ):
+            errors.append(
+                f"{path.relative_to(ROOT)}: active official distribution identity call survived packaging"
+            )
     if list(SKILL.rglob("README.md")):
         errors.append("README.md survived progressive-loading packaging")
 

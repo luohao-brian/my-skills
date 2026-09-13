@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import contextlib
 import io
+import subprocess
 import sys
 import tempfile
 import types
@@ -39,6 +40,44 @@ class PublishTests(unittest.TestCase):
 
 
 class PackagingTransformTests(unittest.TestCase):
+    def test_published_skill_runs_from_foreign_cwd_and_agent_path(self) -> None:
+        skill = ROOT / "openclaw-skills" / "ppt-master"
+        with tempfile.TemporaryDirectory(prefix="ppt-master-agent-runtime-") as directory:
+            root = Path(directory)
+            alias = root / "third party agent" / "skills" / "ppt-master"
+            alias.parent.mkdir(parents=True)
+            alias.symlink_to(skill, target_is_directory=True)
+            caller_cwd = root / "cowork session"
+            projects_root = root / "caller workspace" / "artifacts"
+            caller_cwd.mkdir()
+            projects_root.mkdir(parents=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(alias / "scripts" / "project_manager.py"),
+                    "init",
+                    "runtime-portability",
+                    "--quick-generate",
+                    "--format",
+                    "ppt169",
+                    "--dir",
+                    str(projects_root),
+                ],
+                cwd=caller_cwd,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            projects = list(projects_root.glob("runtime-portability_ppt169_*"))
+            self.assertEqual(len(projects), 1)
+            self.assertTrue((projects[0] / "svg_output").is_dir())
+            self.assertFalse((caller_cwd / "projects").exists())
+            self.assertIn(str(projects[0]), result.stdout)
+
     def test_missing_preview_server_reports_a_runnable_start_command(self) -> None:
         scripts = ROOT / "openclaw-skills" / "ppt-master" / "scripts"
         with patch.object(sys, "path", [str(scripts), *sys.path]):

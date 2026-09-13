@@ -5,14 +5,14 @@ crop finalization, native picture export, deterministic Morph pairing, authored
 PowerPoint presets, or their planning contracts. It builds one temporary
 two-slide project under the gitignored `projects/_smoke_*` namespace and follows
 the inline-smoke convention from
-[`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v6.1.0/docs/rules/code-style.md) §11; do not turn it into
+[`code-style.md`](https://github.com/hugohe3/ppt-master/blob/v6.4.0/docs/rules/code-style.md) §11; do not turn it into
 a test file or public example deck.
 
 The fixture deliberately closes the full planning and execution chain:
 
 - `design_spec.md` carries `Motion suggestion`, one current §VIII image row,
   and `Crop Policy`, with no native-shape planning field;
-- `spec_lock.md` projects that row (`source`, `crop`); the `#M1-11` layout pattern stays in §VIII;
+- `spec_lock.md` projects that row (`source`, `crop`); the `#M1-11` image pattern stays in §VIII;
 - both pages reuse one raster through ordinary, ellipse-preset, and custom-path
   independent nested crops;
 - `animations.json` pairs the main crop across adjacent Morph pages;
@@ -133,7 +133,7 @@ preset = (
 
 ## VIII. Image Resource List
 
-| Filename | Dimensions | Ratio | Purpose | Type | Layout pattern | Crop Policy | Acquire Via | Status | Reference | text_policy | page_role |
+| Filename | Dimensions | Ratio | Purpose | Type | Image pattern | Crop Policy | Acquire Via | Status | Reference | text_policy | page_role |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | scene.png | 1280x720 | 16:9 | Morph crop continuity | Photo | #M1-11 same-source independent crops with a shaped detail | adaptive | user | Existing | Synthetic three-band scene for crop and Morph verification | none | local |
 

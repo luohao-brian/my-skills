@@ -1,0 +1,55 @@
+diff --git a/scripts/tests/test_dogfood_leaves_fixes.py b/scripts/tests/test_dogfood_leaves_fixes.py
+--- a/scripts/tests/test_dogfood_leaves_fixes.py
++++ b/scripts/tests/test_dogfood_leaves_fixes.py
+@@ -16,3 +16,4 @@ import unittest
+ import zipfile
+ from pathlib import Path
++from unittest.mock import patch
+ from xml.etree import ElementTree as ET
+@@ -32,6 +33,6 @@ from svg_to_pptx.drawingml.converter import convert_svg_to_slide_shapes  # noqa: E402
+ from svg_to_pptx.drawingml.utils import project_filter_errors  # noqa: E402
+ from svg_to_pptx.pptx_package.builder import _slide_size_type  # noqa: E402
+-from project_management.cli import _is_project_tree, PROJECTS_ROOT  # noqa: E402
++from project_management.cli import _is_project_tree  # noqa: E402
+ from narration_sync import _project_input_path  # noqa: E402
+ from tts_backends import backend_edge  # noqa: E402
+ from compact_svg_styles import compact_svg_style_tree  # noqa: E402
+@@ -130,6 +131,6 @@ class ImportSourcesProjectTreeTests(unittest.TestCase):
+ class ImportSourcesProjectTreeTests(unittest.TestCase):
+     def test_research_web_sources_dir_is_not_a_project(self) -> None:
+-        with tempfile.TemporaryDirectory(dir=PROJECTS_ROOT) as tmp:
++        with tempfile.TemporaryDirectory() as tmp:
+             root = Path(tmp)
+             scratch = root.with_name(root.name + "_web_sources")
+             scratch.mkdir()
+@@ -139,7 +140,8 @@ class ImportSourcesProjectTreeTests(unittest.TestCase):
+                 (root / "svg_output").mkdir()
+                 (root / "sources").mkdir()
+                 (root / "sources" / "a.md").write_text("# a\n", encoding="utf-8")
+-                self.assertTrue(_is_project_tree(root / "sources" / "a.md"))
++                with patch("project_management.cli.PROJECTS_ROOT", root.parent):
++                    self.assertTrue(_is_project_tree(root / "sources" / "a.md"))
+             finally:
+                 for child in scratch.iterdir():
+                     child.unlink()
+diff --git a/scripts/tests/test_source_to_md_cli.py b/scripts/tests/test_source_to_md_cli.py
+--- a/scripts/tests/test_source_to_md_cli.py
++++ b/scripts/tests/test_source_to_md_cli.py
+@@ -253,7 +253,7 @@
+ class SourceCollisionTests(unittest.TestCase):
+     def setUp(self) -> None:
+         self.temporary = tempfile.TemporaryDirectory()
+         self.addCleanup(self.temporary.cleanup)
+-        self.root = Path(self.temporary.name)
+-
++        self.root = Path(self.temporary.name).resolve()
++
+     def _run_cli(self, *arguments: str) -> subprocess.CompletedProcess:
+diff --git a/scripts/tests/test_preview_browser.py b/scripts/tests/test_preview_browser.py
+--- a/scripts/tests/test_preview_browser.py
++++ b/scripts/tests/test_preview_browser.py
+@@ -114,4 +114,3 @@ class PreviewBrowserTests(unittest.TestCase):
+             with patch.object(common.webbrowser, 'open', return_value=False):
+                 with self.assertLogs('server_common', level='WARNING'):
+                     self.assertFalse(common.open_preview_browser(URL))
+-

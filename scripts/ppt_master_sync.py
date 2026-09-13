@@ -343,6 +343,15 @@ def _validate_stage(stage: Path) -> None:
         text = path.read_text(encoding="utf-8")
         if "require_skill_integrity" in text and path.name != "console_encoding.py":
             raise SyncError(f"identity guard reference survived in {path.relative_to(stage)}")
+        if re.search(
+            r"^\s*_require_official_distribution_identity\(\)\s*$",
+            text,
+            re.MULTILINE,
+        ):
+            raise SyncError(
+                "official distribution identity call survived in "
+                f"{path.relative_to(stage)}"
+            )
 
 
 def _publish(stage: Path, target: Path) -> None:

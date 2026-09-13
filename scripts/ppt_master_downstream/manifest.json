@@ -2,8 +2,8 @@
   "schema_version": 2,
   "repository": "https://github.com/hugohe3/ppt-master.git",
   "subtree": "skills/ppt-master",
-  "release": "v6.1.0",
-  "release_commit": "c40bca58e168fcef2facdc7612cc352d1233679b",
+  "release": "v6.4.0",
+  "release_commit": "2130d4bff8ac64d22acc2366048dae519e52dc9a",
   "packaging_transforms": [
     "openclaw_frontmatter",
     "runtime_contract_load_order",
@@ -25,7 +25,8 @@
   "core_patches": [
     "tts-provider-bridge.patch",
     "image-provider-bridge.patch",
-    "runtime-script-path.patch"
+    "runtime-script-path.patch",
+    "runtime-test-portability.patch"
   ],
   "subsumed_by_upstream": [
     "formal release export requires a current passing final SVG quality report"
