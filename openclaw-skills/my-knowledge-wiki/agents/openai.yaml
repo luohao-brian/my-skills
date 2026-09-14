@@ -1,0 +1,7 @@
+interface:
+  display_name: "My Knowledge Wiki"
+  short_description: "查询个人知识库、基础依赖与带来源的学习材料"
+  default_prompt: "Use $my-knowledge-wiki to explain this concept from my knowledge base with prerequisite context and source citations."
+policy:
+  allow_implicit_invocation: true
+

@@ -13,6 +13,7 @@ fi
 
 bash scripts/verify-repo.sh
 bash scripts/verify-ark-skills.sh
+bash scripts/verify-my-knowledge-wiki.sh
 bash scripts/verify-ppt-master.sh
 if [[ "${#GUIZANG_ARGS[@]}" -gt 0 ]]; then
   bash scripts/verify-guizang-ppt-skill.sh "${GUIZANG_ARGS[@]}"

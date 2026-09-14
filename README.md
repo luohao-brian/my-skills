@@ -2,12 +2,12 @@
 
 这里放自维护的 skill、Hermes 插件，以及当前使用的上游 skill 清单。
 
-当前环境共使用 **76 个 skill**：
+当前环境共使用 **77 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
 | 直接使用上游 | 57 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
-| 本地维护版本 | 19 | 交付源码位于本仓库，由本仓库校验和发布 |
+| 本地维护版本 | 20 | 交付源码位于本仓库，由本仓库校验和发布 |
 
 分类以实际使用的版本为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；未经修改则列入“直接使用上游”。
 
@@ -90,7 +90,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 - [`al-site`](https://github.com/2B-AL/al-site-skill)
 - [`al-sandbox`](https://github.com/2B-AL/al-sandbox-skill)
 
-## 本地维护的 skill（19）
+## 本地维护的 skill（20）
 
 以下目录是部署输入。功能、依赖声明、运行时适配和验证规则都随本仓库版本发布。
 
@@ -128,7 +128,13 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | `baoyu-infographic` | [`openclaw-skills/baoyu-infographic/`](openclaw-skills/baoyu-infographic/) | 固定上游快照，加本地入口与渐进式加载封装 |
 | `diagram-design` | [`openclaw-skills/diagram-design/`](openclaw-skills/diagram-design/) | 固定上游快照，加本地入口与渐进式加载封装 |
 
-## 不在 76 个标准部署项中的组件
+### 个人知识库（1）
+
+| Skill | 源码 | 用途 |
+| --- | --- | --- |
+| `my-knowledge-wiki` | [`openclaw-skills/my-knowledge-wiki/`](openclaw-skills/my-knowledge-wiki/) | 查询个人 Knowledge 服务中的文章、Ontology、证据图谱和带来源回答 |
+
+## 不在 77 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 
@@ -211,6 +217,7 @@ bash scripts/verify-repo.sh
 
 ```bash
 bash scripts/verify-ark-skills.sh
+bash scripts/verify-my-knowledge-wiki.sh
 bash scripts/verify-guizang-ppt-skill.sh
 bash scripts/verify-guizang-ppt-skill.sh --visual
 PYTHON_BIN="$HOME/Documents/hermes-workspace/.venv/bin/python" bash scripts/verify-ppt-master.sh

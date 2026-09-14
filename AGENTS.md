@@ -25,12 +25,14 @@
 - `openclaw-skills/ark-vision/`：Ark Agent Plan 图片理解
 - `openclaw-skills/ark-search/`：Ark Agent Plan 搜索
 - `openclaw-skills/ark-data-pro/`：Ark Agent Plan 专业数据集
+- `openclaw-skills/my-knowledge-wiki/`：个人 Knowledge 服务查询
 - `openclaw-skills/volc-search/`：火山引擎 WebSearch
 - `openclaw-skills/popular-web-designs/`：通用 HTML/CSS 网站设计模板库
 - `openclaw-skills/ppt-master/`：SVG/PPTX 演示文稿生成、转换与多层视觉校验
 - `docs/OPENCLAW-SKILL.md`：本仓库采用的 OpenClaw skill 规范摘要
 - `scripts/verify-repo.sh`：与具体 skill 解耦的仓库基础静态验证
 - `scripts/verify-ark-skills.sh`：Ark skills 专项协议测试
+- `scripts/verify-my-knowledge-wiki.sh`：个人 Knowledge 查询协议测试
 - `scripts/verify-ppt-master.sh`：PPT Master 专项验证
 - `scripts/verify-guizang-ppt-skill.sh`：Guizang PPT 专项契约、静态和可选视觉验证
 - `scripts/verify-all.sh`：显式串联全部验证入口；日常局部改动不要默认使用
@@ -93,6 +95,7 @@
 
 - 通用 skill 文案或 metadata 改动：运行 `bash scripts/verify-repo.sh`
 - Ark skills 改动：运行 `bash scripts/verify-repo.sh` 和 `bash scripts/verify-ark-skills.sh`
+- `my-knowledge-wiki` 改动：运行 `bash scripts/verify-repo.sh` 和 `bash scripts/verify-my-knowledge-wiki.sh`
 - `guizang-ppt-skill` 改动：运行 `bash scripts/verify-repo.sh` 和 `bash scripts/verify-guizang-ppt-skill.sh`；涉及布局或模板视觉时加 `--visual`
 - `ppt-master` 改动：使用 `~/Documents/hermes-workspace` 下由 `uv` 管理的 venv，通过 `PYTHON_BIN=~/Documents/hermes-workspace/.venv/bin/python bash scripts/verify-ppt-master.sh` 运行专项验证
 - 其他 Python 脚本改动：运行 `bash scripts/verify-repo.sh`，必要时再运行对应脚本 `--help` 或组件专项测试
