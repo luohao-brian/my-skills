@@ -24,8 +24,8 @@ python3 {baseDir}/scripts/knowledge_query.py ontology --domain-id mathematics
 
 ## Contract
 
-1. 脚本只从 `MY_KNOWLEDGE_WIKI_API_URL` 和 `MY_KNOWLEDGE_WIKI_API_KEY` 读取服务地址与长期 API Key。不要把 Key 放进命令、URL、输出或文件。只有用户明确接受自签名证书时，才设置 `MY_KNOWLEDGE_WIKI_TLS_INSECURE=true`；它只关闭本 Skill 的证书校验，不允许明文远程 HTTP。
-2. 用户问问题时先用 `query`。需要查看某个概念跨数学、物理和 AI 的知识结构时用 `learning`；需要检查原始章节时用 `retrieve`；需要浏览完整规范骨架时用 `ontology`。
+1. 脚本只从 `MY_KNOWLEDGE_WIKI_API_URL` 和 `MY_KNOWLEDGE_WIKI_API_KEY` 读取服务地址与长期 API Key。不要把 Key 放进命令、URL、输出或文件。已确认的自签名 HTTPS origin 由 `config.json` 限定；`MY_KNOWLEDGE_WIKI_TLS_INSECURE` 仅作为显式覆盖。两种方式都不允许明文远程 HTTP。
+2. 用户问问题时先用 `query`。需要查看某个概念跨领域的前置概念和学习材料时用 `learning`；需要检查原始章节时用 `retrieve`；需要浏览有材料覆盖的概念图时用 `ontology`。
 3. 回答只使用 API 返回的事实。保留 citation 的标题、公开链接、章节和 excerpt；缺少依据时明确说明知识库未覆盖。
-4. Ontology 节点表示知识概念及其先修关系。课程、Blog、论文和技术分析是学习资源，不作为概念节点或先修边。
+4. Ontology 节点只表示具体知识概念。课程、Blog、论文和技术分析作为学习材料挂在概念上；关系只采用服务返回的经审校前置或相关关系。
 5. Stdout 是服务返回的完整 JSON；非零退出码表示查询失败。不要把失败解释成“知识库没有内容”。

@@ -24,13 +24,11 @@ class RecordingHandler(BaseHTTPRequestHandler):
     requests: list[dict[str, object]] = []
 
     def _reply(self) -> None:
-        if self.path == "/api/knowledge/ontology/nodes?query=DDPM&limit=20":
+        if self.path == "/api/knowledge/ontology/concepts?query=DDPM&limit=20":
             value = {"nodes": [
-                {"node_id": "ai:ddpm-course", "kind": "lesson", "label": "扩散模型——DDPM", "aliases": ["DDPM"]},
                 {"node_id": "ai:ddpm", "kind": "concept", "label": "Diffusion Model", "aliases": ["DDPM", "扩散模型"]},
-                {"node_id": "ai:generative", "kind": "phase", "label": "生成式 AI", "aliases": ["DDPM"]},
             ]}
-        elif self.path.startswith("/api/knowledge/ontology/nodes/ai:ddpm/learning-view"):
+        elif self.path.startswith("/api/knowledge/ontology/concepts/ai:ddpm"):
             value = {"focus": {"id": "ai:ddpm", "label": "Diffusion Model"}, "nodes": [], "edges": []}
         else:
             value = {"request_id": "req_test", "answer": "ok"}
@@ -113,6 +111,33 @@ class KnowledgeQuerySkillTests(unittest.TestCase):
         self.assertEqual(api_key, "secret-token")
         self.assertTrue(insecure_tls)
 
+    def test_configured_self_signed_origin_is_insecure_by_default(self) -> None:
+        with patch.dict(KNOWLEDGE_QUERY.os.environ, {
+            KNOWLEDGE_QUERY.API_URL_ENV: "https://8.140.22.158/api/knowledge",
+            KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
+        }, clear=True):
+            api_url, api_key, insecure_tls = KNOWLEDGE_QUERY.load_config()
+        self.assertEqual(api_url, "https://8.140.22.158/api/knowledge")
+        self.assertEqual(api_key, "secret-token")
+        self.assertTrue(insecure_tls)
+
+    def test_configured_self_signed_origin_does_not_apply_to_other_hosts(self) -> None:
+        with patch.dict(KNOWLEDGE_QUERY.os.environ, {
+            KNOWLEDGE_QUERY.API_URL_ENV: "https://example.com/api/knowledge",
+            KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
+        }, clear=True):
+            _, _, insecure_tls = KNOWLEDGE_QUERY.load_config()
+        self.assertFalse(insecure_tls)
+
+    def test_explicit_false_overrides_configured_self_signed_origin(self) -> None:
+        with patch.dict(KNOWLEDGE_QUERY.os.environ, {
+            KNOWLEDGE_QUERY.API_URL_ENV: "https://8.140.22.158/api/knowledge",
+            KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
+            KNOWLEDGE_QUERY.TLS_INSECURE_ENV: "false",
+        }, clear=True):
+            _, _, insecure_tls = KNOWLEDGE_QUERY.load_config()
+        self.assertFalse(insecure_tls)
+
     def test_learning_resolves_concept_and_ontology_maps_to_current_routes(self) -> None:
         learning_args = KNOWLEDGE_QUERY.build_parser().parse_args(["learning", "DDPM"])
         learning = KNOWLEDGE_QUERY.execute(learning_args, self.client())
@@ -123,11 +148,11 @@ class KnowledgeQuerySkillTests(unittest.TestCase):
         KNOWLEDGE_QUERY.execute(ontology_args, self.client())
 
         catalog_request, learning_request, ontology_request = RecordingHandler.requests
-        self.assertEqual(catalog_request["path"], "/api/knowledge/ontology/nodes?query=DDPM&limit=20")
-        self.assertEqual(learning_request["path"], "/api/knowledge/ontology/nodes/ai:ddpm/learning-view?node_limit=40")
+        self.assertEqual(catalog_request["path"], "/api/knowledge/ontology/concepts?query=DDPM&limit=20")
+        self.assertEqual(learning_request["path"], "/api/knowledge/ontology/concepts/ai:ddpm?node_limit=40")
         self.assertEqual(
             ontology_request["path"],
-            "/api/knowledge/ontology/graph?domain_id=mathematics&node_limit=100",
+            "/api/knowledge/ontology/map?domain_id=mathematics&node_limit=100",
         )
         self.assertEqual(ontology_request["authorization"], "Bearer secret-token")
 
