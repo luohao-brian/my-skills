@@ -6,12 +6,11 @@ metadata: {"openclaw":{"skillKey":"my-knowledge-wiki","emoji":"🧭","homepage":
 
 # My Knowledge Wiki
 
-通过只读 Knowledge API 查询个人知识库。先取得真实响应，再根据用户问题组织说明。
+通过只读 Knowledge API 暴露文章、章节、引用和跨领域知识结构。
 
 ## Required Reads
 
-- 需要选择命令、scope 或参数时，读取 [references/query-contract.md](references/query-contract.md)。
-- 普通问答直接运行 `query`，无需预读参考文件。
+- 命令、scope、响应字段、快照语义和知识组织模型见 [references/query-contract.md](references/query-contract.md)。
 
 ## Commands
 
@@ -22,10 +21,11 @@ python3 {baseDir}/scripts/knowledge_query.py retrieve "DDPM"
 python3 {baseDir}/scripts/knowledge_query.py ontology --domain-id mathematics
 ```
 
-## Contract
+## Interface Contract
 
-1. 脚本只从 `MY_KNOWLEDGE_WIKI_API_URL` 和 `MY_KNOWLEDGE_WIKI_API_KEY` 读取服务地址与长期 API Key。不要把 Key 放进命令、URL、输出或文件。已确认的自签名 HTTPS origin 由 `config.json` 限定；`MY_KNOWLEDGE_WIKI_TLS_INSECURE` 仅作为显式覆盖。两种方式都不允许明文远程 HTTP。
-2. 用户问问题时先用 `query`。需要查看某个概念跨领域的前置概念和学习材料时用 `learning`；需要检查原始章节时用 `retrieve`；需要浏览有材料覆盖的概念图时用 `ontology`。
-3. 回答只使用 API 返回的事实。保留 citation 的标题、公开链接、章节和 excerpt；缺少依据时明确说明知识库未覆盖。
-4. Ontology 节点只表示具体知识概念。课程、Blog、论文和技术分析作为学习材料挂在概念上；关系只采用服务返回的经审校前置或相关关系。
-5. Stdout 是服务返回的完整 JSON；非零退出码表示查询失败。不要把失败解释成“知识库没有内容”。
+- `query` 返回带 citation 的回答；`search` 返回候选 Section；`retrieve` 返回 Section 原文与相邻上下文；`learning` 返回焦点概念、局部关系和材料；`ontology` 返回全局导航骨架或指定领域的审校概念图。
+- 服务是只读、同步请求接口，不提供异步 task、job 状态或任务管理。`request_id` 是请求 trace 标识，不是任务 ID。
+- `content_revision`、`knowledge_revision` 和 `ontology_revision` 标识响应所属的内容、知识投影和 Ontology 快照；`truncated`、`degraded` 和 `warnings` 描述响应完整性或降级状态。字段定义见查询契约。
+- Ontology 以 domain、meta-node、concept 和 reviewed edge 组织知识。课程、Blog、论文和技术分析是挂在概念上的 resource，不是 Ontology 节点。
+- 脚本从 `MY_KNOWLEDGE_WIKI_API_URL` 和 `MY_KNOWLEDGE_WIKI_API_KEY` 读取服务地址和 Key。远程地址必须使用 HTTPS；自签名证书只能由私有运行环境显式设置 `MY_KNOWLEDGE_WIKI_TLS_INSECURE=true`，仓库不保存 endpoint。
+- 成功时 stdout 是服务返回的完整 JSON。配置、网络或 HTTP 失败时 stderr 输出错误并返回非零退出码。

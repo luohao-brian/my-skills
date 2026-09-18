@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import ssl
 import sys
 from typing import Any
@@ -19,36 +18,10 @@ API_URL_ENV = "MY_KNOWLEDGE_WIKI_API_URL"
 API_KEY_ENV = "MY_KNOWLEDGE_WIKI_API_KEY"
 TLS_INSECURE_ENV = "MY_KNOWLEDGE_WIKI_TLS_INSECURE"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-DEFAULTS_PATH = Path(__file__).resolve().parents[1] / "config.json"
 
 
 class QueryError(RuntimeError):
     """A configuration or HTTP failure safe to show without secrets."""
-
-
-def configured_insecure_origins() -> set[str]:
-    if not DEFAULTS_PATH.exists():
-        return set()
-    try:
-        value = json.loads(DEFAULTS_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise QueryError(f"invalid skill config: {DEFAULTS_PATH.name}: {exc}") from None
-    origins = value.get("tls_insecure_origins") if isinstance(value, dict) else None
-    if not isinstance(origins, list) or not all(isinstance(item, str) for item in origins):
-        raise QueryError(f"invalid skill config: {DEFAULTS_PATH.name}: tls_insecure_origins must be a string list")
-    return {item.rstrip("/").casefold() for item in origins}
-
-
-def request_origin(parsed: Any) -> str:
-    try:
-        port = parsed.port
-    except ValueError as exc:
-        raise QueryError(f"{API_URL_ENV} has an invalid port: {exc}") from None
-    default_port = (parsed.scheme == "https" and port == 443) or (parsed.scheme == "http" and port == 80)
-    authority = str(parsed.hostname).casefold()
-    if port is not None and not default_port:
-        authority += f":{port}"
-    return f"{parsed.scheme}://{authority}"
 
 
 def load_config() -> tuple[str, str, bool]:
@@ -62,6 +35,10 @@ def load_config() -> tuple[str, str, bool]:
     parsed = urlsplit(api_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise QueryError(f"{API_URL_ENV} must be an absolute HTTP(S) URL")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise QueryError(f"{API_URL_ENV} has an invalid port: {exc}") from None
     if parsed.username or parsed.password:
         raise QueryError(f"{API_URL_ENV} must not contain credentials")
     if parsed.scheme != "https" and parsed.hostname not in LOCAL_HOSTS:
@@ -71,10 +48,7 @@ def load_config() -> tuple[str, str, bool]:
     insecure_value = os.getenv(TLS_INSECURE_ENV, "").strip().lower()
     if insecure_value not in {"", "0", "false", "no", "1", "true", "yes"}:
         raise QueryError(f"{TLS_INSECURE_ENV} must be true or false")
-    if insecure_value:
-        insecure_tls = insecure_value in {"1", "true", "yes"}
-    else:
-        insecure_tls = request_origin(parsed) in configured_insecure_origins()
+    insecure_tls = insecure_value in {"1", "true", "yes"}
     if insecure_tls and parsed.scheme != "https":
         raise QueryError(f"{TLS_INSECURE_ENV} requires an HTTPS API URL")
     return api_url, api_key, insecure_tls

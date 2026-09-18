@@ -111,27 +111,19 @@ class KnowledgeQuerySkillTests(unittest.TestCase):
         self.assertEqual(api_key, "secret-token")
         self.assertTrue(insecure_tls)
 
-    def test_configured_self_signed_origin_is_insecure_by_default(self) -> None:
-        with patch.dict(KNOWLEDGE_QUERY.os.environ, {
-            KNOWLEDGE_QUERY.API_URL_ENV: "https://8.140.22.158/api/knowledge",
-            KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
-        }, clear=True):
-            api_url, api_key, insecure_tls = KNOWLEDGE_QUERY.load_config()
-        self.assertEqual(api_url, "https://8.140.22.158/api/knowledge")
-        self.assertEqual(api_key, "secret-token")
-        self.assertTrue(insecure_tls)
-
-    def test_configured_self_signed_origin_does_not_apply_to_other_hosts(self) -> None:
+    def test_insecure_tls_is_disabled_by_default(self) -> None:
         with patch.dict(KNOWLEDGE_QUERY.os.environ, {
             KNOWLEDGE_QUERY.API_URL_ENV: "https://example.com/api/knowledge",
             KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
         }, clear=True):
-            _, _, insecure_tls = KNOWLEDGE_QUERY.load_config()
+            api_url, api_key, insecure_tls = KNOWLEDGE_QUERY.load_config()
+        self.assertEqual(api_url, "https://example.com/api/knowledge")
+        self.assertEqual(api_key, "secret-token")
         self.assertFalse(insecure_tls)
 
-    def test_explicit_false_overrides_configured_self_signed_origin(self) -> None:
+    def test_explicit_false_keeps_tls_verification_enabled(self) -> None:
         with patch.dict(KNOWLEDGE_QUERY.os.environ, {
-            KNOWLEDGE_QUERY.API_URL_ENV: "https://8.140.22.158/api/knowledge",
+            KNOWLEDGE_QUERY.API_URL_ENV: "https://example.com/api/knowledge",
             KNOWLEDGE_QUERY.API_KEY_ENV: "secret-token",
             KNOWLEDGE_QUERY.TLS_INSECURE_ENV: "false",
         }, clear=True):
