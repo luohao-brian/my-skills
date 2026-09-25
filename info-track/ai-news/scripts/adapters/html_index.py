@@ -205,58 +205,20 @@ def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -
 
 
 def fetch_hex2077(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
-    url = str(source["url"])
     dates = _dates_from_window(window)
-    if dates:
-        items: list[dict[str, str]] = []
-        date = dates[0]
-        dated = dict(source)
-        for candidate_date in dates:
-            dated["url"] = (
-                str(source.get("date_url", source["url"]))
-                .replace("{YYYY-MM-DD}", candidate_date)
-                .replace("{YYYY-MM}", candidate_date[:7])
-            )
-            url = str(dated["url"])
-            try:
-                html = fetch_text(url)
-            except Exception:
-                continue
-            date = candidate_date
-            items = _parse_hex2077_article(html, url, date)
-            if not items:
-                dated_window = dict(window or {})
-                dated_window["date"] = date
-                items = fetch_generic_html(dated, dated_window)
-            if items:
-                break
-    else:
-        html = fetch_text(url)
-        items = _parse_hex2077_article(html, url, "")
-        if not items:
-            items = fetch_generic_html(source, window)
-    filtered = [
-        item
-        for item in items
-        if not item["source_url"].startswith("https://hex2077.dev/docs/")
-        and item["source_url"] != "https://hex2077.dev/"
-        and not item["title"].startswith(">>")
-    ]
-    if filtered:
-        return filtered
-    html = fetch_text(url)
-    description = _page_description(html)
-    if not description:
-        return items[:1]
-    published_at = date
-    return [
-        {
-            "title": f"Hex 2077 AI资讯 {published_at}".strip(),
-            "source_url": url,
-            "published_at": published_at,
-            "summary_basis": description,
-        }
-    ]
+    items: list[dict[str, str]] = []
+    for date in dates:
+        url = (
+            str(source.get("date_url", source["url"]))
+            .replace("{YYYY-MM-DD}", date)
+            .replace("{YYYY-MM}", date[:7])
+        )
+        try:
+            html = fetch_text(url)
+        except Exception:
+            continue
+        items.extend(_parse_hex2077_article(html, url, date))
+    return items
 
 
 def _date_from_window(window: dict[str, Any] | None) -> str:
@@ -330,7 +292,7 @@ def _tmtpost_published_at(html: str, expected_date: str) -> str:
 
 def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[str, str]]:
     items: list[dict[str, str]] = []
-    li_re = re.compile(r"<li\b[^>]*>\s*<p\b[^>]*>(.*?)</p>\s*</li>", re.IGNORECASE | re.DOTALL)
+    li_re = re.compile(r"<li\b[^>]*>(.*?)</li>", re.IGNORECASE | re.DOTALL)
     strong_re = re.compile(r"<strong\b[^>]*>(.*?)</strong>", re.IGNORECASE | re.DOTALL)
     href_re = re.compile(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
 

@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/hugohe3/ppt-master.git",
     "subtree": "skills/ppt-master",
-    "release": "v6.4.0",
-    "commit": "2130d4bff8ac64d22acc2366048dae519e52dc9a"
+    "release": "v6.6.0",
+    "commit": "a50758ac29ec027e85966db33e2ae80031446756"
   },
   "packaging_transforms": [
     "openclaw_frontmatter",
@@ -28,6 +28,7 @@
     "tts-provider-bridge.patch",
     "image-provider-bridge.patch",
     "runtime-script-path.patch",
+    "macos-path-portability.patch",
     "runtime-test-portability.patch"
   ],
   "subsumed_by_upstream": [

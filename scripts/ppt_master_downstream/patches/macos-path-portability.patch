@@ -1,0 +1,66 @@
+diff --git a/scripts/authoring_roundtrip.py b/scripts/authoring_roundtrip.py
+index 33f3142..432f179 100644
+--- a/scripts/authoring_roundtrip.py
++++ b/scripts/authoring_roundtrip.py
+@@ -1510,7 +1510,7 @@ def _rebase_resource_references(
+                 raise AuthoringRoundtripError(
+                     f"SVG resource reference escapes the project: {raw!r}"
+                 ) from exc
+-            relative = os.path.relpath(resolved, target_dir).replace(os.sep, "/")
++            relative = os.path.relpath(resolved, target_dir.resolve()).replace(os.sep, "/")
+             node.set(name, urlunsplit(("", "", relative, "", "")))
+ 
+ 
+diff --git a/scripts/pptx_to_svg/converter.py b/scripts/pptx_to_svg/converter.py
+index aff682a..a0e88af 100644
+--- a/scripts/pptx_to_svg/converter.py
++++ b/scripts/pptx_to_svg/converter.py
+@@ -1387,7 +1387,7 @@ def _write_artifact_tree(
+                 raise RuntimeError(
+                     f"Generated SVG resource escapes the workspace: {raw!r}"
+                 ) from exc
+-            relative = os.path.relpath(resolved, target_dir).replace(os.sep, "/")
++            relative = os.path.relpath(resolved, target_dir.resolve()).replace(os.sep, "/")
+             rebased = urlunsplit(("", "", relative, parsed.query, parsed.fragment))
+             return f"{match.group('prefix')}{quoteattr(rebased)}"
+ 
+diff --git a/scripts/svg_authoring_view.py b/scripts/svg_authoring_view.py
+index fff8771..aa69cba 100644
+--- a/scripts/svg_authoring_view.py
++++ b/scripts/svg_authoring_view.py
+@@ -1020,7 +1020,7 @@ def _rewrite_asset_reference(value: str, source_dir: Path, output_dir: Path) ->
+ 
+     resolved = (source_dir / parsed.path).resolve()
+     try:
+-        relative = os.path.relpath(resolved, output_dir).replace(os.sep, "/")
++        relative = os.path.relpath(resolved, output_dir.resolve()).replace(os.sep, "/")
+     except ValueError:
+         relative = resolved.as_uri()
+     return urlunsplit(("", "", relative, parsed.query, parsed.fragment))
+@@ -1217,7 +1217,7 @@ def _source_proxy_element(
+     proxy.attrib.update(_proxy_canvas_attributes(root))
+     proxy.set(
+         "href",
+-        os.path.relpath(asset_path, output_dir).replace(os.sep, "/"),
++        os.path.relpath(asset_path.resolve(), output_dir.resolve()).replace(os.sep, "/"),
+     )
+     proxy.set(SOURCE_REF_ATTRIBUTE, source_ref)
+     proxy.set(SOURCE_PROXY_ATTRIBUTE, SOURCE_PROXY_KIND)
+@@ -1283,7 +1283,7 @@ def _compact_semantic_tables(
+         preview.attrib.update(_proxy_canvas_attributes(root))
+         preview.set(
+             "href",
+-            os.path.relpath(asset_path, output_dir).replace(os.sep, "/"),
++            os.path.relpath(asset_path.resolve(), output_dir.resolve()).replace(os.sep, "/"),
+         )
+         preview.set("data-pptx-part", "authoring-preview")
+         element.append(preview)
+@@ -1503,7 +1503,7 @@ def _render_projection(
+ 
+ def _portable_path(path: Path, base: Path) -> str:
+     try:
+-        return os.path.relpath(path, base).replace(os.sep, "/")
++        return os.path.relpath(path.resolve(), base.resolve()).replace(os.sep, "/")
+     except ValueError:
+         return path.resolve().as_uri()
+ 

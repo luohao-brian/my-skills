@@ -258,5 +258,31 @@ class TmtpostAdapterTests(unittest.TestCase):
         self.assertNotIn("reporting_notice", {item["source_url"] for item in items})
 
 
+class Hex2077AdapterTests(unittest.TestCase):
+    def test_daily_layouts_and_all_window_dates(self) -> None:
+        source = {
+            "url": "https://hex2077.dev/docs/",
+            "date_url": "https://hex2077.dev/docs/{YYYY-MM}/{YYYY-MM-DD}/",
+        }
+        pages = {
+            "2026-09-24": '<li><strong>新模型发布</strong>发布详情见<a href="https://example.com/new">原文</a>。</li>',
+            "2026-09-23": '<li><p><strong>旧版布局</strong>详情见<a href="https://example.com/old">原文</a>。</p></li>',
+        }
+
+        def fetch(url: str) -> str:
+            return pages[url.rstrip("/").rsplit("/", 1)[-1]]
+
+        window = {
+            "start": datetime(2026, 9, 23, tzinfo=TZ),
+            "end": datetime(2026, 9, 24, tzinfo=TZ),
+        }
+        with mock.patch.object(HTML_INDEX, "fetch_text", side_effect=fetch):
+            items = HTML_INDEX.fetch_hex2077(source, window)
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual([item["published_at"] for item in items], ["2026-09-24", "2026-09-23"])
+        self.assertEqual([item["source_url"] for item in items], ["https://example.com/new", "https://example.com/old"])
+
+
 if __name__ == "__main__":
     unittest.main()
