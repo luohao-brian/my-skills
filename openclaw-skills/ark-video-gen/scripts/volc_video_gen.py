@@ -28,14 +28,13 @@ BACKENDS = {
 }
 BACKEND_MODELS = {
     "ark-agent-plan": (
+        "doubao-seedance-2.5",
         "doubao-seedance-2.0-fast",
-        "doubao-seedance-2.0",
     ),
     "ark-api": (
         "doubao-seedance-2-5-260628",
         "doubao-seedance-2-0-fast-260128",
         "doubao-seedance-2-0-mini-260615",
-        "doubao-seedance-2-0-260128",
     ),
 }
 MODEL_PROFILES: dict[str, dict[str, Any]] = {
@@ -47,13 +46,15 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "max_reference_audios": 3,
         "output_formats": (),
     },
-    "doubao-seedance-2.0": {
-        "max_duration": 15,
-        "resolutions": ("480p", "720p", "1080p", "4k"),
-        "max_reference_images": 9,
-        "max_reference_videos": 3,
-        "max_reference_audios": 3,
-        "output_formats": (),
+    "doubao-seedance-2.5": {
+        "max_duration": 30,
+        "resolutions": ("480p", "720p", "1080p"),
+        "max_reference_images": 30,
+        "max_reference_videos": 10,
+        "max_reference_audios": 10,
+        "max_reference_total": 50,
+        "output_formats": ("mp4", "mov"),
+        "task_types": ("auto", "reference", "edit", "extend"),
     },
     "doubao-seedance-2-5-260628": {
         "max_duration": 30,
@@ -76,14 +77,6 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
     "doubao-seedance-2-0-mini-260615": {
         "max_duration": 15,
         "resolutions": ("480p", "720p"),
-        "max_reference_images": 9,
-        "max_reference_videos": 3,
-        "max_reference_audios": 3,
-        "output_formats": (),
-    },
-    "doubao-seedance-2-0-260128": {
-        "max_duration": 15,
-        "resolutions": ("480p", "720p", "1080p", "4k"),
         "max_reference_images": 9,
         "max_reference_videos": 3,
         "max_reference_audios": 3,

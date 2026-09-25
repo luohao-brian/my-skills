@@ -7,14 +7,14 @@
 | `ark-agent-plan` | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3` | `doubao-seedance-2.0-fast` |
 | `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seedance-2-5-260628` |
 
-Agent Plan 还支持 `doubao-seedance-2.0`。Ark API 还支持 `doubao-seedance-2-0-fast-260128`、`doubao-seedance-2-0-mini-260615` 和 `doubao-seedance-2-0-260128`。后端之间不自动重试或切换。
+Agent Plan 还支持 `doubao-seedance-2.5`。Ark API 还支持 `doubao-seedance-2-0-fast-260128` 和 `doubao-seedance-2-0-mini-260615`。后端之间不自动重试或切换。
 
 ## 模型能力
 
 | 模型 | 时长 | 分辨率 | 参考图片 | 参考视频 | 参考音频 |
 | --- | --- | --- | --- | --- | --- |
-| Seedance 2.5 | 4–30 秒或 `-1` | 480p、720p、1080p | 最多 30 张 | 最多 10 段 | 最多 10 段 |
-| Seedance 2.0 | 4–15 秒或 `-1` | 480p、720p、1080p、4K | 最多 9 张 | 最多 3 段 | 最多 3 段 |
+| Seedance 2.5（Ark API） | 4–30 秒或 `-1` | 480p、720p、1080p | 最多 30 张 | 最多 10 段 | 最多 10 段 |
+| Seedance 2.5（Agent Plan） | 4–30 秒或 `-1` | 480p、720p、1080p | 最多 30 张 | 最多 10 段 | 最多 10 段 |
 | Seedance 2.0 Fast/Mini | 4–15 秒或 `-1` | 480p、720p | 最多 9 张 | 最多 3 段 | 最多 3 段 |
 
 Seedance 2.5 单次最多输入 50 个参考素材；视频总时长不超过 30 秒，音频总时长不超过 30 秒。Seedance 2.0 系列的视频总时长不超过 15 秒，音频总时长不超过 15 秒，参考音频需要与图片或视频一起使用。
@@ -51,31 +51,31 @@ Seedance 2.5 和 2.0 系列不能直接上传普通的真人人脸参考图或�
 文生视频：
 
 ```bash
-python3 {baseDir}/scripts/volc_video_gen.py "海边日落，镜头缓慢后退。" --duration 5 --aspect-ratio 16:9
+uv run --no-project --with 'volcengine-python-sdk[ark]>=5.0.5,<6' python3 {baseDir}/scripts/volc_video_gen.py "海边日落，镜头缓慢后退。" --duration 5 --aspect-ratio 16:9
 ```
 
 首尾帧：
 
 ```bash
-python3 {baseDir}/scripts/volc_video_gen.py "人物从首帧姿态自然转身，最终到达尾帧姿态。" --backend ark-api --first-frame ./start.png --last-frame ./end.png
+uv run --no-project --with 'volcengine-python-sdk[ark]>=5.0.5,<6' python3 {baseDir}/scripts/volc_video_gen.py "人物从首帧姿态自然转身，最终到达尾帧姿态。" --backend ark-api --first-frame ./start.png --last-frame ./end.png
 ```
 
 多素材参考：
 
 ```bash
-python3 {baseDir}/scripts/volc_video_gen.py "使用@图像1中的人物外形，参考@视频1中的动作和运镜，使用@音频1中的音色。" --backend ark-api --reference-image ./person.png --reference-video https://example.com/motion.mp4 --reference-audio ./voice.mp3 --audio --task-type reference
+uv run --no-project --with 'volcengine-python-sdk[ark]>=5.0.5,<6' python3 {baseDir}/scripts/volc_video_gen.py "使用@图像1中的人物外形，参考@视频1中的动作和运镜，使用@音频1中的音色。" --backend ark-api --reference-image ./person.png --reference-video https://example.com/motion.mp4 --reference-audio ./voice.mp3 --audio --task-type reference
 ```
 
 只校验请求，不使用凭证或额度：
 
 ```bash
-python3 {baseDir}/scripts/volc_video_gen.py "一只可爱的小狗面向镜头，轻轻摇动尾巴。中景固定镜头，小狗保持清晰居中，动作自然连贯。" --dry-run
+uv run --no-project --with 'volcengine-python-sdk[ark]>=5.0.5,<6' python3 {baseDir}/scripts/volc_video_gen.py "一只可爱的小狗面向镜头，轻轻摇动尾巴。中景固定镜头，小狗保持清晰居中，动作自然连贯。" --dry-run
 ```
 
 恢复任务：
 
 ```bash
-python3 {baseDir}/scripts/volc_video_gen.py --backend ark-api --resume-task TASK_ID --timeout 600
+uv run --no-project --with 'volcengine-python-sdk[ark]>=5.0.5,<6' python3 {baseDir}/scripts/volc_video_gen.py --backend ark-api --resume-task TASK_ID --timeout 600
 ```
 
 ## 请求与输出

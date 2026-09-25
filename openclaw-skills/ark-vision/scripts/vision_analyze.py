@@ -17,17 +17,17 @@ BACKENDS = {
     "ark-agent-plan": {
         "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
         "api_key_env": "ARK_AGENT_PLAN_API_KEY",
-        "model": "doubao-seed-2.0-lite",
+        "model": "doubao-seed-2.1-lite",
     },
     "ark-api": {
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
         "api_key_env": "ARK_API_KEY",
-        "model": "doubao-seed-2-0-lite-260428",
+        "model": "doubao-seed-2-1-lite-260915",
     },
 }
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seed-2.0-lite", "doubao-seed-2.0-mini"),
-    "ark-api": ("doubao-seed-2-0-lite-260428", "doubao-seed-2-0-mini-260428"),
+    "ark-agent-plan": ("doubao-seed-2.1-lite", "doubao-seed-2.0-mini"),
+    "ark-api": ("doubao-seed-2-1-lite-260915", "doubao-seed-2-0-mini-260428"),
 }
 ARK_FILES_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 MAX_OUTPUT_TOKENS = 2000

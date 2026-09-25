@@ -296,3 +296,5 @@
 | 客服场景 | 热情艾娜 2.0 | `ICL_uranus_zh_female_reqingaina_tob` | 中文 |
 | 角色扮演 | 爽朗少年 2.0 | `ICL_uranus_zh_male_shuanglangshaonian_tob` | 中文 |
 | 客服场景 | 轻盈朵朵 2.0 | `ICL_uranus_zh_female_qingyingduoduo_tob` | 中文 |
+| 客服场景 | 营销小楠 2.0 | `ICL_uranus_zh_female_yingxiaokefu_v2_tob` | 中文 |
+| 客服场景 | 外呼凌凌 2.0 | `ICL_uranus_zh_female_kefunvshengwenhecuishou_tob` | 中文 |

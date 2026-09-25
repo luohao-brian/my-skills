@@ -92,7 +92,7 @@ plugins:
         vision_analyze:
           backend: ark-agent-plan
           api_key: ${ARK_AGENT_PLAN_API_KEY}
-          model: doubao-seed-2.0-lite
+          model: doubao-seed-2.1-lite
 ```
 
 The CLI writes all six sections; the excerpt only shows the main model fields.
@@ -114,15 +114,14 @@ video_gen:
 
 ## Models
 
-- Seedream Agent Plan: `doubao-seedream-5.0-lite`
+- Seedream Agent Plan: `doubao-seedream-5.0-lite`, `doubao-seedream-5.0-pro`
 - Seedream Ark API: `doubao-seedream-5-0-260128`,
-  `doubao-seedream-5-0-pro-260628`
-- Seedance Agent Plan: `doubao-seedance-2.0-fast`, `doubao-seedance-2.0`
+  `doubao-seedream-5-0-pro-260628`, `doubao-seedream-5-0-flash-260915`
+- Seedance Agent Plan: `doubao-seedance-2.0-fast`, `doubao-seedance-2.5`
 - Seedance Ark API: `doubao-seedance-2-5-260628`,
-  `doubao-seedance-2-0-fast-260128`, `doubao-seedance-2-0-mini-260615`,
-  `doubao-seedance-2-0-260128`
-- Vision Agent Plan: `doubao-seed-2.0-lite`, `doubao-seed-2.0-mini`
-- Vision Ark API: `doubao-seed-2-0-lite-260428`,
+  `doubao-seedance-2-0-fast-260128`, `doubao-seedance-2-0-mini-260615`
+- Vision Agent Plan: `doubao-seed-2.1-lite`, `doubao-seed-2.0-mini`
+- Vision Ark API: `doubao-seed-2-1-lite-260915`,
   `doubao-seed-2-0-mini-260428`
 
 ## Other commands

@@ -2,7 +2,7 @@
 name: ark-vision
 description: 使用 Ark Agent Plan（默认）或 Ark API 的多模态模型分析图片、视频和 PDF。适用于读取截图、照片、图表、票据、界面、远程或本地视频、PDF，以及消费 Ark Files API 的 file_id。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-vision
-metadata: {"openclaw":{"skillKey":"ark-vision","emoji":"👁️","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-vision","requires":{"anyBins":["python3","python"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
+metadata: {"openclaw":{"skillKey":"ark-vision","emoji":"👁️","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-vision","requires":{"bins":["uv"],"anyBins":["python3","python"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ---
 
 # Ark Vision
@@ -25,12 +25,12 @@ For a local image, video, or PDF that should be reused, or that is too large to 
 ## Command
 
 ```bash
-python3 {baseDir}/scripts/vision_analyze.py ./screenshot.png "总结这张截图里的关键信息"
-python3 {baseDir}/scripts/vision_analyze.py https://example.com/chart.png "提取图表里的趋势和主要数字"
-python3 {baseDir}/scripts/vision_analyze.py ./receipt.jpg "识别商家、日期、总金额和明细" --json
-python3 {baseDir}/scripts/vision_analyze.py ./clip.mp4 "总结视频中的动作和变化"
-python3 {baseDir}/scripts/vision_analyze.py https://example.com/clip.mp4 "总结视频中的动作和变化"
-python3 {baseDir}/scripts/vision_analyze.py file-20260101000000-example "总结这份 PDF" --media-type pdf
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py ./screenshot.png "总结这张截图里的关键信息"
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py https://example.com/chart.png "提取图表里的趋势和主要数字"
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py ./receipt.jpg "识别商家、日期、总金额和明细" --json
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py ./clip.mp4 "总结视频中的动作和变化"
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py https://example.com/clip.mp4 "总结视频中的动作和变化"
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/vision_analyze.py file-20260101000000-example "总结这份 PDF" --media-type pdf
 ```
 
 ## Parameters

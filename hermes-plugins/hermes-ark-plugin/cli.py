@@ -110,6 +110,8 @@ TTS_VOICES = [
     {"alias": "gujie", "id": "zh_female_gujie_uranus_bigtts", "label": "顾姐 2.0", "language": "中文", "style": "角色扮演"},
     {"alias": "guanggaojieshuo", "id": "zh_male_guanggaojieshuo_uranus_bigtts", "label": "广告解说 2.0", "language": "中文", "style": "通用场景"},
     {"alias": "shaoergushi", "id": "zh_female_shaoergushi_uranus_bigtts", "label": "少儿故事 2.0", "language": "中文", "style": "有声阅读"},
+    {"alias": "yingxiaoxiaonan", "id": "ICL_uranus_zh_female_yingxiaokefu_v2_tob", "label": "营销小楠 2.0", "language": "中文", "style": "客服场景"},
+    {"alias": "waihulingling", "id": "ICL_uranus_zh_female_kefunvshengwenhecuishou_tob", "label": "外呼凌凌 2.0", "language": "中文", "style": "客服场景"},
 ]
 
 _TTS_VOICE_BY_ALIAS = {item["alias"]: item for item in TTS_VOICES}
@@ -247,7 +249,7 @@ def _default_ark_entry(api_key_env: str, *, voice: str | None = None, backend: s
         "vision_analyze": {
             "backend": backend,
             "api_key": "${" + media_key_env + "}",
-            "model": "doubao-seed-2.0-lite" if plan else "doubao-seed-2-0-lite-260428",
+            "model": "doubao-seed-2.1-lite" if plan else "doubao-seed-2-1-lite-260915",
             "timeout_seconds": 300,
             "max_tokens": 2000,
             "temperature": 0.1,
@@ -255,7 +257,7 @@ def _default_ark_entry(api_key_env: str, *, voice: str | None = None, backend: s
         "video_analyze": {
             "backend": backend,
             "api_key": "${" + media_key_env + "}",
-            "model": "doubao-seed-2.0-lite" if plan else "doubao-seed-2-0-lite-260428",
+            "model": "doubao-seed-2.1-lite" if plan else "doubao-seed-2-1-lite-260915",
             "timeout_seconds": 300,
             "max_tokens": 4000,
             "temperature": 0.1,

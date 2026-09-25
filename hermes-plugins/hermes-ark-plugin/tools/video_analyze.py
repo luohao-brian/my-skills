@@ -25,7 +25,7 @@ async def ark_video_analyze(args: dict[str, Any], **kw: Any) -> str:
 
     cfg = section("video_analyze")
     backend = section_backend("video_analyze")
-    default_model = "doubao-seed-2.0-lite" if backend == "ark-agent-plan" else "doubao-seed-2-0-lite-260428"
+    default_model = "doubao-seed-2.1-lite" if backend == "ark-agent-plan" else "doubao-seed-2-1-lite-260915"
     model = str(cfg.get("model") or default_model)
     if is_interrupted():
         return json.dumps({"success": False, "analysis": "", "error": "Interrupted", "provider": "ark"})

@@ -2,7 +2,7 @@
 name: ark-tts
 description: 使用 Ark Agent Plan（默认）或 Ark API 的豆包语音接口把文本生成音频。适用于播报、旁白、配音草稿、语音接口验证和需要返回本地音频路径的任务。
 homepage: https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-tts
-metadata: {"openclaw":{"skillKey":"ark-tts","emoji":"🔊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-tts","requires":{"anyBins":["python3","python"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
+metadata: {"openclaw":{"skillKey":"ark-tts","emoji":"🔊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ark-tts","requires":{"bins":["uv"],"anyBins":["python3","python"]},"primaryEnv":"ARK_AGENT_PLAN_API_KEY","install":[{"id":"python-deps","kind":"uv","package":"requests>=2.32,<3"}]}}
 ---
 
 # Ark TTS
@@ -18,10 +18,8 @@ Synthesize speech with Volcengine Ark and save the audio locally.
 ## Command
 
 ```bash
-python3 {baseDir}/scripts/volc_tts.py "要合成的文本" --output ./outputs/tts.mp3
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_tts.py "要合成的文本" --output ./outputs/tts.mp3
 ```
-
-If `python3` is unavailable, use `python`.
 
 ## Contract
 

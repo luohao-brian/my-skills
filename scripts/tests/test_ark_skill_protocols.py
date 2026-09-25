@@ -100,8 +100,10 @@ class ArkSkillProtocolTests(unittest.TestCase):
         })
         self.assertEqual(VIDEO.BACKENDS["ark-agent-plan"]["model"], "doubao-seedance-2.0-fast")
         self.assertEqual(VIDEO.BACKENDS["ark-api"]["model"], "doubao-seedance-2-5-260628")
-        self.assertEqual(VISION.BACKENDS["ark-agent-plan"]["model"], "doubao-seed-2.0-lite")
-        self.assertEqual(VISION.BACKENDS["ark-api"]["model"], "doubao-seed-2-0-lite-260428")
+        self.assertEqual(VISION.BACKENDS["ark-agent-plan"]["model"], "doubao-seed-2.1-lite")
+        self.assertEqual(VISION.BACKENDS["ark-api"]["model"], "doubao-seed-2-1-lite-260915")
+        self.assertNotIn("doubao-seed-2.0-lite", VISION.BACKEND_MODELS["ark-agent-plan"])
+        self.assertNotIn("doubao-seed-2-0-lite-260428", VISION.BACKEND_MODELS["ark-api"])
         self.assertEqual(VIDEO.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
         self.assertEqual(VISION.BACKENDS["ark-api"]["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
         self.assertEqual(TTS.RESOURCE_ID, "seed-tts-2.0")
@@ -241,6 +243,14 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(pro["size"], "1.5K")
         self.assertNotIn("seed", pro)
         self.assertNotIn("sequential_image_generation", pro)
+        for backend, model in (("ark-api", IMAGE.FLASH_MODEL), ("ark-agent-plan", IMAGE.PLAN_PRO_MODEL)):
+            single = IMAGE.build_payload(
+                backend=backend, model=model, prompt="one panel", images=[],
+                aspect_ratio="1:1", resolution="1.5K", count=1,
+            )
+            self.assertNotIn("sequential_image_generation", single)
+            with self.assertRaisesRegex(ValueError, "1 to 1"):
+                IMAGE.validate_request(backend, model, "2K", 2)
         with self.assertRaisesRegex(ValueError, "1 to 1"):
             IMAGE.validate_request("ark-api", IMAGE.PRO_MODEL, "2K", 2)
 
@@ -331,7 +341,9 @@ class ArkSkillProtocolTests(unittest.TestCase):
             VIDEO.validate_generation("ark-api", "doubao-seedance-2-0-fast-260128", 5, "1080p")
         with self.assertRaisesRegex(ValueError, "resolutions"):
             VIDEO.validate_generation("ark-api", "doubao-seedance-2-5-260628", 5, "4k")
-        VIDEO.validate_generation("ark-api", "doubao-seedance-2-0-260128", 15, "4k")
+        VIDEO.validate_generation("ark-agent-plan", "doubao-seedance-2.5", 5, "720p")
+        with self.assertRaisesRegex(ValueError, "not supported"):
+            VIDEO.validate_generation("ark-agent-plan", "doubao-seedance-2.0", 5, "720p")
 
     def test_video_material_roles_modes_and_order(self) -> None:
         frames, frame_settings = VIDEO.build_request(

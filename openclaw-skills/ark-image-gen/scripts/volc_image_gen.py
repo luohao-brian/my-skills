@@ -19,6 +19,9 @@ DEFAULT_RESOLUTION = "2K"
 DEFAULT_OUTPUT_DIR = Path.home() / "Documents" / "hermes-workspace" / "images"
 REQUEST_TIMEOUT_SECONDS = 180
 PRO_MODEL = "doubao-seedream-5-0-pro-260628"
+FLASH_MODEL = "doubao-seedream-5-0-flash-260915"
+PLAN_PRO_MODEL = "doubao-seedream-5.0-pro"
+SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL}
 ASPECT_RATIOS = ("1:1", "3:4", "4:3", "3:2", "2:3", "16:9", "9:16", "21:9")
 SIZE_ALIASES = {value: value for value in ASPECT_RATIOS}
 
@@ -35,8 +38,8 @@ BACKENDS = {
     },
 }
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seedream-5.0-lite",),
-    "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL),
+    "ark-agent-plan": ("doubao-seedream-5.0-lite", PLAN_PRO_MODEL),
+    "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL, FLASH_MODEL),
 }
 MODEL_CAPABILITIES = {
     "doubao-seedream-5.0-lite": {
@@ -56,6 +59,22 @@ MODEL_CAPABILITIES = {
         "layer_decomposition": False,
     },
     PRO_MODEL: {
+        "resolutions": ("1K", "1.5K", "2K"),
+        "max_references": 10,
+        "max_images": 1,
+        "multi_image": False,
+        "web_search": False,
+        "layer_decomposition": True,
+    },
+    FLASH_MODEL: {
+        "resolutions": ("1K", "1.5K", "2K"),
+        "max_references": 10,
+        "max_images": 1,
+        "multi_image": False,
+        "web_search": False,
+        "layer_decomposition": True,
+    },
+    PLAN_PRO_MODEL: {
         "resolutions": ("1K", "1.5K", "2K"),
         "max_references": 10,
         "max_images": 1,
@@ -125,7 +144,7 @@ def prompt_with_aspect_ratio(prompt: str, aspect_ratio: str) -> str:
 
 
 def infer_backend(model: str) -> str:
-    return "ark-agent-plan" if model == "doubao-seedream-5.0-lite" else "ark-api"
+    return "ark-agent-plan" if model in BACKEND_MODELS["ark-agent-plan"] else "ark-api"
 
 
 def validate_pixel_size(model: str, value: str) -> None:
@@ -136,10 +155,10 @@ def validate_pixel_size(model: str, value: str) -> None:
     ratio = width / height
     if not 1 / 16 <= ratio <= 16:
         raise ValueError("Pixel size aspect ratio must be between 1:16 and 16:1")
-    if model == PRO_MODEL:
+    if model in SINGLE_IMAGE_MODELS:
         pixels = width * height
         if not 921_600 <= pixels <= 4_624_220:
-            raise ValueError("Seedream 5.0 Pro pixel size must contain 921600 to 4624220 pixels")
+            raise ValueError("Seedream 5.0 Pro/Flash pixel size must contain 921600 to 4624220 pixels")
 
 
 def validate_request(
@@ -160,7 +179,7 @@ def validate_request(
 
     if layer_decomposition:
         if not capabilities["layer_decomposition"]:
-            raise ValueError("Layer decomposition requires Seedream 5.0 Pro")
+            raise ValueError("Layer decomposition requires Seedream 5.0 Pro or Flash")
         if image_count != 1:
             raise ValueError("Layer decomposition requires exactly one input image")
         if count != 1:
@@ -234,7 +253,7 @@ def build_payload(
         payload["image"] = images[0] if len(images) == 1 else images
     if layer_decomposition:
         payload["layer_decomposition"] = True
-    elif model != PRO_MODEL:
+    elif MODEL_CAPABILITIES[model]["multi_image"]:
         payload["sequential_image_generation"] = "auto" if count > 1 else "disabled"
         if count > 1:
             payload["sequential_image_generation_options"] = {"max_images": count}
@@ -337,7 +356,7 @@ def main() -> int:
     parser.add_argument("--output-format", choices=("png", "jpeg"), default="png")
     parser.add_argument("--response-format", choices=("url", "b64_json"), default="url")
     parser.add_argument("--web-search", action="store_true", help="Enable Lite web search")
-    parser.add_argument("--layer-decomposition", action="store_true", help="Use Pro to split one input into a base image and layers")
+    parser.add_argument("--layer-decomposition", action="store_true", help="Use Pro or Flash to split one input into a base image and layers")
     parser.add_argument("--dry-run", action="store_true", help="Validate and print the request without calling Ark")
     parser.add_argument("--backend", choices=BACKENDS, default=DEFAULT_BACKEND)
     args = parser.parse_args()

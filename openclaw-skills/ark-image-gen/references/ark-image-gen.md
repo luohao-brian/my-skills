@@ -7,28 +7,29 @@
 | `ark-agent-plan` | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations` | `doubao-seedream-5.0-lite` |
 | `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3/images/generations` | `doubao-seedream-5-0-260128` |
 
-Ark API 还可使用 `doubao-seedream-5-0-pro-260628`。脚本不在后端之间自动切换或重试。
+Agent Plan 还可使用 `doubao-seedream-5.0-pro`。Ark API 还可使用 `doubao-seedream-5-0-pro-260628` 和 `doubao-seedream-5-0-flash-260915`。脚本不在后端之间自动切换或重试。
 
 官方资料：
 
 - 图片生成 API：https://www.volcengine.com/docs/82379/1541523?lang=zh
-- Seedream 5.0 Pro 教程：https://www.volcengine.com/docs/82379/2582774?lang=zh
+- Seedream 5.0 Pro / Flash 教程：https://www.volcengine.com/docs/82379/2582774?lang=zh
 - Pro 交互编辑：https://www.volcengine.com/docs/82379/2582775?lang=zh
 
 ## 普通生图
 
 ```bash
-python3 {baseDir}/scripts/volc_image_gen.py "极简产品海报，画面中央放置一只白色陶瓷杯。" --aspect-ratio 1:1 --resolution 2K
-python3 {baseDir}/scripts/volc_image_gen.py "生成三张连贯的城市晨景，保持地点和风格一致。" --max-images 3
-python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ark-api --model doubao-seedream-5-0-pro-260628 --resolution 1.5K
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "极简产品海报，画面中央放置一只白色陶瓷杯。" --aspect-ratio 1:1 --resolution 2K
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "生成三张连贯的城市晨景，保持地点和风格一致。" --max-images 3
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ark-api --model doubao-seedream-5-0-pro-260628 --resolution 1.5K
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ark-api --model doubao-seedream-5-0-flash-260915 --resolution 1.5K
 ```
 
 尺寸规则：
 
 - Lite：`2K`、`3K`、`4K`。
-- Pro 普通生图：`1K`、`1.5K`、`2K`，默认 `2K`。
+- Pro / Flash 普通生图：`1K`、`1.5K`、`2K`，默认 `2K`。
 - `--aspect-ratio` 支持 `1:1`、`3:4`、`4:3`、`3:2`、`2:3`、`16:9`、`9:16`、`21:9`。脚本将比例补入提示词，并把分辨率档位原样传给 `size`。
-- `--size WIDTHxHEIGHT` 是兼容入口。Pro 自定义尺寸总像素范围为 921600 到 4624220，宽高比范围为 1:16 到 16:1。
+- `--size WIDTHxHEIGHT` 是兼容入口。Pro / Flash 自定义尺寸总像素范围为 921600 到 4624220，宽高比范围为 1:16 到 16:1。
 
 组图规则：
 
@@ -39,7 +40,7 @@ python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ar
 
 `--web-search` 只用于 Lite。`--output-format` 支持 `png`、`jpeg`；`--response-format` 支持 `url`、`b64_json`。
 
-`seed` 只属于旧的 Seedream 3.0 文生图接口。本脚本支持的 Lite 与 Pro 模型不发送该字段。
+`seed` 只属于旧的 Seedream 3.0 文生图接口。本脚本支持的 Lite、Pro 与 Flash 模型不发送该字段。Pro / Flash 单图生成不发送 `sequential_image_generation`。
 
 ## 参考图
 
@@ -48,15 +49,16 @@ Seedream 的 `image` 字段接受 HTTP(S) URL 或图片 Base64。本地路径由
 `--image` 接受本地路径、HTTP(S) URL 或 Data URL。多图按提示词中的“图一、图二……”顺序重复传入：
 
 ```bash
-python3 {baseDir}/scripts/volc_image_gen.py "保留图一的主体外形，采用图二的水彩风格。" --image ./subject.png --image ./style.png
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "保留图一的主体外形，采用图二的水彩风格。" --image ./subject.png --image ./style.png
 ```
 
-## Pro 图层拆分
+## Pro / Flash 图层拆分
 
 图层拆分只使用 `image`、`layer_decomposition` 和 `size`：
 
 ```bash
-python3 {baseDir}/scripts/volc_image_gen.py --backend ark-api --model doubao-seedream-5-0-pro-260628 --image ./poster.png --layer-decomposition
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py --backend ark-api --model doubao-seedream-5-0-pro-260628 --image ./poster.png --layer-decomposition
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py --backend ark-api --model doubao-seedream-5-0-flash-260915 --image ./poster.png --layer-decomposition
 ```
 
 请求结构：

@@ -26,10 +26,10 @@ script does not duplicate that flag inside the JSON-encoded `additions` field.
 ## Usage
 
 ```bash
-python3 {baseDir}/scripts/volc_tts.py "欢迎使用 OpenClaw"
-python3 {baseDir}/scripts/volc_tts.py "欢迎使用 OpenClaw" --backend ark-api
-python3 {baseDir}/scripts/volc_tts.py "今天心情不错" --voice zh_female_vv_uranus_bigtts --output ./speech.mp3
-python3 {baseDir}/scripts/volc_tts.py "Hello from Ark" --format mp3
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_tts.py "欢迎使用 OpenClaw"
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_tts.py "欢迎使用 OpenClaw" --backend ark-api
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_tts.py "今天心情不错" --voice zh_female_vv_uranus_bigtts --output ./speech.mp3
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_tts.py "Hello from Ark" --format mp3
 ```
 
 ## Output

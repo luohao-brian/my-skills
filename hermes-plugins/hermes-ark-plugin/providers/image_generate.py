@@ -22,9 +22,12 @@ ASPECT_SIZES = {
     "9:16": "1600x2848",
 }
 PRO_MODEL = "doubao-seedream-5-0-pro-260628"
+FLASH_MODEL = "doubao-seedream-5-0-flash-260915"
+PLAN_PRO_MODEL = "doubao-seedream-5.0-pro"
+SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL}
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seedream-5.0-lite",),
-    "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL),
+    "ark-agent-plan": ("doubao-seedream-5.0-lite", PLAN_PRO_MODEL),
+    "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL, FLASH_MODEL),
 }
 
 
@@ -86,9 +89,9 @@ class ArkImageGenerateProvider(ImageGenProvider):
         try:
             if model not in BACKEND_MODELS[backend]:
                 raise ValueError(f"model {model} is not supported by backend {backend}")
-            if model == PRO_MODEL and resolution not in {"1K", "1.5K", "2K"}:
-                raise ValueError(f"{PRO_MODEL} supports 1K, 1.5K, or 2K")
-            if model != PRO_MODEL and resolution not in {"2K", "3K", "4K"}:
+            if model in SINGLE_IMAGE_MODELS and resolution not in {"1K", "1.5K", "2K"}:
+                raise ValueError(f"{model} supports 1K, 1.5K, or 2K")
+            if model not in SINGLE_IMAGE_MODELS and resolution not in {"2K", "3K", "4K"}:
                 raise ValueError(f"{model} supports 2K, 3K, or 4K")
             request_payload: dict[str, Any] = {
                 "model": model,
@@ -101,7 +104,7 @@ class ArkImageGenerateProvider(ImageGenProvider):
             if refs:
                 encoded = [_reference(value) for value in refs[:10]]
                 request_payload["image"] = encoded[0] if len(encoded) == 1 else encoded
-            if model != PRO_MODEL:
+            if model not in SINGLE_IMAGE_MODELS:
                 request_payload["sequential_image_generation"] = "disabled"
             response = post_json(
                 ark_base_url("image_generate"),

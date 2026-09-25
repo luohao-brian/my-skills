@@ -14,21 +14,19 @@ from agent.video_gen_provider import (
 )
 
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seedance-2.0-fast", "doubao-seedance-2.0"),
+    "ark-agent-plan": ("doubao-seedance-2.5", "doubao-seedance-2.0-fast"),
     "ark-api": (
         "doubao-seedance-2-5-260628",
         "doubao-seedance-2-0-fast-260128",
         "doubao-seedance-2-0-mini-260615",
-        "doubao-seedance-2-0-260128",
     ),
 }
 MODEL_PROFILES: dict[str, dict[str, Any]] = {
     "doubao-seedance-2.0-fast": {"max_duration": 15, "resolutions": ["480p", "720p"], "max_reference_images": 9},
-    "doubao-seedance-2.0": {"max_duration": 15, "resolutions": ["480p", "720p", "1080p", "4k"], "max_reference_images": 9},
+    "doubao-seedance-2.5": {"max_duration": 30, "resolutions": ["480p", "720p", "1080p"], "max_reference_images": 30},
     "doubao-seedance-2-5-260628": {"max_duration": 30, "resolutions": ["480p", "720p", "1080p"], "max_reference_images": 30},
     "doubao-seedance-2-0-fast-260128": {"max_duration": 15, "resolutions": ["480p", "720p"], "max_reference_images": 9},
     "doubao-seedance-2-0-mini-260615": {"max_duration": 15, "resolutions": ["480p", "720p"], "max_reference_images": 9},
-    "doubao-seedance-2-0-260128": {"max_duration": 15, "resolutions": ["480p", "720p", "1080p", "4k"], "max_reference_images": 9},
 }
 ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"]
 TERMINAL_FAILURES = {"failed", "cancelled", "expired"}
