@@ -39,8 +39,8 @@ EXCLUDED_HOSTS = {"github.com", "www.github.com"}
 DEFAULT_MAX_SECONDS = 720
 HTTP_TIMEOUT_SECONDS = 6
 OPENCLI_TIMEOUT_SECONDS = 12
-OPENCLI_WORKERS = 3
-OPENCLI_SEMAPHORE = threading.BoundedSemaphore(2)
+OPENCLI_WORKERS = 1
+OPENCLI_SEMAPHORE = threading.BoundedSemaphore(1)
 LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
 
 
@@ -879,7 +879,7 @@ def collect_document(args: argparse.Namespace) -> dict[str, Any]:
     else:
         try:
             log_progress(
-                f"collecting browser-backed fixed channels with {OPENCLI_WORKERS} workers"
+                f"collecting browser-backed fixed channels with {OPENCLI_WORKERS} worker(s)"
             )
             browser_rows, counts, errors, warnings = collect_browser_sources(
                 registry, start, end, deadline

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import threading
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -179,6 +181,30 @@ class CommunityPulseTests(unittest.TestCase):
         self.assertTrue(document["sources"]["reddit"]["ok"])
         self.assertFalse(document["sources"]["linux-do"]["ok"])
         self.assertEqual(document["sources"]["linux-do"]["error"], "AUTH_REQUIRED")
+
+    def test_shared_browser_commands_do_not_overlap(self) -> None:
+        registry = dict(self.registry)
+        registry["twitter_accounts"] = {"models": ["karpathy"]}
+        registry["reddit_subreddits"] = {"models": ["LocalLLaMA"]}
+        for key in ("zhihu", "linux_do", "bilibili"):
+            registry[key] = registry[key][:1]
+        lock = threading.Lock()
+        active = 0
+        maximum = 0
+
+        def fake_opencli(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+            nonlocal active, maximum
+            with lock:
+                active += 1
+                maximum = max(maximum, active)
+            time.sleep(0.01)
+            with lock:
+                active -= 1
+            return []
+
+        with mock.patch.object(MODULE, "opencli", side_effect=fake_opencli):
+            MODULE.collect_browser_sources(registry)
+        self.assertEqual(maximum, 1)
 
 
 if __name__ == "__main__":
