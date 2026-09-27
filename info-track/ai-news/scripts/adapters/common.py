@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import html
 import re
 import time
@@ -18,8 +19,11 @@ def fetch_text(url: str, timeout: int = 30) -> str:
     for attempt in range(3):
         try:
             with urlopen(request, timeout=timeout) as response:
+                payload = response.read()
+                if response.headers.get("Content-Encoding", "").lower() == "gzip":
+                    payload = gzip.decompress(payload)
                 charset = response.headers.get_content_charset() or "utf-8"
-                return response.read().decode(charset, errors="replace")
+                return payload.decode(charset, errors="replace")
         except Exception as exc:
             last_error = exc
             if "HTTP Error 429" in str(exc):

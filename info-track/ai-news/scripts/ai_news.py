@@ -197,23 +197,10 @@ def is_noise_entry(item: dict[str, str], source_id: str, window: dict[str, Any])
 
 
 def resolve_fetcher(source: dict[str, Any]):
-    source_id = str(source.get("id", ""))
     kind = str(source.get("kind", ""))
-    if kind == "rss":
-        return FETCHERS["rss"]
-    if kind == "json":
-        return FETCHERS["tensorfeed_json"]
-    if source_id == "anthropic-news":
-        return FETCHERS["anthropic"]
-    if source_id == "tmtpost-edge-ai-daily":
-        return FETCHERS["tmtpost"]
-    if source_id == "maomu-news":
-        return FETCHERS["maomu"]
-    if source_id == "xiaohu-daily":
-        return FETCHERS["xiaohu"]
-    if source_id == "hex2077":
-        return FETCHERS["hex2077"]
-    return FETCHERS["html"]
+    if kind not in FETCHERS:
+        raise ValueError(f"source {source.get('id', '')} has unknown kind: {kind or '(missing)'}")
+    return FETCHERS[kind]
 
 
 def collect_data(args: argparse.Namespace) -> dict[str, Any]:
@@ -231,9 +218,9 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
         source_name = str(source["name"])
         source_kind = str(source["kind"])
         source_role = str(source["role"])
-        fetcher = resolve_fetcher(source)
 
         try:
+            fetcher = resolve_fetcher(source)
             raw_items = fetcher(source, window)
         except Exception as exc:  # pragma: no cover - network sources drift.
             source_rows.append(
@@ -411,6 +398,8 @@ def validate_sources() -> list[str]:
         source_id = str(source.get("id", ""))
         if source.get("role") not in SOURCE_ROLES:
             errors.append(f"sources[{index}] has invalid role")
+        if source.get("kind") not in FETCHERS:
+            errors.append(f"sources[{index}] has unknown kind: {source.get('kind')}")
         if source_id in seen:
             errors.append(f"repeated source id: {source_id}")
         seen.add(source_id)

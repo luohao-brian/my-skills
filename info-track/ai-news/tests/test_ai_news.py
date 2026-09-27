@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import importlib.util
+import io
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,6 +16,7 @@ assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+from adapters import common as COMMON
 from adapters import html_index as HTML_INDEX
 
 
@@ -256,6 +259,217 @@ class TmtpostAdapterTests(unittest.TestCase):
         self.assertEqual(items[0]["published_at"], "2026-08-31T08:20:00+08:00")
         self.assertEqual(items[1]["published_at"], "2026-08-29T08:23:00+08:00")
         self.assertNotIn("reporting_notice", {item["source_url"] for item in items})
+
+
+class DatedAnchorParserTests(unittest.TestCase):
+    ANTHROPIC_LIST_HTML = """
+    <html><body><ul>
+      <li><a class="PublicationList-module__listItem" href="/news/claude-discovers-novel-enzyme-system">
+        <div class="PublicationList-module__meta">
+          <time class="PublicationList-module__date">Sep 23, 2026</time>
+          <span class="PublicationList-module__subject">Science</span>
+        </div>
+        <span class="PublicationList-module__title">Claude discovers a novel enzyme system</span>
+      </a></li>
+      <li><a class="PublicationList-module__listItem" href="/news/enterprise-frontier-safeguards">
+        <div class="PublicationList-module__meta">
+          <time class="PublicationList-module__date">Sep 18, 2026</time>
+          <span class="PublicationList-module__subject">Announcements</span>
+        </div>
+        <span class="PublicationList-module__title">Enterprise frontier safeguards</span>
+      </a></li>
+      <li><a class="PublicationList-module__listItem" href="/news/undated-announcement">Undated announcement</a></li>
+    </ul></body></html>
+    """
+
+    def test_anthropic_list_structure_yields_dated_items(self) -> None:
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.ANTHROPIC_LIST_HTML):
+            items = HTML_INDEX.fetch_anthropic({"id": "anthropic-news", "url": "https://www.anthropic.com/news"})
+
+        self.assertEqual(len(items), 2)
+        first = items[0]
+        self.assertEqual(first["title"], "Claude discovers a novel enzyme system")
+        self.assertEqual(first["published_at"], "Sep 23, 2026")
+        self.assertEqual(
+            first["source_url"],
+            "https://www.anthropic.com/news/claude-discovers-novel-enzyme-system",
+        )
+        self.assertEqual(first["summary_basis"], first["title"])
+
+    def test_dated_anchor_parser_skips_items_without_dates(self) -> None:
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.ANTHROPIC_LIST_HTML):
+            items = HTML_INDEX.fetch_dated_anchors(
+                {"url": "https://www.anthropic.com/news"},
+                href_prefix="/news/",
+                date_patterns=(r"Sep\s+\d{1,2},\s+20\d{2}",),
+            )
+
+        self.assertEqual(len(items), 2)
+        self.assertNotIn("undated-announcement", {item["source_url"] for item in items})
+
+    def test_zero_parsed_links_trigger_markup_drift_warning(self) -> None:
+        html = "<html><body>" + "".join(
+            f'<a href="/news/item-{index}">undated item {index}</a>' for index in range(6)
+        ) + "</body></html>"
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(HTML_INDEX, "fetch_text", return_value=html),
+            mock.patch("sys.stderr", stderr),
+        ):
+            items = HTML_INDEX.fetch_dated_anchors(
+                {"url": "https://www.anthropic.com/news"},
+                href_prefix="/news/",
+                source_id="anthropic-news",
+            )
+
+        self.assertEqual(items, [])
+        self.assertIn("markup may have changed", stderr.getvalue())
+
+    def test_generic_html_falls_back_when_times_run_out(self) -> None:
+        html = (
+            "<html><body><time>2026-09-27T08:00:00+08:00</time>"
+            '<a href="/first">first sufficiently long title</a>'
+            '<a href="/second">second sufficiently long title</a>'
+            "</body></html>"
+        )
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=html):
+            items = HTML_INDEX.fetch_generic_html(
+                {"url": "https://example.com/news"}, {"date": "2026-09-26"}
+            )
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0]["published_at"], "2026-09-27T08:00:00+08:00")
+        self.assertEqual(items[1]["published_at"], "2026-09-26")
+
+    def test_resolve_fetcher_is_kind_driven(self) -> None:
+        self.assertIs(MODULE.resolve_fetcher({"id": "a", "kind": "rss"}), MODULE.FETCHERS["rss"])
+        self.assertIs(
+            MODULE.resolve_fetcher({"id": "b", "kind": "anthropic_list"}),
+            MODULE.FETCHERS["anthropic_list"],
+        )
+        self.assertIs(
+            MODULE.resolve_fetcher({"id": "c", "kind": "tmtpost_daily"}),
+            MODULE.FETCHERS["tmtpost_daily"],
+        )
+        with self.assertRaises(ValueError):
+            MODULE.resolve_fetcher({"id": "d", "kind": "nope"})
+
+    def test_validate_sources_rejects_unknown_kind(self) -> None:
+        registry = {
+            "sources": [
+                {"id": "x", "name": "X", "kind": "nope", "role": "media", "url": "https://example.com"}
+            ]
+        }
+        with mock.patch.object(MODULE, "load_json", return_value=registry):
+            errors = MODULE.validate_sources()
+
+        self.assertTrue(any("unknown kind" in error for error in errors))
+
+
+class MaomuTimelineTests(unittest.TestCase):
+    MAOMU_HTML = """
+    <html><body>
+      <div class="news-tag" style="margin:20px 0;"><span>今日 - 2026-09-27</span></div>
+      <ul class="ant-timeline news-list hidden-sm-and-down">
+        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
+          <div class="ant-row"><div class="ant-col ant-col-19">
+            <div class="news-time"><span>08:53</span></div>
+            <a class="dark:text-white" target="_blank" href="https://www.36kr.com/p/4000927879319685">
+              <h3 class="title line-clamp-2">管住AI，成了一门新生意</h3>
+              <div class="desc text-gray-500 line-clamp-2">三类玩家，掘金AI安全。</div>
+              <div class="source-name text-gray-500">来源： <span>36氪</span></div>
+            </a>
+          </div></div>
+        </div></li>
+        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
+          <div class="ant-row"><div class="ant-col ant-col-19">
+            <div class="news-time"><span>07:59</span></div>
+            <a target="_blank" href="https://www.tmtpost.com/8153235.html">
+              <h3 class="title line-clamp-2">Edge AI Daily 早报（9月27日）</h3>
+              <div class="desc text-gray-500 line-clamp-2">OpenAI发布持久化智能体。</div>
+              <div class="source-name text-gray-500">来源： <span>钛媒体</span></div>
+            </a>
+          </div></div>
+        </div></li>
+      </ul>
+      <div class="news-tag" style="margin:20px 0;"><span>2026-09-26</span></div>
+      <ul class="ant-timeline news-list hidden-sm-and-down">
+        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
+          <div class="news-time"><span>23:44</span></div>
+          <a target="_blank" href="https://www.ithome.com/1/007/444.htm">
+            <h3 class="title line-clamp-2">Anthropic Claude 刷新物理学世界纪录</h3>
+            <div class="desc text-gray-500 line-clamp-2">单挑基于杨振宁理论 9 圈难题。</div>
+            <div class="source-name text-gray-500">来源： <span>IT之家</span></div>
+          </a>
+        </div></li>
+      </ul>
+      <a class="news-item" target="_blank" href="https://www.36kr.com/p/3991444838857731">
+        <div class="news-day">6天前 输出token永久免费的旧闻</div>
+      </a>
+    </body></html>
+    """
+
+    def test_timeline_items_get_exact_datetimes(self) -> None:
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.MAOMU_HTML):
+            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
+
+        self.assertEqual(len(items), 3)
+        self.assertEqual(items[0]["published_at"], "2026-09-27T08:53:00+08:00")
+        self.assertEqual(items[0]["title"], "管住AI，成了一门新生意")
+        self.assertEqual(items[0]["summary_basis"], "三类玩家，掘金AI安全。 来源： 36氪")
+        self.assertEqual(items[2]["published_at"], "2026-09-26T23:44:00+08:00")
+
+    def test_sidebar_day_ago_entries_are_excluded(self) -> None:
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.MAOMU_HTML):
+            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
+
+        self.assertNotIn("3991444838857731", {item["source_url"] for item in items})
+
+    def test_groups_without_iso_date_are_skipped(self) -> None:
+        html = (
+            '<html><body>'
+            '<div class="news-tag"><span>昨日推荐</span></div>'
+            '<div class="news-time"><span>12:00</span></div>'
+            '<a href="https://example.com/x"><h3 class="title">没有日期的分组标题</h3></a>'
+            '<div class="news-tag"><span>2026-09-27</span></div>'
+            '<div class="news-time"><span>08:00</span></div>'
+            '<a href="https://example.com/y"><h3 class="title">今天的热门新闻标题</h3></a>'
+            "</body></html>"
+        )
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=html):
+            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["published_at"], "2026-09-27T08:00:00+08:00")
+        self.assertEqual(items[0]["source_url"], "https://example.com/y")
+
+
+class FetchTextTests(unittest.TestCase):
+    def test_fetch_text_decodes_gzip_content_encoding(self) -> None:
+        body = b"<?xml version='1.0'?><rss><channel/></rss>"
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = gzip.compress(body)
+        response.headers.get.return_value = "gzip"
+        response.headers.get_content_charset.return_value = "utf-8"
+
+        with mock.patch.object(COMMON, "urlopen", return_value=response):
+            text = COMMON.fetch_text("https://example.com/feed.xml")
+
+        self.assertEqual(text, body.decode())
+
+    def test_fetch_text_keeps_identity_payload_untouched(self) -> None:
+        body = b"<?xml version='1.0'?><rss><channel/></rss>"
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = body
+        response.headers.get.return_value = ""
+        response.headers.get_content_charset.return_value = "utf-8"
+
+        with mock.patch.object(COMMON, "urlopen", return_value=response):
+            text = COMMON.fetch_text("https://example.com/feed.xml")
+
+        self.assertEqual(text, body.decode())
 
 
 class Hex2077AdapterTests(unittest.TestCase):

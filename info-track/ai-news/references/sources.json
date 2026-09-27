@@ -40,14 +40,14 @@
       "id": "tmtpost-edge-ai-daily",
       "name": "TMTPost Edge AI Daily",
       "role": "aggregator",
-      "kind": "html_index",
+      "kind": "tmtpost_daily",
       "url": "https://www.tmtpost.com/user/7944025"
     },
     {
       "id": "maomu-news",
       "name": "猫目 AI 快讯",
       "role": "aggregator",
-      "kind": "html_index",
+      "kind": "maomu_timeline",
       "url": "https://maomu.com/news"
     },
     {
@@ -70,7 +70,7 @@
       "id": "anthropic-news",
       "name": "Anthropic News",
       "role": "official",
-      "kind": "html_index",
+      "kind": "anthropic_list",
       "url": "https://www.anthropic.com/news"
     },
     {

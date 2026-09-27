@@ -8,7 +8,7 @@ import json
 from .common import fetch_text, first_text
 
 
-def fetch_tensorfeed_json(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
+def fetch_json_articles(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
     payload = json.loads(fetch_text(str(source["url"])))
     articles = payload.get("articles", payload if isinstance(payload, list) else [])
     items: list[dict[str, str]] = []

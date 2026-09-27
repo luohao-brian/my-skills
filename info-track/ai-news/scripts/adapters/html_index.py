@@ -7,6 +7,7 @@ agent-facing skill contract.
 
 from __future__ import annotations
 
+import sys
 from datetime import timedelta
 from typing import Any
 import re
@@ -16,6 +17,11 @@ from .common import absolutize_url, fetch_text, first_text, strip_html
 
 LINK_RE = re.compile(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
 TIME_RE = re.compile(r"<time\b[^>]*(?:datetime=[\"']([^\"']+)[\"'])?[^>]*>(.*?)</time>", re.IGNORECASE | re.DOTALL)
+ANCHOR_TIME_RE = re.compile(r"<time\b[^>]*>(.*?)</time>", re.IGNORECASE | re.DOTALL)
+TITLE_SPAN_RE = re.compile(
+    r"<span\b[^>]*class=[\"'][^\"']*title[^\"']*[\"'][^>]*>(.*?)</span>", re.IGNORECASE | re.DOTALL
+)
+STALE_LINK_THRESHOLD = 5
 META_DESC_RE = re.compile(
     r"<meta\b[^>]*(?:name|property)=[\"'](?:description|og:description)[\"'][^>]*content=[\"']([^\"']+)[\"']",
     re.IGNORECASE,
@@ -72,7 +78,7 @@ def fetch_generic_html(source: dict[str, Any], window: dict[str, Any] | None = N
             {
                 "title": title,
                 "source_url": absolutize_url(url, href),
-                "published_at": times[min(index, len(times) - 1)] if times else fallback_date,
+                "published_at": times[index] if index < len(times) else fallback_date,
                 "summary_basis": title,
             }
         )
@@ -92,35 +98,83 @@ def fetch_generic_html(source: dict[str, Any], window: dict[str, Any] | None = N
     return items
 
 
-def fetch_anthropic(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
+def fetch_dated_anchors(
+    source: dict[str, Any],
+    window: dict[str, Any] | None = None,
+    *,
+    href_prefix: str,
+    date_patterns: tuple[str, ...] = (),
+    source_id: str = "",
+) -> list[dict[str, str]]:
+    """Parse list-page items anchored on links that carry their own date.
+
+    Each item is one <a href="prefix..."> block whose body contains a date
+    (a <time> element first, then text matching date_patterns) and a title
+    (a span whose class mentions "title" first, then the cleaned anchor text
+    with the date removed). Items without a parseable date or a usable title
+    are skipped, so a page redesign degrades to zero items instead of garbage
+    rows that would short-circuit fallback parsing. When the page still has
+    links under the prefix but nothing parses, a stderr warning flags the
+    probable markup drift.
+    """
     url = str(source["url"])
     html = fetch_text(url)
+    date_res = [re.compile(pattern) for pattern in date_patterns]
     items: list[dict[str, str]] = []
-    article_re = re.compile(r"<article\b.*?</article>", re.IGNORECASE | re.DOTALL)
-    href_re = re.compile(r"<a\b[^>]*href=[\"']([^\"']+)[\"']", re.IGNORECASE)
-    title_re = re.compile(r"<h[1-4]\b[^>]*>(.*?)</h[1-4]>", re.IGNORECASE | re.DOTALL)
-    date_re = re.compile(r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}", re.IGNORECASE)
-    body_re = re.compile(r"<p\b[^>]*>(.*?)</p>", re.IGNORECASE | re.DOTALL)
+    seen: set[str] = set()
 
-    for article in article_re.findall(html):
-        href_match = href_re.search(article)
-        title_match = title_re.search(article)
-        date_match = date_re.search(article)
-        if not href_match or not title_match or not date_match:
+    for href, body in LINK_RE.findall(html):
+        if not href.startswith(href_prefix):
             continue
-        summary_match = body_re.search(article)
-        title = strip_html(title_match.group(1))
-        if not title:
+        full_url = absolutize_url(url, href)
+        if full_url in seen:
             continue
+        time_match = ANCHOR_TIME_RE.search(body)
+        date_text = strip_html(time_match.group(1)) if time_match else ""
+        body_text = strip_html(body)
+        if not date_text:
+            for date_re in date_res:
+                match = date_re.search(body_text)
+                if match:
+                    date_text = match.group(0)
+                    break
+        title_match = TITLE_SPAN_RE.search(body)
+        if title_match:
+            title = strip_html(title_match.group(1))
+        elif date_text:
+            title = body_text.replace(date_text, "", 1).strip()
+        else:
+            title = ""
+        title = re.sub(r"\s+", " ", title).strip(" ·|-")
+        if not date_text or len(title) < 4:
+            continue
+        seen.add(full_url)
         items.append(
             {
                 "title": title,
-                "source_url": absolutize_url(url, href_match.group(1)),
-                "published_at": date_match.group(0),
-                "summary_basis": strip_html(summary_match.group(1)) if summary_match else title,
+                "source_url": full_url,
+                "published_at": date_text,
+                "summary_basis": title,
             }
         )
 
+    if not items and html.count(f'href="{href_prefix}') >= STALE_LINK_THRESHOLD:
+        print(
+            f"[ai-news] {source_id or url}: page has links under {href_prefix} "
+            "but 0 parsed; markup may have changed",
+            file=sys.stderr,
+        )
+    return items
+
+
+def fetch_anthropic(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    items = fetch_dated_anchors(
+        source,
+        window,
+        href_prefix="/news/",
+        date_patterns=(r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+20\d{2}",),
+        source_id=str(source.get("id", "")),
+    )
     return items or fetch_generic_html(source, window)
 
 
@@ -156,52 +210,63 @@ def fetch_tmtpost(source: dict[str, Any], window: dict[str, Any] | None = None) 
 
 
 def fetch_maomu(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
-    return fetch_generic_html(source, window)
+    """Parse the maomu news timeline.
 
+    The page groups items under date headers ("今日 - 2026-09-27" or plain
+    "2026-09-26") and stamps each item with a Beijing-time HH:MM clock. Older
+    sidebar entries ("N天前") carry no news-time marker and are not matched.
+    Composing header date plus item clock yields exact per-item timestamps
+    instead of labeling everything with the collection day.
+    """
+    url = str(source["url"])
+    html = fetch_text(url)
+    group_re = re.compile(
+        r'<div\b[^>]*class=["\'][^"\']*news-tag[^"\']*["\'][^>]*>\s*<span[^>]*>([^<]+)</span>',
+        re.IGNORECASE,
+    )
+    item_re = re.compile(
+        r'class=["\']news-time["\'][^>]*>\s*<span[^>]*>(\d{1,2}:\d{2})</span>'
+        r'\s*</div>'
+        r'\s*<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    h3_re = re.compile(r"<h3\b[^>]*>(.*?)</h3>", re.IGNORECASE | re.DOTALL)
+    desc_re = re.compile(r'<div\b[^>]*class=["\'][^"\']*desc[^"\']*["\'][^>]*>(.*?)</div>', re.IGNORECASE | re.DOTALL)
+    source_re = re.compile(
+        r'<div\b[^>]*class=["\'][^"\']*source-name[^"\']*["\'][^>]*>(.*?)</div>', re.IGNORECASE | re.DOTALL
+    )
+    iso_date_re = re.compile(r"20\d{2}-\d{2}-\d{2}")
 
-def fetch_xiaohu(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
-    dates = _dates_from_window(window)
-    all_items: list[dict[str, str]] = []
-    for date in dates:
-        dated_url = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
-        try:
-            html = fetch_text(dated_url)
-        except Exception:
+    items: list[dict[str, str]] = []
+    groups = list(group_re.finditer(html))
+    for index, group in enumerate(groups):
+        date_match = iso_date_re.search(group.group(1))
+        if not date_match:
             continue
-        if "<title>404" in html[:500]:
-            continue
-        items = _parse_xiaohu_daily(html, dated_url, date)
-        if items:
-            all_items.extend(items)
-        else:
-            dated = dict(source)
-            dated["url"] = dated_url
-            dated_window = dict(window or {})
-            dated_window["date"] = date
-            try:
-                all_items.extend(fetch_generic_html(dated, dated_window))
-            except Exception:
-                pass
-    if all_items:
-        return all_items
-
-    base_url = str(source["url"])
-    try:
-        html = fetch_text(base_url)
-    except Exception:
-        return []
-    date_link_re = re.compile(r'href="(\d{4}-\d{2}-\d{2})/?"')
-    found_dates = date_link_re.findall(html)
-    for date in found_dates[:3]:
-        dated_url = str(source.get("date_url", source["url"])).replace("{YYYY-MM-DD}", date)
-        try:
-            daily_html = fetch_text(dated_url)
-        except Exception:
-            continue
-        items = _parse_xiaohu_daily(daily_html, dated_url, date)
-        if items:
-            return items
-    return fetch_generic_html(source, window)
+        day = date_match.group(0)
+        segment_end = groups[index + 1].start() if index + 1 < len(groups) else len(html)
+        segment = html[group.end():segment_end]
+        for clock, href, body in item_re.findall(segment):
+            title_match = h3_re.search(body)
+            title = strip_html(title_match.group(1)) if title_match else ""
+            if len(title) < 4:
+                continue
+            desc_match = desc_re.search(body)
+            source_match = source_re.search(body)
+            summary = strip_html(desc_match.group(1)) if desc_match else title
+            source_name = strip_html(source_match.group(1)) if source_match else ""
+            if source_name:
+                summary = f"{summary} {source_name}" if summary else source_name
+            hour, minute = clock.split(":")
+            items.append(
+                {
+                    "title": title,
+                    "source_url": absolutize_url(url, href),
+                    "published_at": f"{day}T{int(hour):02d}:{minute}:00+08:00",
+                    "summary_basis": summary,
+                }
+            )
+    return items
 
 
 def fetch_hex2077(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
@@ -320,39 +385,3 @@ def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[
     return items
 
 
-def _parse_xiaohu_daily(html: str, url: str, published_at: str) -> list[dict[str, str]]:
-    items: list[dict[str, str]] = []
-    theme_item_re = re.compile(
-        r'<div class="theme-item"><a\s+href="([^"]+)"[^>]*>(.*?)</a>\s*(?:<span class="score-pill[^"]*">(\d+)</span>)?</div>',
-        re.DOTALL,
-    )
-    headline_re = re.compile(r'<div class="headline-title">(.*?)</div>', re.DOTALL)
-    theme_desc_re = re.compile(r'<div class="theme-desc">(.*?)</div>', re.DOTALL)
-    section_re = re.compile(r'<div class="section-title">(.*?)</div>', re.DOTALL)
-
-    theme_descs = [strip_html(m) for m in theme_desc_re.findall(html)]
-    sections = [strip_html(m) for m in section_re.findall(html)]
-    headlines = [strip_html(m) for m in headline_re.findall(html)]
-
-    for index, (href, body, _score) in enumerate(theme_item_re.findall(html)):
-        title = strip_html(body)
-        if len(title) < 8:
-            continue
-        section_idx = min(index // 5, max(len(sections) - 1, 0)) if sections else 0
-        desc_idx = min(index // 10, max(len(theme_descs) - 1, 0)) if theme_descs else 0
-        summary_parts = []
-        if section_idx < len(sections):
-            summary_parts.append(sections[section_idx])
-        if desc_idx < len(theme_descs):
-            summary_parts.append(theme_descs[desc_idx])
-        summary = " | ".join(summary_parts) if summary_parts else title
-        items.append(
-            {
-                "title": title,
-                "source_url": absolutize_url(url, href),
-                "published_at": published_at,
-                "summary_basis": summary,
-            }
-        )
-
-    return items
