@@ -4,6 +4,7 @@ import importlib.util
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 
@@ -144,6 +145,40 @@ class CommunityPulseTests(unittest.TestCase):
             self.assertIn("--use-env-proxy", MODULE.os.environ["NODE_OPTIONS"])
             self.assertEqual(MODULE.os.environ["NODE_NO_WARNINGS"], "1")
             install_opener.assert_called_once()
+
+    def test_disconnected_legacy_extension_does_not_skip_working_sources(self) -> None:
+        args = SimpleNamespace(
+            channels=MODULE.CHANNELS_PATH, hours=72, max_seconds=60, skip_browser=False,
+        )
+        browser_result = (
+            {"twitter": [], "reddit": [], "zhihu": [], "bilibili": []},
+            {source: (1, 0) for source in ("twitter", "reddit", "zhihu", "bilibili")},
+            {"linux-do": "AUTH_REQUIRED"},
+            {},
+        )
+        public_collectors = (
+            "collect_bluesky", "collect_hackernews", "collect_v2ex",
+            "collect_opencli_public", "collect_lesswrong", "collect_polymarket",
+        )
+        with (
+            mock.patch.multiple(MODULE, **{name: mock.DEFAULT for name in public_collectors}) as public,
+            mock.patch.object(MODULE, "collect_browser_sources", return_value=browser_result) as browser,
+            mock.patch.object(
+                MODULE.subprocess, "run",
+                return_value=MODULE.subprocess.CompletedProcess(
+                    ["opencli", "daemon", "status"], 0,
+                    stdout="Daemon: running\nExtension: disconnected\n",
+                ),
+            ),
+        ):
+            for collector in public.values():
+                collector.return_value = ([], 0)
+            document = MODULE.collect_document(args)
+        browser.assert_called_once()
+        self.assertTrue(document["sources"]["twitter"]["ok"])
+        self.assertTrue(document["sources"]["reddit"]["ok"])
+        self.assertFalse(document["sources"]["linux-do"]["ok"])
+        self.assertEqual(document["sources"]["linux-do"]["error"], "AUTH_REQUIRED")
 
 
 if __name__ == "__main__":

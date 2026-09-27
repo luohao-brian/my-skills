@@ -57,9 +57,9 @@ python3 {baseDir}/scripts/community_pulse.py run \
 
 ## 采集边界
 
-- X、Reddit、知乎、Linux.do、B站依赖 Chrome 登录态与 OpenCLI Browser Bridge。桥接不可用时继续采集公开来源，并在来源状态中记录失败原因。
+- X、Reddit、知乎、Linux.do、B站通过 OpenCLI 站点适配器读取已配置的 Chrome。逐来源采集并记录失败；某一站点缺少登录态或浏览器连接失败时，其他站点仍照常采集。Linux.do feed 需要登录。
 - HN、Bluesky、V2EX、Lobsters、LessWrong、Product Hunt 和 Polymarket 使用公开读取能力，不要求登录。
-- `collect` 和 `run` 支持显式 `--http-proxy`、`--https-proxy` 与 `--no-proxy`。代理只作用于本次 Python 采集进程及其 OpenCLI 子进程，不持久化、不写入产物，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理，避免 Browser Bridge 本地连接绕路。
+- `collect` 和 `run` 支持显式 `--http-proxy`、`--https-proxy` 与 `--no-proxy`。代理只作用于本次 Python 采集进程及其 OpenCLI 子进程，不持久化、不写入产物，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理，避免本地浏览器连接绕路。
 - 代理参数覆盖 Python 公开 HTTP 请求和 OpenCLI 公共适配器；Chrome 登录态来源仍使用 Chrome 自身的网络配置。需要代理时必须在唯一一次采集命令中传入，不得在失败后另起 `curl` 补采。
 - 采集器会输出来源进度并在 `--max-seconds` 预算内结束。启动后等待同一进程完成，不要因暂时没有新输出而重复运行。
 - X 只采固定账号；Reddit 只采固定 subreddit；Bluesky 只采固定 Custom Feed；V2EX 只采固定节点；不得用通用 Web 搜索代替。

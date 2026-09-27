@@ -312,23 +312,6 @@ def opencli(
     raise ValueError("OpenCLI output is not a list")
 
 
-def browser_bridge_ready(deadline: float | None = None) -> tuple[bool, str | None]:
-    try:
-        result = subprocess.run(
-            ["opencli", "daemon", "status"],
-            capture_output=True,
-            text=True,
-            timeout=remaining_timeout(deadline, 5),
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, describe_error(exc)
-    output = clean_text((result.stdout or "") + " " + (result.stderr or ""), 420)
-    if "Daemon: running" in output and "Extension: connected" in output:
-        return True, None
-    return False, output or "OpenCLI Browser Bridge unavailable"
-
-
 def add_source_status(
     statuses: dict[str, Any], source: str, ok: bool, raw: int, selected: int,
     error: str | None = None, warning: str | None = None,
@@ -894,36 +877,29 @@ def collect_document(args: argparse.Namespace) -> dict[str, Any]:
         for source in browser_sources:
             add_source_status(statuses, source, False, 0, 0, "browser-backed collection disabled by --skip-browser")
     else:
-        log_progress("checking OpenCLI Browser Bridge")
-        ready, reason = browser_bridge_ready(deadline)
-        if not ready:
+        try:
+            log_progress(
+                f"collecting browser-backed fixed channels with {OPENCLI_WORKERS} workers"
+            )
+            browser_rows, counts, errors, warnings = collect_browser_sources(
+                registry, start, end, deadline
+            )
             for source in browser_sources:
-                add_source_status(statuses, source, False, 0, 0, reason)
-            log_progress(f"browser sources skipped: {reason}")
-        else:
-            try:
-                log_progress(
-                    f"collecting browser-backed fixed channels with {OPENCLI_WORKERS} workers"
-                )
-                browser_rows, counts, errors, warnings = collect_browser_sources(
-                    registry, start, end, deadline
-                )
-                for source in browser_sources:
-                    if source in errors:
-                        add_source_status(statuses, source, False, 0, 0, errors[source])
-                        log_progress(f"source={source} failed error={errors[source]}")
-                        continue
-                    rows = browser_rows.get(source, [])
-                    raw, selected = counts.get(source, (0, 0))
-                    candidates.extend(rows)
-                    add_source_status(statuses, source, True, raw, selected, warning=warnings.get(source))
-                    log_progress(f"source={source} ok raw={raw} selected={selected}")
-            except Exception as exc:
-                message = clean_text(describe_error(exc), 360)
-                for source in browser_sources:
-                    if source not in statuses:
-                        add_source_status(statuses, source, False, 0, 0, message)
-                log_progress(f"browser collection failed error={message}")
+                if source in errors:
+                    add_source_status(statuses, source, False, 0, 0, errors[source])
+                    log_progress(f"source={source} failed error={errors[source]}")
+                    continue
+                rows = browser_rows.get(source, [])
+                raw, selected = counts.get(source, (0, 0))
+                candidates.extend(rows)
+                add_source_status(statuses, source, True, raw, selected, warning=warnings.get(source))
+                log_progress(f"source={source} ok raw={raw} selected={selected}")
+        except Exception as exc:
+            message = clean_text(describe_error(exc), 360)
+            for source in browser_sources:
+                if source not in statuses:
+                    add_source_status(statuses, source, False, 0, 0, message)
+            log_progress(f"browser collection failed error={message}")
 
     deduplicated = deduplicate(candidates)
     add_source_diagnostics(statuses, deduplicated, registry)
