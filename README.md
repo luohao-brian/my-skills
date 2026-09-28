@@ -2,12 +2,12 @@
 
 这里放自维护的 skill、Hermes 插件，以及当前使用的上游 skill 清单。
 
-当前环境共使用 **77 个 skill**：
+当前环境共使用 **78 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
 | 直接使用上游 | 56 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
-| 本地维护版本 | 21 | 交付源码位于本仓库，由本仓库校验和发布 |
+| 本地维护版本 | 22 | 交付源码位于本仓库，由本仓库校验和发布 |
 
 分类以实际使用的版本为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；未经修改则列入“直接使用上游”。
 
@@ -89,7 +89,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 - [`al-site`](https://github.com/2B-AL/al-site-skill)
 - [`al-sandbox`](https://github.com/2B-AL/al-sandbox-skill)
 
-## 本地维护的 skill（21）
+## 本地维护的 skill（22）
 
 以下目录是部署输入。功能、依赖声明、运行时适配和验证规则都随本仓库版本发布。
 
@@ -103,7 +103,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | `ai-oss-models` | [`info-track/ai-oss-models/`](info-track/ai-oss-models/) | 开放模型、数据集与本地部署动态 |
 | `ai-tech-blogs` | [`info-track/ai-tech-blogs/`](info-track/ai-tech-blogs/) | 中文 AI 技术博客聚合 |
 
-### Ark（8）
+### Ark（9）
 
 | Skill | 源码 | 用途 |
 | --- | --- | --- |
@@ -114,6 +114,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | `ark-video-gen` | [`openclaw-skills/ark-video-gen/`](openclaw-skills/ark-video-gen/) | Seedance 视频生成 |
 | `ark-tts` | [`openclaw-skills/ark-tts/`](openclaw-skills/ark-tts/) | 文本转语音 |
 | `ark-stt` | [`openclaw-skills/ark-stt/`](openclaw-skills/ark-stt/) | 语音转文字 |
+| `ark-seed-audio` | [`openclaw-skills/ark-seed-audio/`](openclaw-skills/ark-seed-audio/) | 音效、对白与场景音频生成 |
 | `ark-vision` | [`openclaw-skills/ark-vision/`](openclaw-skills/ark-vision/) | 图片与视频理解 |
 
 ### 设计与演示（6）
@@ -139,7 +140,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | --- | --- | --- |
 | `oss-image-bed` | [`openclaw-skills/oss-image-bed/`](openclaw-skills/oss-image-bed/) | 上传文件到阿里云 OSS 或火山 TOS，生成临时链接并自动清理 |
 
-## 不在 77 个标准部署项中的组件
+## 不在 78 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 

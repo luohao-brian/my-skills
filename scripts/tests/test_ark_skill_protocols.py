@@ -27,6 +27,7 @@ IMAGE = load_script("ark_image_gen_protocol", "openclaw-skills/ark-image-gen/scr
 VIDEO = load_script("ark_video_gen_protocol", "openclaw-skills/ark-video-gen/scripts/volc_video_gen.py")
 STT = load_script("ark_stt_protocol", "openclaw-skills/ark-stt/scripts/volc_stt.py")
 TTS = load_script("ark_tts_protocol", "openclaw-skills/ark-tts/scripts/volc_tts.py")
+SEED_AUDIO = load_script("ark_seed_audio_protocol", "openclaw-skills/ark-seed-audio/scripts/seed_audio.py")
 VISION = load_script("ark_vision_protocol", "openclaw-skills/ark-vision/scripts/vision_analyze.py")
 ARK_FILE = load_script("ark_file_protocol", "openclaw-skills/ark-file/scripts/ark_file.py")
 SEARCH = load_script("ark_search_protocol", "openclaw-skills/ark-search/scripts/web_search.py")
@@ -34,6 +35,64 @@ PLUGIN_CLI = load_script("hermes_ark_plugin_cli", "hermes-plugins/hermes-ark-plu
 
 
 class ArkSkillProtocolTests(unittest.TestCase):
+    def test_seed_audio_prompt_only_and_ordered_voices(self) -> None:
+        import contextlib
+        import io
+        import re
+
+        source = (ROOT / "openclaw-skills/ark-tts/references/seed-tts-2.0-voices.md").read_text(encoding="utf-8")
+        catalog = json.loads((ROOT / "openclaw-skills/ark-seed-audio/references/preset-voices.json").read_text(encoding="utf-8"))
+        source_rows = re.findall(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|$", source, re.M)
+        self.assertEqual(
+            catalog["voices"],
+            [{"scenario": scenario, "name": name, "id": voice_id, "language": language}
+             for scenario, name, voice_id, language in source_rows],
+        )
+        self.assertEqual(SEED_AUDIO.list_voices("云舟")[0]["id"], "zh_male_m191_uranus_bigtts")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(SEED_AUDIO.main(["--list-voices", "云舟"]), 0)
+        self.assertEqual(json.loads(output.getvalue())["voices"][0]["name"], "云舟 2.0")
+        effect = SEED_AUDIO.build_payload("雨夜的脚步声。无人声。", [], "mp3", 48000)
+        self.assertNotIn("references", effect)
+        self.assertEqual(effect["model"], "seed-audio-1.0")
+        scene = SEED_AUDIO.build_payload(
+            "@音频1说第一句，@音频2说第二句。",
+            ["zh_female_vv_uranus_bigtts", "zh_male_m191_uranus_bigtts"],
+            "mp3", 48000,
+        )
+        self.assertEqual(scene["references"], [
+            {"speaker": "zh_female_vv_uranus_bigtts"},
+            {"speaker": "zh_male_m191_uranus_bigtts"},
+        ])
+        with self.assertRaisesRegex(ValueError, "unknown preset voice ID"):
+            SEED_AUDIO.build_payload("一句话", ["audio:/tmp/voice.wav"], "mp3", 48000)
+        with self.assertRaisesRegex(ValueError, "prompt voice labels"):
+            SEED_AUDIO.build_payload(
+                "只有@音频1说话", ["zh_female_vv_uranus_bigtts", "zh_male_m191_uranus_bigtts"],
+                "mp3", 48000,
+            )
+        with patch.dict(os.environ, {"ARK_TTS_X_API_KEY": "tts-only"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "ARK_SEED_AUDIO_API_KEY"):
+                SEED_AUDIO.get_api_key()
+        with patch.dict(os.environ, {"ARK_SEED_AUDIO_API_KEY": "seed-only"}, clear=True):
+            self.assertEqual(SEED_AUDIO.get_api_key(), "seed-only")
+
+    def test_seed_audio_saves_decoded_audio_and_subtitles(self) -> None:
+        import base64
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "effect.mp3"
+            result = SEED_AUDIO.save_result({
+                "audio": base64.b64encode(b"ID3test-audio").decode("ascii"),
+                "duration": 2.5,
+                "subtitle": [],
+            }, output, "mp3", 48000)
+            self.assertEqual(output.read_bytes(), b"ID3test-audio")
+            self.assertEqual(json.loads(Path(result["subtitle_path"]).read_text()), [])
+            self.assertEqual(result["bytes"], len(b"ID3test-audio"))
+
     def test_hermes_plugin_manifest_and_default_config(self) -> None:
         manifest = (ROOT / "hermes-plugins/hermes-ark-plugin/plugin.yaml").read_text(encoding="utf-8")
         self.assertIn("manifest_version: 2", manifest)

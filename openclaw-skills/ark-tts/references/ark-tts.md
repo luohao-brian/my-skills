@@ -8,7 +8,7 @@
 | `ark-api` | `ARK_TTS_X_API_KEY` | `https://openspeech.bytedance.com/api/v3/tts/unidirectional` |
 
 Both backends use resource `seed-tts-2.0` and the same built-in voice catalog.
-Access to paid, custom, or cloned voices still depends on the selected backend's account entitlement.
+This skill selects preset voices from [seed-tts-2.0-voices.md](seed-tts-2.0-voices.md). Availability of a preset still depends on the selected backend's account entitlement.
 Endpoints are fixed, and the script does not fall back between backends.
 
 ## Request

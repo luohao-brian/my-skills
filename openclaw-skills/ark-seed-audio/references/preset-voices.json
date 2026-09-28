@@ -1,0 +1,1769 @@
+{
+  "source": "ark-tts/references/seed-tts-2.0-voices.md",
+  "voices": [
+    {
+      "scenario": "通用场景",
+      "name": "Vivi 2.0",
+      "id": "zh_female_vv_uranus_bigtts",
+      "language": "语种：中文、日文、印尼、墨西哥西班牙语；方言：四川、陕西、东北"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "小何 2.0",
+      "id": "zh_female_xiaohe_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "云舟 2.0",
+      "id": "zh_male_m191_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "小天 2.0",
+      "id": "zh_male_taocheng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "刘飞 2.0",
+      "id": "zh_male_liufei_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "魅力苏菲 2.0",
+      "id": "zh_female_sophie_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "清新女声 2.0",
+      "id": "zh_female_qingxinnvsheng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "知性灿灿 2.0",
+      "id": "zh_female_cancan_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "撒娇学妹 2.0",
+      "id": "zh_female_sajiaoxuemei_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "甜美小源 2.0",
+      "id": "zh_female_tianmeixiaoyuan_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "甜美桃子 2.0",
+      "id": "zh_female_tianmeitaozi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "爽快思思 2.0",
+      "id": "zh_female_shuangkuaisisi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "佩奇猪 2.0",
+      "id": "zh_female_peiqi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "邻家女孩 2.0",
+      "id": "zh_female_linjianvhai_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "少年梓辛 2.0",
+      "id": "zh_male_shaonianzixin_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "猴哥 2.0",
+      "id": "zh_male_sunwukong_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "教育场景",
+      "name": "Tina老师 2.0",
+      "id": "zh_female_yingyujiaoxue_uranus_bigtts",
+      "language": "中文、英式英语"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "暖阳女声 2.0",
+      "id": "zh_female_kefunvsheng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "儿童绘本 2.0",
+      "id": "zh_female_xiaoxue_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "大壹 2.0",
+      "id": "zh_male_dayi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "黑猫侦探社咪仔 2.0",
+      "id": "zh_female_mizai_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "鸡汤女 2.0",
+      "id": "zh_female_jitangnv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "魅力女友 2.0",
+      "id": "zh_female_meilinvyou_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "流畅女声 2.0",
+      "id": "zh_female_liuchangnv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "儒雅逸辰 2.0",
+      "id": "zh_male_ruyayichen_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Tim",
+      "id": "en_male_tim_uranus_bigtts",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Dacey",
+      "id": "en_female_dacey_uranus_bigtts",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Stokie",
+      "id": "en_female_stokie_uranus_bigtts",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔妈妈 2.0",
+      "id": "zh_female_wenroumama_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "解说小明 2.0",
+      "id": "zh_male_jieshuoxiaoming_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "TVB女声 2.0",
+      "id": "zh_female_tvbnv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "译制片男 2.0",
+      "id": "zh_male_yizhipiannan_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "俏皮女声 2.0",
+      "id": "zh_female_qiaopinv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "直率英子 2.0",
+      "id": "zh_female_zhishuaiyingzi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "邻家男孩 2.0",
+      "id": "zh_male_linjiananhai_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "四郎 2.0",
+      "id": "zh_male_silang_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "儒雅青年 2.0",
+      "id": "zh_male_ruyaqingnian_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "擎苍 2.0",
+      "id": "zh_male_qingcang_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "熊二 2.0",
+      "id": "zh_male_xionger_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "樱桃丸子 2.0",
+      "id": "zh_female_yingtaowanzi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温暖阿虎 2.0",
+      "id": "zh_male_wennuanahu_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "奶气萌娃 2.0",
+      "id": "zh_male_naiqimengwa_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "婆婆 2.0",
+      "id": "zh_female_popo_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "高冷御姐 2.0",
+      "id": "zh_female_gaolengyujie_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "傲娇霸总 2.0",
+      "id": "zh_male_aojiaobazong_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "懒音绵宝 2.0",
+      "id": "zh_male_lanyinmianbao_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "反卷青年 2.0",
+      "id": "zh_male_fanjuanqingnian_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔淑女 2.0",
+      "id": "zh_female_wenroushunv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "古风少御 2.0",
+      "id": "zh_female_gufengshaoyu_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "活力小哥 2.0",
+      "id": "zh_male_huolixiaoge_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "霸气青叔 2.0",
+      "id": "zh_male_baqiqingshu_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "悬疑解说 2.0",
+      "id": "zh_male_xuanyijieshuo_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "萌丫头 2.0",
+      "id": "zh_female_mengyatou_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "贴心女声 2.0",
+      "id": "zh_female_tiexinnvsheng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "鸡汤妹妹 2.0",
+      "id": "zh_female_jitangmei_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "磁性解说男声 2.0",
+      "id": "zh_male_cixingjieshuonan_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "亮嗓萌仔 2.0",
+      "id": "zh_male_liangsangmengzai_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "开朗姐姐 2.0",
+      "id": "zh_female_kailangjiejie_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "高冷沉稳 2.0",
+      "id": "zh_male_gaolengchenwen_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "深夜播客 2.0",
+      "id": "zh_male_shenyeboke_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "鲁班七号 2.0",
+      "id": "zh_male_lubanqihao_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "娇喘女声 2.0",
+      "id": "zh_female_jiaochuannv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "林潇 2.0",
+      "id": "zh_female_linxiao_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "玲玲姐姐 2.0",
+      "id": "zh_female_lingling_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "春日部姐姐 2.0",
+      "id": "zh_female_chunribu_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "唐僧 2.0",
+      "id": "zh_male_tangseng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "庄周 2.0",
+      "id": "zh_male_zhuangzhou_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "开朗弟弟 2.0",
+      "id": "zh_male_kailangdidi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "猪八戒 2.0",
+      "id": "zh_male_zhubajie_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "感冒电音姐姐 2.0",
+      "id": "zh_female_ganmaodianyin_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "谄媚女声 2.0",
+      "id": "zh_female_chanmeinv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "女雷神 2.0",
+      "id": "zh_female_nvleishen_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "亲切女声 2.0",
+      "id": "zh_female_qinqienv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "快乐小东 2.0",
+      "id": "zh_male_kuailexiaodong_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "开朗学长 2.0",
+      "id": "zh_male_kailangxuezhang_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "悠悠君子 2.0",
+      "id": "zh_male_youyoujunzi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "文静毛毛 2.0",
+      "id": "zh_female_wenjingmaomao_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "知性女声 2.0",
+      "id": "zh_female_zhixingnv_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "清爽男大 2.0",
+      "id": "zh_male_qingshuangnanda_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "渊博小叔 2.0",
+      "id": "zh_male_yuanboxiaoshu_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "阳光青年 2.0",
+      "id": "zh_male_yangguangqingnian_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "清澈梓梓 2.0",
+      "id": "zh_female_qingchezizi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "甜美悦悦 2.0",
+      "id": "zh_female_tianmeiyueyue_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "心灵鸡汤 2.0",
+      "id": "zh_female_xinlingjitang_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔小哥 2.0",
+      "id": "zh_male_wenrouxiaoge_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "柔美女友 2.0",
+      "id": "zh_female_roumeinvyou_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "东方浩然 2.0",
+      "id": "zh_male_dongfanghaoran_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔小雅 2.0",
+      "id": "zh_female_wenrouxiaoya_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "天才童声 2.0",
+      "id": "zh_male_tiancaitongsheng_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "武则天 2.0",
+      "id": "zh_female_wuzetian_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "顾姐 2.0",
+      "id": "zh_female_gujie_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "广告解说 2.0",
+      "id": "zh_male_guanggaojieshuo_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "少儿故事 2.0",
+      "id": "zh_female_shaoergushi_uranus_bigtts",
+      "language": "中文"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Charlie 2.0",
+      "id": "ICL_uranus_en_female_charlie_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Ethan 2.0",
+      "id": "ICL_uranus_en_male_ethan_tob",
+      "language": "澳洲英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Alastor 2.0",
+      "id": "ICL_uranus_en_male_alastor_tob",
+      "language": "英式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Chucky 2.0",
+      "id": "ICL_uranus_en_male_chucky_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Noah 2.0",
+      "id": "ICL_uranus_en_male_noah_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Jigsaw 2.0",
+      "id": "ICL_uranus_en_male_jigsaw_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Clown Man 2.0",
+      "id": "ICL_uranus_en_male_clown_man_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Cartoon Chef 2.0",
+      "id": "ICL_uranus_en_male_cartoon_chef_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Frosty Man 2.0",
+      "id": "ICL_uranus_en_male_frosty_man_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "The Grinch 2.0",
+      "id": "ICL_uranus_en_male_the_grinch_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Kevin McCallister 2.0",
+      "id": "ICL_uranus_en_male_kevin_mccallister_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Michael 2.0",
+      "id": "ICL_uranus_en_male_michael_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Big Boogie 2.0",
+      "id": "ICL_uranus_en_male_big_boogie_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Xavier 2.0",
+      "id": "ICL_uranus_en_male_xavier_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "多语种",
+      "name": "Zayne 2.0",
+      "id": "ICL_uranus_en_male_zayne_tob",
+      "language": "美式英语"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "客服婉君 2.0",
+      "id": "ICL_uranus_zh_female_kefuwanjun_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "傲娇女友 2.0",
+      "id": "ICL_uranus_zh_female_aojiaonvyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "傲慢娇声 2.0",
+      "id": "ICL_uranus_zh_female_aomanjiaosheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "邪魅女王 2.0",
+      "id": "ICL_uranus_zh_female_xiemeinvwang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "病娇姐姐 2.0",
+      "id": "ICL_uranus_zh_female_bingjiaojiejie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病娇萌妹 2.0",
+      "id": "ICL_uranus_zh_female_bingjiaomengmei_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病弱少女 2.0",
+      "id": "ICL_uranus_zh_female_bingruoshaonv_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "成熟温柔 2.0",
+      "id": "ICL_uranus_zh_female_chengshuwenrou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "成熟姐姐 2.0",
+      "id": "ICL_uranus_zh_female_chengshujiejie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "纯真少女 2.0",
+      "id": "ICL_uranus_zh_female_chunzhenshaonv_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "纯澈女生 2.0",
+      "id": "ICL_uranus_zh_female_chunchenvsheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "妩媚可人 2.0",
+      "id": "ICL_uranus_zh_female_wumeikeren_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "乖巧可儿 2.0",
+      "id": "ICL_uranus_zh_female_guaiqiaokeer_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "和蔼奶奶 2.0",
+      "id": "ICL_uranus_zh_female_heainainai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "活泼刁蛮 2.0",
+      "id": "ICL_uranus_zh_female_huopodiaoman_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "活泼女孩 2.0",
+      "id": "ICL_uranus_zh_female_huoponvhai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "娇憨女王 2.0",
+      "id": "ICL_uranus_zh_female_jiaohannvwang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "娇弱萝莉 2.0",
+      "id": "ICL_uranus_zh_female_jiaoruoluoli_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "假小子 2.0",
+      "id": "ICL_uranus_zh_female_jiaxiaozi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "精灵向导 2.0",
+      "id": "ICL_uranus_zh_female_jinglingxiangdao_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "开朗婷婷 2.0",
+      "id": "ICL_uranus_zh_female_kailangtingting_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "开心小鸿 2.0",
+      "id": "ICL_uranus_zh_female_kaixinxiaohong_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "可爱女生 2.0",
+      "id": "ICL_uranus_zh_female_keainvsheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "灵动欣欣 2.0",
+      "id": "ICL_uranus_zh_female_lingdongxinxin_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "邻居阿姨 2.0",
+      "id": "ICL_uranus_zh_female_linjuayi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "甜美娇俏 2.0",
+      "id": "ICL_uranus_zh_female_tianmeijiaoqiao_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "清冷高雅 2.0",
+      "id": "ICL_uranus_zh_female_qinglenggaoya_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "理性圆子 2.0",
+      "id": "ICL_uranus_zh_female_lixingyuanzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "性感魅惑 2.0",
+      "id": "ICL_uranus_zh_female_xingganmeihuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "暖心茜茜 2.0",
+      "id": "ICL_uranus_zh_female_nuanxinqianqian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "暖心学姐 2.0",
+      "id": "ICL_uranus_zh_female_nuanxinxuejie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "清甜莓莓 2.0",
+      "id": "ICL_uranus_zh_female_qingtianmeimei_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "清甜桃桃 2.0",
+      "id": "ICL_uranus_zh_female_qingtiantaotao_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "清晰小雪 2.0",
+      "id": "ICL_uranus_zh_female_qingxixiaoxue_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "倾心少女 2.0",
+      "id": "ICL_uranus_zh_female_qingxinshaonv_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "柔骨魂师 2.0",
+      "id": "ICL_uranus_zh_female_rouguhunshi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "软萌糖糖 2.0",
+      "id": "ICL_uranus_zh_female_ruanmengtangtang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "软萌团子 2.0",
+      "id": "ICL_uranus_zh_female_ruanmengtuanzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "甜美活泼 2.0",
+      "id": "ICL_uranus_zh_female_tianmeihuopo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "甜美小橘 2.0",
+      "id": "ICL_uranus_zh_female_tianmeixiaoju_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "甜美小雨 2.0",
+      "id": "ICL_uranus_zh_female_tianmeixiaoyu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "调皮公主 2.0",
+      "id": "ICL_uranus_zh_female_tiaopigongzhu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "贴心女友 2.0",
+      "id": "ICL_uranus_zh_female_tiexinnvyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔女神 2.0",
+      "id": "ICL_uranus_zh_female_wenrounvshen_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景,S2S-SC",
+      "name": "温柔文雅 2.0",
+      "id": "ICL_uranus_zh_female_wenrouwenya_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "知心姐姐 2.0",
+      "id": "ICL_uranus_zh_female_zhixinjiejie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "妩媚御姐 2.0",
+      "id": "ICL_uranus_zh_female_wumeiyujie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "元气甜妹 2.0",
+      "id": "ICL_uranus_zh_female_yuanqitianmei_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "邪魅御姐 2.0",
+      "id": "ICL_uranus_zh_female_xiemeiyujie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "性感御姐 2.0",
+      "id": "ICL_uranus_zh_female_xingganyujie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "秀丽倩倩 2.0",
+      "id": "ICL_uranus_zh_female_xiuliqianqian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "贴心闺蜜 2.0",
+      "id": "ICL_uranus_zh_female_tiexinguimi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "贴心妹妹 2.0",
+      "id": "ICL_uranus_zh_female_tiexinmeimei_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "温柔白月光 2.0",
+      "id": "ICL_uranus_zh_female_wenroubaiyueguang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "初恋女友 2.0",
+      "id": "ICL_uranus_zh_female_chuliannvyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "知性温婉 2.0",
+      "id": "ICL_uranus_zh_female_zhixingwenwan_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "傲气凌人 2.0",
+      "id": "ICL_uranus_zh_male_aoqilingren_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "黯刃秦主 2.0",
+      "id": "ICL_uranus_zh_male_anrenqinzhu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "傲娇公子 2.0",
+      "id": "ICL_uranus_zh_male_aojiaogongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "傲娇精英 2.0",
+      "id": "ICL_uranus_zh_male_aojiaojingying_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "傲慢青年 2.0",
+      "id": "ICL_uranus_zh_male_aomanqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "傲慢少爷 2.0",
+      "id": "ICL_uranus_zh_male_aomanshaoye_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "枕边低语 2.0",
+      "id": "ICL_uranus_zh_male_zhenbiandiyu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "霸道少爷 2.0",
+      "id": "ICL_uranus_zh_male_badaoshaoye_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "霸道总裁 2.0",
+      "id": "ICL_uranus_zh_male_badaozongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "病娇白莲 2.0",
+      "id": "ICL_uranus_zh_male_bingjiaobailian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "病娇弟弟 2.0",
+      "id": "ICL_uranus_zh_male_bingjiaodidi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病娇哥哥 2.0",
+      "id": "ICL_uranus_zh_male_bingjiaogege_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病娇男友 2.0",
+      "id": "ICL_uranus_zh_male_bingjiaonanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病娇少年 2.0",
+      "id": "ICL_uranus_zh_male_bingjiaoshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病弱公子 2.0",
+      "id": "ICL_uranus_zh_male_bingruogongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "病弱少年 2.0",
+      "id": "ICL_uranus_zh_male_bingruoshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "不羁青年 2.0",
+      "id": "ICL_uranus_zh_male_bujiqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "醇厚低音 2.0",
+      "id": "ICL_uranus_zh_male_chunhoudiyin_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "视频配音",
+      "name": "咆哮小哥 2.0",
+      "id": "ICL_uranus_zh_male_paoxiaoxiaoge_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "炀炀 2.0",
+      "id": "ICL_uranus_zh_male_yangyang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "孱弱少爷 2.0",
+      "id": "ICL_uranus_zh_male_chanruoshaoye_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "成熟总裁 2.0",
+      "id": "ICL_uranus_zh_male_chengshuzongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "沉稳明仔 2.0",
+      "id": "ICL_uranus_zh_male_chenwenmingzai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "清逸苏感 2.0",
+      "id": "ICL_uranus_zh_male_qingyisugan_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "纯真学弟 2.0",
+      "id": "ICL_uranus_zh_male_chunzhenxuedi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "磁性男嗓 2.0",
+      "id": "ICL_uranus_zh_male_cixingnansang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "醋精男生 2.0",
+      "id": "ICL_uranus_zh_male_cujingnansheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "醋精男友 2.0",
+      "id": "ICL_uranus_zh_male_cujingnanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "低音沉郁 2.0",
+      "id": "ICL_uranus_zh_male_diyinchenyu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "风发少年 2.0",
+      "id": "ICL_uranus_zh_male_fengfashaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "儒雅公子 2.0",
+      "id": "ICL_uranus_zh_male_ruyagongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演,S2S-SC",
+      "name": "腹黑公子 2.0",
+      "id": "ICL_uranus_zh_male_fuheigongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "干净少年 2.0",
+      "id": "ICL_uranus_zh_male_ganjingshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "高冷总裁 2.0",
+      "id": "ICL_uranus_zh_male_gaolengzongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "孤傲公子 2.0",
+      "id": "ICL_uranus_zh_male_guaogongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "孤高公子 2.0",
+      "id": "ICL_uranus_zh_male_gugaogongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "诡异神秘 2.0",
+      "id": "ICL_uranus_zh_male_guiyishenmi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "固执病娇 2.0",
+      "id": "ICL_uranus_zh_male_guzhibingjiao_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "憨厚敦实 2.0",
+      "id": "ICL_uranus_zh_male_hanhoudunshi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "活力青年 2.0",
+      "id": "ICL_uranus_zh_male_huoliqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "活泼男友 2.0",
+      "id": "ICL_uranus_zh_male_huoponanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "活泼爽朗 2.0",
+      "id": "ICL_uranus_zh_male_huoposhuanglang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "胡子叔叔 2.0",
+      "id": "ICL_uranus_zh_male_huzishushu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "机甲智能 2.0",
+      "id": "ICL_uranus_zh_male_jijiazhineng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "精英青年 2.0",
+      "id": "ICL_uranus_zh_male_jingyingqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "俊逸公子 2.0",
+      "id": "ICL_uranus_zh_male_junyigongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "开朗轻快 2.0",
+      "id": "ICL_uranus_zh_male_kailangqingkuai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "开朗青年 2.0",
+      "id": "ICL_uranus_zh_male_kailangqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "蓝银草魂师 2.0",
+      "id": "ICL_uranus_zh_male_lanyincaohunshi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷傲总裁 2.0",
+      "id": "ICL_uranus_zh_male_lengaozongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷淡疏离 2.0",
+      "id": "ICL_uranus_zh_male_lengdanshuli_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷峻高智 2.0",
+      "id": "ICL_uranus_zh_male_lengjungaozhi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷峻上司 2.0",
+      "id": "ICL_uranus_zh_male_lengjunshangsi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "冷酷哥哥 2.0",
+      "id": "ICL_uranus_zh_male_lengkugege_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷脸兄长 2.0",
+      "id": "ICL_uranus_zh_male_lenglianxiongzhang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷脸学霸 2.0",
+      "id": "ICL_uranus_zh_male_lenglianxueba_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷漠男友 2.0",
+      "id": "ICL_uranus_zh_male_lengmonanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "冷漠兄长 2.0",
+      "id": "ICL_uranus_zh_male_lengmoxiongzhang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "凌云青年 2.0",
+      "id": "ICL_uranus_zh_male_lingyunqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "清冷矜贵 2.0",
+      "id": "ICL_uranus_zh_male_qinglengjingui_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "绿茶小哥 2.0",
+      "id": "ICL_uranus_zh_male_lvchaxiaoge_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "懵懂青年 2.0",
+      "id": "ICL_uranus_zh_male_mengdongqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "闷油瓶小哥 2.0",
+      "id": "ICL_uranus_zh_male_menyoupingxiaoge_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "嚣张小哥 2.0",
+      "id": "ICL_uranus_zh_male_xiaozhangxiaoge_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "粘人男友 2.0",
+      "id": "ICL_uranus_zh_male_nianrennanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "内敛才俊 2.0",
+      "id": "ICL_uranus_zh_male_neiliancaijun_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "暖心体贴 2.0",
+      "id": "ICL_uranus_zh_male_nuanxintitie_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "翩翩公子 2.0",
+      "id": "ICL_uranus_zh_male_pianpiangongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "沉稳优雅 2.0",
+      "id": "ICL_uranus_zh_male_chenwenyouya_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "青涩小生 2.0",
+      "id": "ICL_uranus_zh_male_qingsexiaosheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "青涩青年 2.0",
+      "id": "ICL_uranus_zh_male_qingseqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "清爽少年 2.0",
+      "id": "ICL_uranus_zh_male_qingshuangshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "清新波波 2.0",
+      "id": "ICL_uranus_zh_male_qingxinbobo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "亲切青年 2.0",
+      "id": "ICL_uranus_zh_male_qinqieqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "亲切小卓 2.0",
+      "id": "ICL_uranus_zh_male_qinqiexiaozhuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "清朗温润 2.0",
+      "id": "ICL_uranus_zh_male_qinglangwenrun_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "热血少年 2.0",
+      "id": "ICL_uranus_zh_male_rexueshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "儒雅才俊 2.0",
+      "id": "ICL_uranus_zh_male_ruyacaijun_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "儒雅君子 2.0",
+      "id": "ICL_uranus_zh_male_ruyajunzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "儒雅总裁 2.0",
+      "id": "ICL_uranus_zh_male_ruyazongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "撒娇男生 2.0",
+      "id": "ICL_uranus_zh_male_sajiaonansheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "撒娇男友 2.0",
+      "id": "ICL_uranus_zh_male_sajiaonanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "撒娇粘人 2.0",
+      "id": "ICL_uranus_zh_male_sajiaonianren_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "洒脱青年 2.0",
+      "id": "ICL_uranus_zh_male_satuoqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "少年将军 2.0",
+      "id": "ICL_uranus_zh_male_shaonianjiangjun_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "深沉总裁 2.0",
+      "id": "ICL_uranus_zh_male_shenchenzongcai_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "机灵小伙 2.0",
+      "id": "ICL_uranus_zh_male_jilingxiaohuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "神秘法师 2.0",
+      "id": "ICL_uranus_zh_male_shenmifashi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "通用场景",
+      "name": "率真小伙 2.0",
+      "id": "ICL_uranus_zh_male_shuaizhenxiaohuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "爽朗小阳 2.0",
+      "id": "ICL_uranus_zh_male_shuanglangxiaoyang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "低沉缱绻 2.0",
+      "id": "ICL_uranus_zh_male_dichenqianquan_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "斯文青年 2.0",
+      "id": "ICL_uranus_zh_male_siwenqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "甜系男友 2.0",
+      "id": "ICL_uranus_zh_male_tianxinanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "贴心男友 2.0",
+      "id": "ICL_uranus_zh_male_tiexinnanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温柔男同桌 2.0",
+      "id": "ICL_uranus_zh_male_wenrounantongzhuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温柔男友 2.0",
+      "id": "ICL_uranus_zh_male_wenrounanyou_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温柔学长 2.0",
+      "id": "ICL_uranus_zh_male_wenrouxuezhang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温润学者 2.0",
+      "id": "ICL_uranus_zh_male_wenrunxuezhe_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温顺少年 2.0",
+      "id": "ICL_uranus_zh_male_wenshunshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "寡言小哥 2.0",
+      "id": "ICL_uranus_zh_male_guayanxiaoge_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "小侯爷 2.0",
+      "id": "ICL_uranus_zh_male_xiaohouye_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "奶气小生 2.0",
+      "id": "ICL_uranus_zh_male_naiqixiaosheng_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "潇洒随性 2.0",
+      "id": "ICL_uranus_zh_male_xiaosasuixing_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "温柔内敛 2.0",
+      "id": "ICL_uranus_zh_male_wenrouneilian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "学霸男同桌 2.0",
+      "id": "ICL_uranus_zh_male_xuebanantongzhuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "学霸同桌 2.0",
+      "id": "ICL_uranus_zh_male_xuebatongzhuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "阳光洋洋 2.0",
+      "id": "ICL_uranus_zh_male_yangguangyangyang_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "有声阅读",
+      "name": "温暖少年 2.0",
+      "id": "ICL_uranus_zh_male_wennuanshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "意气少年 2.0",
+      "id": "ICL_uranus_zh_male_yiqishaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "油腻大叔 2.0",
+      "id": "ICL_uranus_zh_male_younidashu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "幽默大爷 2.0",
+      "id": "ICL_uranus_zh_male_youmodaye_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "幽默叔叔 2.0",
+      "id": "ICL_uranus_zh_male_youmoshushu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "优柔帮主 2.0",
+      "id": "ICL_uranus_zh_male_youroubangzhu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "优柔公子 2.0",
+      "id": "ICL_uranus_zh_male_yourougongzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "元气少年 2.0",
+      "id": "ICL_uranus_zh_male_yuanqishaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "仗剑君子 2.0",
+      "id": "ICL_uranus_zh_male_zhangjianjunzi_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "仗剑侠客 2.0",
+      "id": "ICL_uranus_zh_male_zhangjianxiake_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "正直青年 2.0",
+      "id": "ICL_uranus_zh_male_zhengzhiqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "直率青年 2.0",
+      "id": "ICL_uranus_zh_male_zhishuaiqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "中二青年 2.0",
+      "id": "ICL_uranus_zh_male_zhongerqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "自负青年 2.0",
+      "id": "ICL_uranus_zh_male_zifuqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "自信青年 2.0",
+      "id": "ICL_uranus_zh_male_zixinqingnian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "天才同桌 2.0",
+      "id": "ICL_uranus_zh_male_tiancaitongzhuo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "清新沐沐 2.0",
+      "id": "ICL_uranus_zh_male_qingxinmumu_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "温婉珊珊 2.0",
+      "id": "ICL_uranus_zh_female_wenwanshanshan_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "热情艾娜 2.0",
+      "id": "ICL_uranus_zh_female_reqingaina_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "角色扮演",
+      "name": "爽朗少年 2.0",
+      "id": "ICL_uranus_zh_male_shuanglangshaonian_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "轻盈朵朵 2.0",
+      "id": "ICL_uranus_zh_female_qingyingduoduo_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "营销小楠 2.0",
+      "id": "ICL_uranus_zh_female_yingxiaokefu_v2_tob",
+      "language": "中文"
+    },
+    {
+      "scenario": "客服场景",
+      "name": "外呼凌凌 2.0",
+      "id": "ICL_uranus_zh_female_kefunvshengwenhecuishou_tob",
+      "language": "中文"
+    }
+  ]
+}
