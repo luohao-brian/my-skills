@@ -1,0 +1,709 @@
+{
+  "version": 1,
+  "ecosystems": [
+    {
+      "id": "llm-vlm",
+      "label": "LLM/VLM 基础、专项与本地衍生",
+      "stages": [
+        {
+          "id": "foundation",
+          "label": "基础权重与通用对话",
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text"
+          ],
+          "pipeline_tags": [
+            "text-generation"
+          ],
+          "query_role": "llm",
+          "query_filters": [
+            "text-generation"
+          ]
+        },
+        {
+          "id": "specialization",
+          "label": "推理、代码、工具调用与后训练",
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text"
+          ],
+          "tags": [
+            "reasoning",
+            "coding",
+            "tool-use",
+            "function-calling",
+            "sft",
+            "dpo",
+            "rlhf"
+          ],
+          "upstream": [
+            "foundation"
+          ]
+        },
+        {
+          "id": "local-derivative",
+          "label": "量化、合并、微调与适配器",
+          "tags": [
+            "gguf",
+            "mlx",
+            "quantized",
+            "on-device",
+            "merge",
+            "finetune",
+            "adapter",
+            "distilled",
+            "uncensored",
+            "abliterated",
+            "heretic",
+            "decensored"
+          ],
+          "upstream": [
+            "foundation",
+            "specialization"
+          ]
+        },
+        {
+          "id": "multimodal",
+          "label": "图像/视频/音频理解",
+          "input": [
+            "image",
+            "video",
+            "audio",
+            "text"
+          ],
+          "output": [
+            "text"
+          ],
+          "pipeline_tags": [
+            "image-text-to-text",
+            "video-text-to-text",
+            "audio-text-to-text"
+          ],
+          "query_role": "vlm",
+          "query_filters": [
+            "image-text-to-text",
+            "video-text-to-text",
+            "audio-text-to-text"
+          ]
+        },
+        {
+          "id": "document",
+          "label": "OCR 与文档抽取",
+          "input": [
+            "image"
+          ],
+          "output": [
+            "text"
+          ],
+          "tags": [
+            "ocr",
+            "document-understanding"
+          ]
+        },
+        {
+          "id": "text-representation",
+          "label": "翻译与向量表示",
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text",
+            "embedding"
+          ],
+          "pipeline_tags": [
+            "translation",
+            "sentence-similarity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "label": "图像/视频生成、控制、编辑与画质增强",
+      "stages": [
+        {
+          "id": "image-foundation",
+          "label": "图像生成与图片编辑基础权重",
+          "input": [
+            "text",
+            "image"
+          ],
+          "output": [
+            "image"
+          ],
+          "pipeline_tags": [
+            "text-to-image",
+            "image-to-image"
+          ],
+          "query_role": "image-generation",
+          "query_filters": [
+            "text-to-image",
+            "image-to-image"
+          ]
+        },
+        {
+          "id": "video-foundation",
+          "label": "文本/图片/视频条件的视频生成",
+          "input": [
+            "text",
+            "image",
+            "video"
+          ],
+          "output": [
+            "video"
+          ],
+          "pipeline_tags": [
+            "text-to-video",
+            "image-to-video",
+            "image-text-to-video",
+            "video-to-video"
+          ],
+          "query_role": "video-generation",
+          "query_filters": [
+            "text-to-video",
+            "image-to-video",
+            "image-text-to-video",
+            "video-to-video"
+          ],
+          "upstream": [
+            "image-foundation"
+          ]
+        },
+        {
+          "id": "conditioning",
+          "label": "分割、跟踪、姿态、运动、深度与人脸分析",
+          "input": [
+            "image",
+            "video"
+          ],
+          "output": [
+            "mask",
+            "pose",
+            "motion",
+            "depth",
+            "face",
+            "landmarks"
+          ],
+          "pipeline_tags": [
+            "mask-generation",
+            "image-segmentation",
+            "video-segmentation",
+            "pose-estimation",
+            "human-pose-estimation",
+            "depth-estimation",
+            "motion-extraction",
+            "face-detection",
+            "face-landmarks"
+          ],
+          "tags": [
+            "segment-anything",
+            "sam2",
+            "sam3",
+            "matting"
+          ],
+          "query_role": "media-conditioning",
+          "query_filters": [
+            "mask-generation",
+            "image-segmentation",
+            "depth-estimation"
+          ],
+          "comfyui_filters": [
+            "mask-generation",
+            "image-segmentation",
+            "video-segmentation",
+            "pose-estimation",
+            "human-pose-estimation",
+            "depth-estimation",
+            "motion-extraction",
+            "face-detection",
+            "face-landmarks"
+          ],
+          "upstream": [
+            "image-foundation",
+            "video-foundation"
+          ]
+        },
+        {
+          "id": "animation-avatar",
+          "label": "动作迁移、角色动画、数字人与对口型",
+          "input": [
+            "image",
+            "video",
+            "audio",
+            "pose",
+            "motion"
+          ],
+          "output": [
+            "video"
+          ],
+          "pipeline_tags": [
+            "image-to-video",
+            "audio-to-video",
+            "speech-to-video"
+          ],
+          "tags": [
+            "character-animation",
+            "motion-transfer",
+            "motion-control",
+            "pose-control",
+            "audio-driven-avatar",
+            "lip-sync",
+            "talking-head",
+            "digital-human"
+          ],
+          "comfyui_filters": [
+            "audio-driven-video",
+            "audio-to-video",
+            "avatar",
+            "camera-control",
+            "character-animation",
+            "character-consistency",
+            "digital-human",
+            "first-last-frame-to-video",
+            "identity-consistency",
+            "image-to-video",
+            "image-text-to-video",
+            "lip-sync",
+            "lipsync",
+            "motion-control",
+            "motion-transfer",
+            "multi-shot-video",
+            "pose-control",
+            "reference-to-video",
+            "speech-to-video",
+            "talking-head"
+          ],
+          "upstream": [
+            "conditioning",
+            "video-foundation"
+          ]
+        },
+        {
+          "id": "editing-finishing",
+          "label": "换脸、人物替换、局部编辑、补帧与放大",
+          "input": [
+            "image",
+            "video",
+            "mask",
+            "face"
+          ],
+          "output": [
+            "image",
+            "video"
+          ],
+          "pipeline_tags": [
+            "video-to-video"
+          ],
+          "tags": [
+            "face-swap",
+            "faceswap",
+            "person-replacement",
+            "video-editing",
+            "video-inpainting"
+          ],
+          "comfyui_filters": [
+            "face-swap",
+            "faceswap",
+            "person-replacement",
+            "video-editing",
+            "video-effects",
+            "video-inpainting",
+            "video-outpainting",
+            "video-relighting",
+            "video-to-video"
+          ],
+          "upstream": [
+            "conditioning",
+            "animation-avatar",
+            "video-foundation"
+          ]
+        },
+        {
+          "id": "enhancement",
+          "label": "清晰度、分辨率、画质修复与补帧",
+          "input": [
+            "image",
+            "video"
+          ],
+          "output": [
+            "image",
+            "video"
+          ],
+          "tags": [
+            "image-upscaling",
+            "image-super-resolution",
+            "super-resolution",
+            "image-restoration",
+            "deblurring",
+            "video-upscaling",
+            "video-super-resolution",
+            "video-restoration",
+            "frame-interpolation"
+          ],
+          "query_role": "media-enhancement",
+          "query_filters": [
+            "image-upscaling",
+            "video-upscaling",
+            "super-resolution",
+            "image-restoration",
+            "frame-interpolation"
+          ],
+          "comfyui_filters": [
+            "image-upscaling",
+            "image-super-resolution",
+            "super-resolution",
+            "image-restoration",
+            "deblurring",
+            "video-upscaling",
+            "video-super-resolution",
+            "video-restoration",
+            "frame-interpolation"
+          ],
+          "upstream": [
+            "image-foundation",
+            "video-foundation",
+            "animation-avatar",
+            "editing-finishing"
+          ]
+        },
+        {
+          "id": "local-derivative",
+          "label": "量化、蒸馏与本地适配版本",
+          "tags": [
+            "gguf",
+            "mlx",
+            "quantized",
+            "on-device",
+            "merge",
+            "finetune",
+            "adapter",
+            "distilled",
+            "uncensored",
+            "abliterated",
+            "heretic",
+            "decensored"
+          ],
+          "upstream": [
+            "image-foundation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "speech",
+      "label": "TTS/ASR 与语音专项",
+      "stages": [
+        {
+          "id": "speech-recognition",
+          "label": "语音识别",
+          "input": [
+            "audio"
+          ],
+          "output": [
+            "text"
+          ],
+          "pipeline_tags": [
+            "automatic-speech-recognition"
+          ],
+          "query_role": "audio-stt",
+          "query_filters": [
+            "automatic-speech-recognition"
+          ]
+        },
+        {
+          "id": "speech-synthesis",
+          "label": "文本到语音",
+          "input": [
+            "text"
+          ],
+          "output": [
+            "audio"
+          ],
+          "pipeline_tags": [
+            "text-to-speech"
+          ],
+          "query_role": "audio-tts",
+          "query_filters": [
+            "text-to-speech"
+          ]
+        },
+        {
+          "id": "local-derivative",
+          "label": "量化、蒸馏与本地适配版本",
+          "tags": [
+            "gguf",
+            "mlx",
+            "quantized",
+            "on-device",
+            "merge",
+            "finetune",
+            "adapter",
+            "distilled",
+            "uncensored",
+            "abliterated",
+            "heretic",
+            "decensored"
+          ],
+          "upstream": [
+            "speech-recognition"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision",
+      "label": "Decision 与 JEV 风格结构化预测",
+      "stages": [
+        {
+          "id": "native-prediction",
+          "label": "Choice、Score 与 Noul 原生预测",
+          "input": [
+            "state",
+            "candidates"
+          ],
+          "output": [
+            "choice",
+            "score",
+            "noul"
+          ],
+          "tags": [
+            "typed-decisions",
+            "structured-prediction"
+          ],
+          "query_role": "decision"
+        },
+        {
+          "id": "protocol-adapter",
+          "label": "JEV 接口适配与语义对照",
+          "input": [
+            "structured-request"
+          ],
+          "output": [
+            "structured-response"
+          ],
+          "upstream": [
+            "native-prediction"
+          ]
+        },
+        {
+          "id": "local-derivative",
+          "label": "量化、蒸馏与本地适配版本",
+          "tags": [
+            "gguf",
+            "mlx",
+            "quantized",
+            "on-device",
+            "merge",
+            "finetune",
+            "adapter",
+            "distilled",
+            "uncensored",
+            "abliterated",
+            "heretic",
+            "decensored"
+          ],
+          "upstream": [
+            "native-prediction"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "label": "歌曲、音效与视频 Foley",
+      "stages": [
+        {
+          "id": "general-audio",
+          "label": "文本/视频/音频条件的音频基础模型",
+          "input": [
+            "text",
+            "video",
+            "audio"
+          ],
+          "output": [
+            "audio"
+          ],
+          "pipeline_tags": [
+            "text-to-audio",
+            "video-to-audio",
+            "audio-to-audio"
+          ],
+          "query_role": "audio-generation",
+          "query_filters": [
+            "text-to-audio",
+            "video-to-audio",
+            "audio-to-audio"
+          ]
+        },
+        {
+          "id": "song",
+          "label": "音乐与歌曲生成",
+          "input": [
+            "text",
+            "lyrics",
+            "melody"
+          ],
+          "output": [
+            "music"
+          ],
+          "tags": [
+            "text-to-music",
+            "music-generation"
+          ],
+          "upstream": [
+            "general-audio"
+          ]
+        },
+        {
+          "id": "sound-effect",
+          "label": "独立文本音效与环境声",
+          "input": [
+            "text"
+          ],
+          "output": [
+            "audio"
+          ],
+          "tags": [
+            "text-to-sfx",
+            "sound-effects",
+            "ambience-generation"
+          ],
+          "upstream": [
+            "general-audio"
+          ]
+        },
+        {
+          "id": "video-foley",
+          "label": "视频同步音效",
+          "input": [
+            "video",
+            "text"
+          ],
+          "output": [
+            "audio"
+          ],
+          "tags": [
+            "video-to-sfx",
+            "text-video-to-sfx"
+          ],
+          "upstream": [
+            "general-audio"
+          ]
+        },
+        {
+          "id": "audio-edit",
+          "label": "音效续写与局部修改",
+          "input": [
+            "audio",
+            "text"
+          ],
+          "output": [
+            "audio"
+          ],
+          "tags": [
+            "audio-inpaint",
+            "audio-continuation"
+          ],
+          "upstream": [
+            "general-audio",
+            "song"
+          ]
+        },
+        {
+          "id": "singing-conversion",
+          "label": "歌声音色转换",
+          "input": [
+            "singing-audio",
+            "reference-voice"
+          ],
+          "output": [
+            "singing-audio"
+          ],
+          "tags": [
+            "singing-voice-conversion"
+          ],
+          "upstream": [
+            "song"
+          ]
+        },
+        {
+          "id": "singing-synthesis",
+          "label": "歌词与音符驱动的歌声合成",
+          "input": [
+            "lyrics",
+            "notes"
+          ],
+          "output": [
+            "singing-audio"
+          ],
+          "tags": [
+            "singing-voice-synthesis"
+          ],
+          "upstream": [
+            "song"
+          ]
+        },
+        {
+          "id": "local-derivative",
+          "label": "量化、蒸馏与本地适配版本",
+          "tags": [
+            "gguf",
+            "mlx",
+            "quantized",
+            "on-device",
+            "merge",
+            "finetune",
+            "adapter",
+            "distilled",
+            "uncensored",
+            "abliterated",
+            "heretic",
+            "decensored"
+          ],
+          "upstream": [
+            "general-audio"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "embodied",
+      "label": "VLA 与机器人动作策略",
+      "stages": [
+        {
+          "id": "robotics-candidate",
+          "label": "HF 机器人任务候选；须核对模型卡才判定 VLA 或策略",
+          "pipeline_tags": ["robotics"],
+          "query_role": "robotics",
+          "query_filters": ["robotics"]
+        },
+        {
+          "id": "vla-policy",
+          "label": "视觉、语言及机器人状态条件的动作策略",
+          "input": ["image", "text", "robotics"],
+          "output": ["robotics"],
+          "tags": ["vision-language-action", "vla"],
+          "upstream": ["robotics-candidate"]
+        },
+        {
+          "id": "world-action",
+          "label": "联合预测动作与未来视觉状态的模型",
+          "input": ["image", "text", "robotics"],
+          "output": ["robotics", "video"],
+          "tags": ["world-action-model"],
+          "upstream": ["robotics-candidate"]
+        },
+        {
+          "id": "adapted-policy",
+          "label": "面向机器人本体或任务的策略权重",
+          "tags": ["finetune", "adapter", "lora"],
+          "upstream": ["vla-policy", "world-action"]
+        }
+      ]
+    }
+  ]
+}

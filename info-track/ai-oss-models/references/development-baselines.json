@@ -1,0 +1,410 @@
+{
+  "version": 1,
+  "purpose": "单卡本地 SFT、蒸馏和小规模 RL 入口；具体显存与吞吐由模型、序列长度、批量、精度和工具版本决定",
+  "tools": [
+    {
+      "id": "unslothai/unsloth",
+      "url": "https://github.com/unslothai/unsloth",
+      "domains": [
+        "llm-vlm"
+      ],
+      "methods": [
+        "sft",
+        "dpo",
+        "grpo",
+        "lora",
+        "qlora"
+      ],
+      "entry": "选择小型开放权重模型，先做 LoRA/QLoRA SFT；RL 从小模型和短输出试验开始",
+      "evidence": "https://github.com/unslothai/unsloth"
+    },
+    {
+      "id": "huggingface/trl",
+      "url": "https://github.com/huggingface/trl",
+      "domains": [
+        "llm-vlm",
+        "decision"
+      ],
+      "methods": [
+        "sft",
+        "dpo",
+        "grpo",
+        "distillation"
+      ],
+      "entry": "SFTTrainer/DPOTrainer/GRPOTrainer/DistillationTrainer 分别对应监督、偏好、可验证奖励和师生训练；GRPO 可选 colocate 单 GPU 模式",
+      "evidence": "https://huggingface.co/docs/trl/grpo_trainer"
+    },
+    {
+      "id": "huggingface/peft",
+      "url": "https://github.com/huggingface/peft",
+      "domains": [
+        "llm-vlm",
+        "media",
+        "speech"
+      ],
+      "methods": [
+        "lora",
+        "qlora",
+        "adapter"
+      ],
+      "entry": "训练和保存 adapter；需与基座模型、量化方式及目标层对应",
+      "evidence": "https://github.com/huggingface/peft"
+    },
+    {
+      "id": "hiyouga/LlamaFactory",
+      "url": "https://github.com/hiyouga/LlamaFactory",
+      "domains": [
+        "llm-vlm"
+      ],
+      "methods": [
+        "sft",
+        "dpo",
+        "ppo",
+        "lora",
+        "qlora"
+      ],
+      "entry": "用统一配置训练 LLM/VLM；单卡先从 LoRA/QLoRA 与小模型验证",
+      "evidence": "https://github.com/hiyouga/LlamaFactory"
+    },
+    {
+      "id": "huggingface/diffusers",
+      "url": "https://github.com/huggingface/diffusers",
+      "domains": [
+        "media"
+      ],
+      "methods": [
+        "lora",
+        "dreambooth",
+        "sft"
+      ],
+      "entry": "从官方 text-to-image/DreamBooth LoRA 示例训练角色或风格，不把所有视频基座视为单卡可训练",
+      "evidence": "https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/README.md"
+    },
+    {
+      "id": "ace-step/ACE-Step-1.5",
+      "url": "https://github.com/ace-step/ACE-Step-1.5",
+      "domains": [
+        "music"
+      ],
+      "methods": [
+        "lora",
+        "lokr"
+      ],
+      "entry": "按官方教程准备音频和文字标注后训练 adapter；先核对当前版本与所选权重的训练条件",
+      "evidence": "https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/LoRA_Training_Tutorial.md"
+    },
+    {
+      "id": "RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+      "url": "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+      "domains": [
+        "music"
+      ],
+      "methods": [
+        "singing-conversion",
+        "voice-conversion"
+      ],
+      "entry": "准备目标音色的干净人声片段，按官方单说话人训练与索引步骤制作转换模型；原歌伴奏另行保留和混音",
+      "evidence": "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/blob/main/docs/en/cli.md"
+    },
+    {
+      "id": "MoonInTheRiver/DiffSinger",
+      "url": "https://github.com/MoonInTheRiver/DiffSinger",
+      "domains": [
+        "music"
+      ],
+      "methods": [
+        "singing-synthesis"
+      ],
+      "entry": "按官方 SVS 路径准备歌词、音符和歌声音频，用于按谱歌声合成；与音色转换分开评估",
+      "evidence": "https://github.com/MoonInTheRiver/DiffSinger"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "allenai/Dolci-Instruct-SFT",
+      "domains": [
+        "llm-vlm"
+      ],
+      "methods": [
+        "sft"
+      ],
+      "sample_unit": "instruction/response",
+      "evidence": "https://huggingface.co/datasets/allenai/Dolci-Instruct-SFT"
+    },
+    {
+      "id": "HuggingFaceH4/ultrafeedback_binarized",
+      "domains": [
+        "llm-vlm"
+      ],
+      "methods": [
+        "dpo"
+      ],
+      "sample_unit": "chosen/rejected preference pair",
+      "evidence": "https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized"
+    },
+    {
+      "id": "open-r1/OpenR1-Math-220k",
+      "domains": [
+        "llm-vlm"
+      ],
+      "methods": [
+        "distillation",
+        "sft",
+        "grpo"
+      ],
+      "sample_unit": "problem/solution; GRPO reward需另行定义",
+      "evidence": "https://huggingface.co/datasets/open-r1/OpenR1-Math-220k"
+    },
+    {
+      "id": "LocalLLaMA/typed-decisions",
+      "domains": ["decision"],
+      "methods": ["sft", "decision-evaluation"],
+      "sample_unit": "state/questions/gold；choice、noul、score 的类型化目标与概率分布",
+      "evidence": "https://huggingface.co/datasets/LocalLLaMA/typed-decisions"
+    },
+    {
+      "id": "avbiswas/bev-decision",
+      "domains": ["decision"],
+      "methods": ["sft", "rlvr"],
+      "sample_unit": "state/questions_json；每题含 type、criteria 和可核对的 label",
+      "evidence": "https://huggingface.co/datasets/avbiswas/bev-decision"
+    }
+  ],
+  "local_experiments": [
+    {
+      "id": "sft-small-chat",
+      "method": "sft",
+      "max_parameters": 3000000000,
+      "model_id": "Qwen/Qwen3-0.6B",
+      "dataset_id": "HuggingFaceH4/ultrachat_200k",
+      "dataset_config": "default",
+      "dataset_split": "train_sft",
+      "required_columns": ["messages"],
+      "sample_unit": "messages 中的 user/assistant 对话",
+      "signal": "assistant 回复作为监督目标",
+      "local_scope": "先抽样并限制序列长度，使用 LoRA SFT；记录峰值显存和单步耗时后再扩大样本",
+      "tools": [
+        {"project": "huggingface/trl", "component": "SFTTrainer", "role": "读取对话数据并训练学生", "evidence": "https://huggingface.co/docs/trl/sft_trainer"},
+        {"project": "huggingface/peft", "component": "LoraConfig", "role": "只训练 LoRA adapter", "evidence": "https://huggingface.co/docs/trl/peft_integration"}
+      ],
+      "evidence": [
+        "https://huggingface.co/Qwen/Qwen3-0.6B",
+        "https://huggingface.co/datasets/HuggingFaceH4/ultrachat_200k"
+      ]
+    },
+    {
+      "id": "offline-math-distillation",
+      "method": "offline-response-distillation",
+      "max_parameters": 3000000000,
+      "model_id": "Qwen/Qwen3-0.6B",
+      "dataset_id": "open-r1/OpenR1-Math-220k",
+      "dataset_config": "default",
+      "dataset_split": "train",
+      "required_columns": ["problem", "solution", "answer", "correctness_math_verify"],
+      "sample_unit": "problem/solution/answer",
+      "signal": "已发布的教师推理与答案；用 correctness_math_verify 筛选可核验样本后做 response SFT",
+      "local_scope": "离线抽样和长度过滤后训练学生 LoRA；不要求教师与学生同卡驻留，也不称为 logit 蒸馏",
+      "tools": [
+        {"project": "huggingface/datasets", "component": "load_dataset/filter/map", "role": "筛选答案正确的教师样本并转成对话格式", "evidence": "https://huggingface.co/docs/datasets/process"},
+        {"project": "huggingface/trl", "component": "SFTTrainer", "role": "用已发布教师回答监督学生", "evidence": "https://huggingface.co/docs/trl/sft_trainer"},
+        {"project": "huggingface/peft", "component": "LoraConfig", "role": "只训练学生 LoRA adapter", "evidence": "https://huggingface.co/docs/trl/peft_integration"}
+      ],
+      "evidence": [
+        "https://huggingface.co/Qwen/Qwen3-0.6B",
+        "https://huggingface.co/datasets/open-r1/OpenR1-Math-220k"
+      ]
+    },
+    {
+      "id": "small-math-rlvr",
+      "method": "rlvr-grpo",
+      "max_parameters": 3000000000,
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "dataset_id": "trl-lib/DeepMath-103K",
+      "dataset_config": "default",
+      "dataset_split": "train",
+      "required_columns": ["prompt", "solution"],
+      "sample_unit": "prompt/solution",
+      "signal": "对生成答案运行可程序验证的数学正确率奖励",
+      "local_scope": "先从可解析答案的短题抽样，用 TRL GRPO 的 accuracy_reward；先测生成组数、长度和峰值显存",
+      "tools": [
+        {"project": "huggingface/trl", "component": "GRPOTrainer", "role": "采样生成并执行 RLVR 更新", "evidence": "https://huggingface.co/docs/trl/grpo_trainer"},
+        {"project": "huggingface/trl", "component": "accuracy_reward", "role": "解析生成答案并与 solution 核对", "evidence": "https://huggingface.co/docs/trl/rewards"},
+        {"project": "huggingface/peft", "component": "LoraConfig", "role": "限制为学生 LoRA 更新", "evidence": "https://huggingface.co/docs/trl/peft_integration"}
+      ],
+      "evidence": [
+        "https://huggingface.co/docs/trl/grpo_trainer",
+        "https://huggingface.co/docs/trl/rewards",
+        "https://huggingface.co/datasets/trl-lib/DeepMath-103K"
+      ]
+    },
+    {
+      "id": "decision-laya-typed-sft",
+      "method": "decision-sft",
+      "max_parameters": 1000000000,
+      "model_id": "convaiinnovations/laya",
+      "dataset_id": "LocalLLaMA/typed-decisions",
+      "dataset_config": "all",
+      "dataset_split": "train",
+      "required_columns": ["state", "questions", "gold", "workflow", "label_agreement"],
+      "sample_unit": "每条含状态、多道 choice/noul/score 问题及 gold 分布；按 workflow 分层抽样",
+      "signal": "以 gold 的类型化答案/分布训练 decision head，保留 test 做独立评估；统计准确率、概率校准和选项顺序敏感性",
+      "preparation": "把 state、questions、gold 的 JSON 字符串解析为对象；按官方 Laya notebook 的类型化问题格式转换。过滤低 label_agreement 样本，避免把教师分歧当硬真值。",
+      "local_scope": "官方 notebook 使用 2×T4；在单卡 L20/5090 上先以小样本、短 state 运行一个训练步并记录峰值显存和耗时，再决定可用 batch。不能把官方双卡结果当单卡实测。",
+      "resource_evidence": "https://github.com/NandhaKishorM/laya/blob/main/notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb",
+      "tools": [
+        {"project": "NandhaKishorM/laya", "component": "typed-decisions fine-tuning notebook", "role": "构造类型化训练样本、训练决策头、拟合温度并评估", "evidence": "https://github.com/NandhaKishorM/laya/blob/main/notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb"},
+        {"project": "huggingface/datasets", "component": "load_dataset/filter/map", "role": "读取 train/test、解析 JSON 并按 workflow 采样", "evidence": "https://huggingface.co/docs/datasets/process"}
+      ],
+      "evidence": ["https://huggingface.co/convaiinnovations/laya", "https://huggingface.co/datasets/LocalLLaMA/typed-decisions"]
+    },
+    {
+      "id": "decision-rlvr-counterfactual",
+      "method": "decision-rlvr",
+      "max_parameters": 3000000000,
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "dataset_id": "avbiswas/bev-decision",
+      "dataset_config": "counterfactual_15k",
+      "dataset_split": "train",
+      "required_columns": ["state", "questions_json", "domain", "question_types"],
+      "sample_unit": "规则条件决策的 state 和 questions_json；题内 criteria 给候选，label 给正确键",
+      "signal": "仅取可确定的 choice 问题；让模型只输出候选键，解析后与 label 精确比对作为 0/1 可验证奖励",
+      "preparation": "解析 questions_json，筛出单个 choice 且 label 位于 criteria 键集合的样本；把 state、instructions 和 criteria 转为 prompt。固定 test，不将 label 放入 prompt。",
+      "local_scope": "从 Qwen 0.5B 的 LoRA 与短输出开始，先做小样本 GRPO 单步显存/吞吐检查；训练后用未见过的 counterfactual_15k/test 核对选择正确率和格式有效率。",
+      "resource_evidence": "https://huggingface.co/docs/trl/grpo_trainer",
+      "tools": [
+        {"project": "huggingface/datasets", "component": "load_dataset/filter/map", "role": "解析类型化问题并构造不泄漏标签的 prompt", "evidence": "https://huggingface.co/docs/datasets/process"},
+        {"project": "huggingface/trl", "component": "GRPOTrainer + 自定义精确匹配 reward", "role": "用 gold choice 键检验生成结果并更新策略", "evidence": "https://huggingface.co/docs/trl/grpo_trainer"},
+        {"project": "huggingface/peft", "component": "LoraConfig", "role": "限制为小模型 adapter 更新", "evidence": "https://huggingface.co/docs/trl/peft_integration"}
+      ],
+      "evidence": ["https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct", "https://huggingface.co/datasets/avbiswas/bev-decision"]
+    },
+    {
+      "id": "ltx-video-t2v-lora",
+      "method": "video-t2v-lora",
+      "model_id": "Lightricks/LTX-2.5",
+      "model_weight_path": "diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors",
+      "dataset_id": "Baberg/ltx-2.5-ic-lora-cartoon-dataset",
+      "dataset_config": "repository",
+      "dataset_split": "dataset_training_20.json",
+      "dataset_manifest": "dataset_training_20.json",
+      "required_columns": ["video", "caption"],
+      "media_columns": ["video"],
+      "sample_unit": "目标视频与文字描述，共 20 个片段；从原成对数据仅抽取 video/caption",
+      "signal": "文字描述为条件，目标视频为生成监督；原参考视频不进入 T2V 训练",
+      "preparation": "从数据仓的 dataset_training_20.json 提取 video/caption 两列，另存 T2V JSON；用 LTX-2.5 dev checkpoint 和匹配的专用 Gemma 4 编码器运行 process_dataset.py，然后修改 t2v_lora_low_vram.yaml 的模型与缓存路径。",
+      "local_scope": "运行 uv run python scripts/train.py configs/t2v_lora_low_vram.yaml。官方此配置针对约 32GB GPU；先以 20 条样本做单步验证，再扩充数据。仓库没有独立留出集，需自行留样。",
+      "resource_evidence": "https://docs.ltx.io/open-source-model/ltx-trainer/quick-start",
+      "tools": [
+        {"project": "Lightricks/LTX-2", "component": "process_dataset.py", "role": "把目标视频和 caption 缓存为视频 latents 与文本条件", "evidence": "https://github.com/Lightricks/LTX-2/blob/main/packages/ltx-trainer/docs/dataset-preparation.md"},
+        {"project": "Lightricks/LTX-2", "component": "t2v_lora_low_vram.yaml + train.py", "role": "按官方低显存配置训练文生视频 LoRA", "evidence": "https://github.com/Lightricks/LTX-2/blob/main/packages/ltx-trainer/configs/t2v_lora_low_vram.yaml"}
+      ],
+      "evidence": ["https://huggingface.co/Lightricks/LTX-2.5", "https://huggingface.co/datasets/Baberg/ltx-2.5-ic-lora-cartoon-dataset", "https://docs.ltx.io/open-source-model/ltx-trainer/quick-start"]
+    },
+    {
+      "id": "ltx-video-ic-lora",
+      "method": "video-ic-lora",
+      "model_id": "Lightricks/LTX-2.5",
+      "model_weight_path": "diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors",
+      "dataset_id": "Baberg/ltx-2.5-ic-lora-cartoon-dataset",
+      "dataset_config": "repository",
+      "dataset_split": "dataset_training_20.json",
+      "dataset_manifest": "dataset_training_20.json",
+      "required_columns": ["video", "reference_video", "caption"],
+      "media_columns": ["video", "reference_video"],
+      "sample_unit": "同一镜头的真人参考视频、2D 风格目标视频和文字描述，共 20 对训练样本",
+      "signal": "参考视频为条件，目标视频为生成监督；属于视频到视频 IC-LoRA，不是普通文生视频 LoRA",
+      "preparation": "从数据仓读取 dataset_training_20.json 和对应视频；用与 LTX-2.5 dev checkpoint 匹配的专用 Gemma 4 编码器运行 process_dataset.py，按官方 v2v_ic_lora 配置训练。旧 LTX-2.3 文本缓存不能复用。",
+      "local_scope": "运行 uv run python scripts/train.py configs/v2v_ic_lora.yaml。官方约 32GB 的低显存配置针对 T2V；这组 IC-LoRA 的单卡显存没有官方数值。数据集为 768×448×97 帧，先测预处理和单步显存；需自行留样评估。",
+      "resource_evidence": "https://docs.ltx.io/open-source-model/ltx-trainer/quick-start",
+      "tools": [
+        {"project": "Lightricks/LTX-2", "component": "process_dataset.py", "role": "把成对视频和 caption 缓存为视频 latents 与文本条件", "evidence": "https://github.com/Lightricks/LTX-2/blob/main/packages/ltx-trainer/docs/dataset-preparation.md"},
+        {"project": "Lightricks/LTX-2", "component": "v2v_ic_lora.yaml + train.py", "role": "训练参考视频到目标视频的 IC-LoRA", "evidence": "https://docs.ltx.io/open-source-model/ltx-trainer/quick-start"}
+      ],
+      "evidence": ["https://huggingface.co/Lightricks/LTX-2.5", "https://huggingface.co/datasets/Baberg/ltx-2.5-ic-lora-cartoon-dataset", "https://docs.ltx.io/open-source-model/ltx-trainer/quick-start"]
+    },
+    {
+      "id": "stable-audio-sfx-lora",
+      "method": "audio-sfx-lora",
+      "max_parameters": 3000000000,
+      "model_id": "stabilityai/stable-audio-3-small-sfx-base",
+      "dataset_id": "CLAPv2/clotho_full_2",
+      "dataset_config": "default",
+      "dataset_split": "train",
+      "required_columns": ["audio", "text"],
+      "media_columns": ["audio"],
+      "sample_unit": "音效音频及文字描述；从 train 中筛选 20–50 个同一目标声音域的片段",
+      "signal": "音频为生成监督，文字描述为条件",
+      "preparation": "先按 file_name 去重，再将 HF audio/text 列导出为同名音频文件和 .txt 描述文件（如 clip.wav + clip.txt），放进 stable-audio-3 的 --data_dir；检查片段时长和描述一致性。",
+      "local_scope": "运行 uv sync --extra lora，再运行 uv run python scripts/train_lora.py --model small-sfx-base --data_dir ./my_data --rank 16 --steps 1000。官方 small LoRA 显存说明约 2.5GB，bf16 + lora-xs 约 2GB；先以 20–50 条定域音效实测。",
+      "resource_evidence": "https://github.com/Stability-AI/stable-audio-3/blob/main/docs/workflows/lora.md",
+      "tools": [
+        {"project": "huggingface/datasets", "component": "load_dataset", "role": "导出 audio/text 样本并生成训练目录", "evidence": "https://huggingface.co/docs/datasets/audio_load"},
+        {"project": "Stability-AI/stable-audio-3", "component": "scripts/train_lora.py", "role": "以 small-sfx-base 训练音效生成 LoRA", "evidence": "https://github.com/Stability-AI/stable-audio-3/blob/main/docs/workflows/lora.md"}
+      ],
+      "evidence": ["https://huggingface.co/stabilityai/stable-audio-3-small-sfx-base", "https://huggingface.co/datasets/CLAPv2/clotho_full_2"]
+    },
+    {
+      "id": "stable-audio-music-lora",
+      "method": "audio-music-lora",
+      "max_parameters": 3000000000,
+      "model_id": "stabilityai/stable-audio-3-small-music-base",
+      "dataset_id": "CLAPv2/MusicCaps",
+      "dataset_config": "default",
+      "dataset_split": "train",
+      "required_columns": ["audio", "caption"],
+      "media_columns": ["audio"],
+      "sample_unit": "约 10 秒音乐音频及音乐文字描述；按风格抽取小样本",
+      "signal": "音乐片段为生成监督，caption 为条件；不包含长歌曲歌词结构",
+      "preparation": "将 HF audio/caption 导出为同名音频文件和 .txt 描述文件（如 clip.wav + clip.txt），放进 stable-audio-3 的 --data_dir。",
+      "local_scope": "运行 uv sync --extra lora，再运行 uv run python scripts/train_lora.py --model small-music-base --data_dir ./my_data --rank 16 --steps 1000。官方 small LoRA 显存说明约 2.5GB，bf16 + lora-xs 约 2GB；先做 10 秒片段适配并实测。",
+      "resource_evidence": "https://github.com/Stability-AI/stable-audio-3/blob/main/docs/workflows/lora.md",
+      "tools": [
+        {"project": "huggingface/datasets", "component": "load_dataset", "role": "导出 audio/caption 样本并生成训练目录", "evidence": "https://huggingface.co/docs/datasets/audio_load"},
+        {"project": "Stability-AI/stable-audio-3", "component": "scripts/train_lora.py", "role": "以 small-music-base 训练音乐片段生成 LoRA", "evidence": "https://github.com/Stability-AI/stable-audio-3/blob/main/docs/workflows/lora.md"}
+      ],
+      "evidence": ["https://huggingface.co/stabilityai/stable-audio-3-small-music-base", "https://huggingface.co/datasets/CLAPv2/MusicCaps"]
+    }
+  ],
+  "single_gpu_workflows": [
+    {
+      "method": "sft",
+      "domains": [
+        "llm-vlm",
+        "decision"
+      ],
+      "start": "先选有完整权重和 tokenizer 的较小基座，取有授权且可抽样的 instruction/response 或 state/candidates/label 数据；从 LoRA/QLoRA、microbatch=1、较短序列、梯度累积与 gradient checkpointing 开始",
+      "measure": "记录基座规模、精度、序列长度、LoRA rank、峰值显存、每步耗时、训练损失和留出集任务正确率",
+      "fallback": "OOM 时先缩短序列/图像尺寸，再降低 rank 或改用更小基座；不要仅凭权重文件大小估算训练显存"
+    },
+    {
+      "method": "distillation",
+      "domains": [
+        "llm-vlm",
+        "decision"
+      ],
+      "start": "单卡优先让教师离线生成带模型版本和采样参数的回答或结构化标签，再用学生模型做 LoRA SFT；若使用 TRL 的在线 DistillationTrainer，须另核对教师和学生同时驻留的资源",
+      "measure": "固定留出集，对比教师、未训练学生和蒸馏学生的正确率、格式有效率与推理延迟",
+      "fallback": "教师与学生无法同卡驻留时保留离线响应蒸馏路径，不声称完成 logit 蒸馏"
+    },
+    {
+      "method": "rl",
+      "domains": [
+        "llm-vlm",
+        "decision"
+      ],
+      "start": "先定义可程序验证的奖励及失败样例，用小模型、短输出、LoRA 和 TRL GRPO 的 colocate 模式试验；DPO 则使用 chosen/rejected 成对数据",
+      "measure": "记录奖励命中率、KL/长度变化、峰值显存、生成耗时和独立留出集结果",
+      "fallback": "若生成与训练共享显存失败，减少上下文和并行生成数量，或退到 DPO/SFT；不要把随机奖励上涨当成语义正确"
+    },
+    {
+      "method": "media-lora",
+      "domains": [
+        "media",
+        "music"
+      ],
+      "start": "图像从 Diffusers 官方 LoRA 示例和较低分辨率、小批量开始；音乐按 ACE-Step 官方音频预处理与 LoRA/LoKr 路径准备片段和文字标注",
+      "measure": "记录训练分辨率或音频时长、精度、batch、峰值显存、质量对照与过拟合样例",
+      "fallback": "无官方训练脚本、训练权重或完整条件证据的模型只保留观察，不列为本地可实施"
+    }
+  ]
+}

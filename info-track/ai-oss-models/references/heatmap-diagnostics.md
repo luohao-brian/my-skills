@@ -1,29 +1,23 @@
 # 覆盖诊断与热力图
 
-AI 开源模型分析回答“召回链路与正式入选结果覆盖了哪些方向和交付环节”。Hugging Face Models、Hugging Face Datasets 与 GitHub Projects 对应不同实体类型，绝对数量不能组成来源贡献排名。
+覆盖图回答六条模型主干、本地衍生、ComfyUI 工作流和本地开发入口各有哪些候选。VLA 主干基线是当前状态参照，不计入窗口模型数。所有计数来自完整 `--output` 的 `diagnostics` 和 `groups`。
 
 ## 诊断顺序
 
-1. 先看 `sources` 的 `ok`、`count`、`selected` 和 `errors`，分别判断模型、数据集与工程交付件的采集健康；不比较三者的入选率。
-2. 使用顶层 `diagnostics` 检查召回漏斗。owner、local filter、模态查询、媒体生态和全局榜单会互相重叠，只有 `open_candidate_union` 是模型候选并集，查询通道数量不得直接相加。
-3. 使用 `diagnostics.coverage` 检查正式入选结果。模型方向只来自结构化字段；`unknown` 必须保留，不能按模型名称补猜。
-4. `models_by_group_and_role` 的展示分组可能重叠；跨组总量使用 `unique_model_repositories`。数据集使用 `datasets_by_group.unique_repositories`。
-5. 可复现项目直接使用每个项目的 `metadata.coverage` 生成“项目 × 数据/训练/模型/评测/部署”布尔矩阵；聚合计数使用 `reproducible_by_component`。
-6. 媒体雷达把能力覆盖与活动密度分开看：能力矩阵说明本窗口发现了什么，`media_open_activity_selected` 和每条 `activity_density.signals` 说明哪些候选独立满足透明活动条件。两者都不表示下游系统是否已经覆盖或是否应当验证。
+1. 分别看 `sources.huggingface_models`、`github_tools`、`huggingface_development_datasets` 的 `ok`、`count`、`selected`、`errors`。三者是不同实体，不比较入选率。
+2. 看 `owner_candidates`、`local_filter_candidates`、`modality_query_candidates`、`media_ecosystem_candidates`、全局 Trending 和最近更新池。查询池会重叠；只有 `open_candidate_union` 是去重的模型候选并集。
+3. 看 `coverage.models_by_group_and_role`。列使用 `llm`、`vlm`、`decision`、`media-conditioning`、`media-enhancement`、图像、视频、音频、TTS、ASR 等固定方向；结构化证据不足时保留 `unknown`。
+4. 看 `coverage.unique_model_repositories` 得到跨分节去重数。`flagship`、`local`、`notable_discoveries`、`media_customization` 可以包含同一仓库，不能把行总数直接相加。
+5. 看 `media_customization_by_capability` 与各候选的 `media_customization.lanes`，确认素材控制、图生视频、角色动画、音频驱动和编辑收尾是否被覆盖。另看 `media_open_activity_selected` 与 `activity_density.signals`，不要把活动条件解释为模型质量。
+6. 看 `groups.development` 的工具和数据集窗口事件，再按 `development_baselines` 的方法检查 SFT、蒸馏、DPO/GRPO 是否有训练入口。基线数量和窗口更新数分开显示。
+7. 看 `canonical_trace_statuses` 和 `canonical_trace_fetch_errors`，区分已追溯到结构化终点、无父仓字段、多父分叉和父仓读取失败。再从候选 `canonical_model_trace.hops` 检查衍生线主模型与更远 `root_model`；注册表声明与路径不一致时列为核对项，不自动改写成一致。
 
 ## 可用图表
 
-- 召回漏斗：展示各查询通道、候选并集和正式入选数。这是流程图或漏斗图，不是来源热力图。
-- 模型覆盖热力图：行是 `flagship | local | notable_discoveries | media_customization`，列是固定模型方向，单元格来自 `models_by_group_and_role`；每行单独归一化并标注样本量。
-- 本地部署矩阵：行是入选本地模型，列是 GGUF、MLX、量化、Ollama-compatible、on-device、ComfyUI、Diffusers 等结构化 `deployment` 值。
-- ComfyUI 后图像媒体矩阵：行是模型，列先按 `media_customization.lanes` 和具体能力展开，再用独立布尔列展示 open-activity、high-trending、recent-repository-activity、high-download-velocity、high-like-velocity、downloads-growing、likes-growing、rank-rising；不将这些信号相加为颜色强度。只使用结构化任务、精确 tag 或 model card 明确信号，不按模型名补列。
-- 复现链路矩阵：行是项目，列是数据、训练、模型、评测、部署，使用布尔覆盖，不用 star 或下载量替代开放交付件。
+- 召回漏斗：查询通道 → 去重候选并集 → 四个正式分节的入选数。
+- 模型覆盖矩阵：行是 `flagship | local | notable_discoveries | media_customization`；列是结构化模型方向。每行标注样本量，小于 5 的行标“小样本”。
+- 本地部署矩阵：行是本地模型；列是 GGUF、MLX、量化、Ollama-compatible、on-device、ComfyUI、Diffusers 等已有 `deployment` 值。
+- ComfyUI 工作流矩阵：行是候选模型；前六列是 `media-conditioning`、`image-to-video`、`character-animation`、`audio-driven-avatar`、`video-editing-effects`、`media-enhancement`；再按具体能力展开 mask、姿态、运动、深度、人脸分析、换脸、对口型、超分和补帧等。活动信号用独立布尔列展示，不合成颜色强度。
+- 本地开发矩阵：行是精确登记的工具或数据集；列是 SFT、LoRA/QLoRA、蒸馏、DPO/GRPO 和所属模型主干。窗口更新单独标记，不把“项目支持方法”解释为“当前单卡已跑通”。
 
-## 禁止解释
-
-- 不生成 Hugging Face Models、Datasets、GitHub Projects 的“来源贡献排名”或“强弱评分”。
-- 不把 `count`、TrendingScore、下载、点赞、star 或 fork 跨实体相加。
-- 不把查询通道的重叠候选重复计入总量。
-- 不把热门、本地部署或低拒绝标签解释为模型质量、安全性或能力强弱。
-- 不把媒体能力覆盖或高活动解释为下游系统缺口、升级建议或验证结论；这些判断属于消费报告的验证平台。
-- 小于 5 个正式样本的行标注“小样本”；采集失败显示失败状态，不绘制为零覆盖。
+采集失败单独显示失败状态，不绘制为零覆盖。不从模型名称补齐未知方向或能力，不将 TrendingScore、下载和点赞跨任务相加。

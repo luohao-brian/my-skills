@@ -1,6 +1,6 @@
 {
-  "version": 7,
-  "verified_at": "2026-08-15",
+  "version": 8,
+  "verified_at": "2026-09-27",
   "families": [
     {"id": "qwen", "owner": "Qwen", "openness": "weights-only", "evidence": ["https://huggingface.co/Qwen/Qwen3.6-35B-A3B"]},
     {"id": "glm", "owner": "zai-org", "openness": "weights-only", "evidence": ["https://huggingface.co/zai-org/GLM-5.2"]},
@@ -29,9 +29,42 @@
     {"id": "baidu-open", "owner": "baidu", "openness": "weights-only", "evidence": ["https://huggingface.co/baidu/Unlimited-OCR"]},
     {"id": "cohere-open", "owner": "CohereLabs", "openness": "weights-only", "evidence": ["https://huggingface.co/CohereLabs/command-a-03-2025"]},
     {"id": "smollm", "owner": "HuggingFaceTB", "openness": "reproducible", "evidence": ["https://huggingface.co/HuggingFaceTB/SmolLM3-3B"]},
-    {"id": "ltx", "owner": "Lightricks", "openness": "weights-only", "evidence": ["https://huggingface.co/Lightricks/LTX-2.5", "https://github.com/Lightricks/LTX-2"]}
+    {"id": "ltx", "owner": "Lightricks", "openness": "weights-only", "evidence": ["https://huggingface.co/Lightricks/LTX-2.5", "https://github.com/Lightricks/LTX-2"]},
+    {"id": "neohorse", "owner": "TokenRhythm", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/TokenRhythm/NeoHorse-Jev-4B"]},
+    {"id": "kev", "owner": "jaredpalmer", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/jaredpalmer/kev-4b"]},
+    {"id": "openjev", "owner": "apus-ailab", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/apus-ailab/APUS-OpenJev-v1-4B"]},
+    {"id": "laya", "owner": "convaiinnovations", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/convaiinnovations/laya"]},
+    {"id": "openmoss", "owner": "OpenMOSS-Team", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect-v2.0"]},
+    {"id": "stability-audio", "owner": "stabilityai", "openness": "weights-only", "evidence": ["https://huggingface.co/collections/stabilityai/stable-audio-3"]},
+    {"id": "ace-step", "owner": "ACE-Step", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/ACE-Step/Ace-Step1.5"]},
+    {"id": "yue2", "owner": "m-a-p", "openness": "weights-only", "evidence": ["https://huggingface.co/m-a-p/YuE2-3B"]},
+    {"id": "mmaudio", "owner": "hkchengrex", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/hkchengrex/MMAudio"]},
+    {"id": "audiox", "owner": "Zeyue7", "openness": "weights-only", "evidence": ["https://huggingface.co/Zeyue7/AudioX"]},
+    {"id": "thinksound", "owner": "FunAudioLLM", "openness": "weights-only", "evidence": ["https://huggingface.co/FunAudioLLM/ThinkSound"]},
+    {"id": "seed-vc", "owner": "Plachta", "openness": "weights-only", "evidence": ["https://huggingface.co/Plachta/Seed-VC"]},
+    {"id": "rvc", "owner": "lj1995", "openness": "partial-artifacts", "evidence": ["https://huggingface.co/lj1995/VoiceConversionWebUI"]},
+    {"id": "segment-anything", "owner": "facebook", "openness": "weights-only", "evidence": ["https://huggingface.co/facebook/sam2.1-hiera-large", "https://huggingface.co/facebook/sam3"]},
+    {"id": "real-esrgan", "owner": "ai-forever", "openness": "weights-only", "evidence": ["https://huggingface.co/ai-forever/Real-ESRGAN"]},
+    {"id": "lerobot", "owner": "lerobot", "openness": "weights-only", "evidence": ["https://huggingface.co/lerobot/smolvla_base", "https://huggingface.co/docs/lerobot"]},
+    {"id": "openvla", "owner": "openvla", "openness": "weights-only", "evidence": ["https://huggingface.co/openvla/openvla-7b"]},
+    {"id": "flux-action", "owner": "black-forest-labs", "openness": "weights-only", "evidence": ["https://huggingface.co/black-forest-labs/flux-3-action-base"]},
+    {"id": "groot", "owner": "nvidia", "openness": "weights-only", "evidence": ["https://huggingface.co/nvidia/GR00T-N1.7-3B"]},
+    {"id": "molmoact", "owner": "allenai", "openness": "weights-only", "evidence": ["https://huggingface.co/allenai/MolmoAct2"]}
   ],
   "flagship_models": {
+    "media-conditioning": [
+      {"id": "facebook/sam2.1-hiera-large", "family": "segment-anything"},
+      {"id": "facebook/sam3", "family": "segment-anything"}
+    ],
+    "media-enhancement": [
+      {"id": "ai-forever/Real-ESRGAN", "family": "real-esrgan"}
+    ],
+    "decision": [
+      {"id": "TokenRhythm/NeoHorse-Jev-4B", "family": "neohorse"},
+      {"id": "jaredpalmer/kev-4b", "family": "kev"},
+      {"id": "apus-ailab/APUS-OpenJev-v1-4B", "family": "openjev"},
+      {"id": "convaiinnovations/laya", "family": "laya"}
+    ],
     "llm": [
       {"id": "zai-org/GLM-5.2", "family": "glm"},
       {"id": "deepseek-ai/DeepSeek-V4-Pro", "family": "deepseek"},
@@ -125,6 +158,20 @@
       {"id": "tencent/HunyuanVideo-1.5", "family": "hunyuan"},
       {"id": "nvidia/Cosmos3-Super-Image2Video-4Step", "family": "cosmos3"}
     ],
+    "audio-generation": [
+      {"id": "OpenMOSS-Team/MOSS-SoundEffect-v2.0", "family": "openmoss"},
+      {"id": "stabilityai/stable-audio-3-medium", "family": "stability-audio"},
+      {"id": "stabilityai/stable-audio-3-small-sfx", "family": "stability-audio"},
+      {"id": "stabilityai/stable-audio-3-small-music", "family": "stability-audio"},
+      {"id": "tencent/HunyuanVideo-Foley", "family": "hunyuan"},
+      {"id": "hkchengrex/MMAudio", "family": "mmaudio"},
+      {"id": "Zeyue7/AudioX", "family": "audiox"},
+      {"id": "FunAudioLLM/ThinkSound", "family": "thinksound"},
+      {"id": "ACE-Step/Ace-Step1.5", "family": "ace-step"},
+      {"id": "m-a-p/YuE2-3B", "family": "yue2"},
+      {"id": "Plachta/Seed-VC", "family": "seed-vc"},
+      {"id": "lj1995/VoiceConversionWebUI", "family": "rvc"}
+    ],
     "audio-tts": [
       {"id": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", "family": "qwen"},
       {"id": "zai-org/GLM-TTS", "family": "glm"},
@@ -155,10 +202,23 @@
       {"id": "nvidia/Nemotron-3-Embed-1B-BF16", "family": "nemotron"}
     ],
     "robotics": [
-      {"id": "tencent/Hy-Embodied-RxBrain-1.0", "family": "hunyuan"}
+      {"id": "black-forest-labs/flux-3-action-base", "family": "flux-action", "subtype": "world-action-adaptation-base"},
+      {"id": "black-forest-labs/flux-3-action-so101", "family": "flux-action", "subtype": "robot-policy"},
+      {"id": "black-forest-labs/flux-3-action-droid", "family": "flux-action", "subtype": "robot-policy"}
+    ]
+  },
+  "ecosystem_baseline_models": {
+    "robotics": [
+      {"id": "lerobot/smolvla_base", "family": "lerobot", "subtype": "vla-policy"},
+      {"id": "lerobot/xvla-base", "family": "lerobot", "subtype": "vla-policy"},
+      {"id": "lerobot/pi05_base", "family": "lerobot", "subtype": "vla-policy"},
+      {"id": "openvla/openvla-7b", "family": "openvla", "subtype": "vla-policy"},
+      {"id": "nvidia/GR00T-N1.7-3B", "family": "groot", "subtype": "vla-policy"},
+      {"id": "allenai/MolmoAct2", "family": "molmoact", "subtype": "vla-policy"}
     ]
   },
   "local_models": [
+    {"id": "TokenRhythm/NeoHorse-Jev-4B-GGUF", "family": "neohorse", "role": "decision", "canonical": "TokenRhythm/NeoHorse-Jev-4B", "deployment": ["gguf", "quantized"]},
     {"id": "Qwen/Qwen3.8-27B-FP8", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.8-27B", "deployment": ["quantized"]},
     {"id": "unsloth/Qwen3.8-27B-GGUF", "family": "qwen", "role": "vlm", "canonical": "Qwen/Qwen3.8-27B", "deployment": ["gguf", "ollama-compatible", "quantized"]},
     {"id": "lightx2v/Minimax-h3-Turbo", "family": "minimax", "role": "video-generation", "canonical": "MiniMaxAI/MiniMax-H3", "deployment": ["diffusers"]},
@@ -182,6 +242,8 @@
     {"id": "openbmb/MiniCPM5-1B-MLX", "family": "minicpm", "role": "llm", "canonical": "openbmb/MiniCPM5-1B", "deployment": ["mlx", "on-device"]}
   ],
   "local_roots": [
+    "TokenRhythm/NeoHorse-Jev-4B",
+    "jaredpalmer/kev-4b",
     "meta-llama/Llama-3.1-8B-Instruct",
     "google/gemma-3-12b-it",
     "Qwen/Qwen3-8B",
@@ -209,6 +271,18 @@
     "lmstudio-community"
   ],
   "model_overrides": {
+    "OpenMOSS-Team/MOSS-SoundEffect-v2.0": {"audio_tasks": ["text-to-sfx"]},
+    "stabilityai/stable-audio-3-medium": {"audio_tasks": ["text-to-sfx", "ambience-generation", "audio-inpaint", "audio-continuation"]},
+    "stabilityai/stable-audio-3-small-sfx": {"audio_tasks": ["text-to-sfx"]},
+    "stabilityai/stable-audio-3-small-music": {"audio_tasks": ["music-generation"]},
+    "tencent/HunyuanVideo-Foley": {"audio_tasks": ["video-to-sfx", "text-video-to-sfx"]},
+    "hkchengrex/MMAudio": {"audio_tasks": ["video-to-sfx", "text-video-to-sfx"]},
+    "Zeyue7/AudioX": {"audio_tasks": ["text-to-sfx", "video-to-sfx", "text-video-to-sfx", "music-generation"]},
+    "FunAudioLLM/ThinkSound": {"audio_tasks": ["video-to-sfx"]},
+    "ACE-Step/Ace-Step1.5": {"audio_tasks": ["song-generation"]},
+    "m-a-p/YuE2-3B": {"audio_tasks": ["song-generation"]},
+    "Plachta/Seed-VC": {"audio_tasks": ["singing-conversion"]},
+    "lj1995/VoiceConversionWebUI": {"audio_tasks": ["singing-conversion"]},
     "allenai/olmOCR-2-7B-1025": {"capabilities": ["ocr", "document"]},
     "deepseek-ai/DeepSeek-OCR-2": {"capabilities": ["ocr", "document"]},
     "tencent/HunyuanOCR": {"capabilities": ["ocr", "document"]},

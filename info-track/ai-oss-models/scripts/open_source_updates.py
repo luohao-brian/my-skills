@@ -16,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -26,6 +27,8 @@ WINDOW_DAYS = 7
 LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_REGISTRY_PATH = BASE_DIR / "references" / "model-registry.json"
+ECOSYSTEM_ARCHITECTURE_PATH = BASE_DIR / "references" / "ecosystem-architecture.json"
+DEVELOPMENT_BASELINES_PATH = BASE_DIR / "references" / "development-baselines.json"
 PROJECT_REGISTRY_PATH = BASE_DIR / "references" / "reproducible-projects.json"
 DATASET_REGISTRY_PATH = BASE_DIR / "references" / "dataset-registry.json"
 
@@ -48,6 +51,9 @@ MODEL_EXPAND = [
 FLAGSHIP_ROLES = [
     "llm",
     "vlm",
+    "decision",
+    "media-conditioning",
+    "media-enhancement",
     "image-generation",
     "video-generation",
     "audio-generation",
@@ -58,22 +64,33 @@ FLAGSHIP_ROLES = [
     "embedding",
     "robotics",
 ]
-DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetune", "adapter"]
+DERIVATIVE_FILTERS = ["gguf", "mlx", "quantized", "on-device", "merge", "finetune", "adapter", "distilled"]
 ALIGNMENT_QUERY_FILTERS = ["uncensored", "abliterated", "heretic", "decensored"]
 LOCAL_MODEL_FILTERS = DERIVATIVE_FILTERS + ALIGNMENT_QUERY_FILTERS
-MODALITY_QUERY_FILTERS = {
-    "image-generation": ["text-to-image", "image-to-image"],
-    "video-generation": [
-        "text-to-video",
-        "image-to-video",
-        "image-text-to-video",
-        "video-to-video",
-    ],
-    "audio-tts": ["text-to-speech"],
-    "audio-stt": ["automatic-speech-recognition"],
-}
-MODALITY_FOCUS_ROLES = tuple(MODALITY_QUERY_FILTERS)
+ECOSYSTEM_ARCHITECTURE = json.loads(ECOSYSTEM_ARCHITECTURE_PATH.read_text(encoding="utf-8"))
+ECOSYSTEM_STAGES = [
+    (ecosystem, stage)
+    for ecosystem in ECOSYSTEM_ARCHITECTURE["ecosystems"]
+    for stage in ecosystem["stages"]
+]
+MODALITY_QUERY_FILTERS: dict[str, list[str]] = {}
+for _, stage in ECOSYSTEM_STAGES:
+    if stage.get("query_role") and stage.get("query_filters"):
+        role_filters = MODALITY_QUERY_FILTERS.setdefault(stage["query_role"], [])
+        role_filters.extend(value for value in stage.get("query_filters", []) if value not in role_filters)
+MODALITY_FOCUS_ROLES = (
+    "media-conditioning",
+    "media-enhancement",
+    "image-generation",
+    "video-generation",
+    "audio-generation",
+    "audio-tts",
+    "audio-stt",
+    "robotics",
+)
 MEDIA_DEPLOYMENT_ROLES = {
+    "media-conditioning",
+    "media-enhancement",
     "vlm",
     "image-generation",
     "video-generation",
@@ -82,39 +99,12 @@ MEDIA_DEPLOYMENT_ROLES = {
     "audio-stt",
 }
 MEDIA_ECOSYSTEM_FILTERS = ["comfyui"]
-MEDIA_CUSTOMIZATION_QUERY_FILTERS = [
-    "audio-driven-video",
-    "audio-to-video",
-    "avatar",
-    "camera-control",
-    "character-animation",
-    "character-consistency",
-    "digital-human",
-    "face-swap",
-    "faceswap",
-    "first-last-frame-to-video",
-    "identity-consistency",
-    "image-to-video",
-    "image-text-to-video",
-    "lip-sync",
-    "lipsync",
-    "motion-control",
-    "motion-transfer",
-    "multi-shot-video",
-    "pose-control",
-    "person-replacement",
-    "reference-to-video",
-    "speech-to-video",
-    "talking-head",
-    "video-editing",
-    "video-effects",
-    "video-inpainting",
-    "video-outpainting",
-    "video-relighting",
-    "video-to-video",
-    "frame-interpolation",
-    "video-upscaling",
-]
+MEDIA_CUSTOMIZATION_QUERY_FILTERS = list(dict.fromkeys(
+    value
+    for ecosystem, stage in ECOSYSTEM_STAGES
+    if ecosystem["id"] == "media"
+    for value in stage.get("comfyui_filters", [])
+))
 MEDIA_PROFILE_RUNTIME_TAGS = {"comfyui", "diffusers", "diffusion-single-file"}
 MEDIA_RUNTIME_TAGS = {
     "comfyui": "comfyui",
@@ -127,6 +117,26 @@ MEDIA_RUNTIME_TAGS = {
     "vllm": "vllm",
 }
 MEDIA_CUSTOMIZATION_TAGS = {
+    "image-upscaling": "image-enhancement",
+    "image-super-resolution": "image-enhancement",
+    "super-resolution": "image-enhancement",
+    "image-restoration": "image-enhancement",
+    "deblurring": "image-enhancement",
+    "video-restoration": "video-enhancement",
+    "video-super-resolution": "video-enhancement",
+    "mask-generation": "segmentation-mask",
+    "image-segmentation": "segmentation-mask",
+    "video-segmentation": "segmentation-mask",
+    "segment-anything": "segmentation-mask",
+    "sam2": "segmentation-mask",
+    "sam3": "segmentation-mask",
+    "pose-estimation": "pose-extraction",
+    "human-pose-estimation": "pose-extraction",
+    "depth-estimation": "depth-map",
+    "motion-extraction": "motion-extraction",
+    "face-detection": "face-analysis",
+    "face-landmarks": "face-analysis",
+    "matting": "segmentation-mask",
     "audio-driven": "audio-driven-video",
     "audio-driven-avatar": "audio-driven-video",
     "audio-to-video": "audio-driven-video",
@@ -162,6 +172,13 @@ MEDIA_CUSTOMIZATION_TAGS = {
     "video-upscaling": "video-enhancement",
 }
 MEDIA_CUSTOMIZATION_LANES = {
+    "image-enhancement": "media-enhancement",
+    "video-enhancement": "media-enhancement",
+    "segmentation-mask": "media-conditioning",
+    "pose-extraction": "media-conditioning",
+    "motion-extraction": "media-conditioning",
+    "depth-map": "media-conditioning",
+    "face-analysis": "media-conditioning",
     "image-to-video": "image-to-video",
     "reference-to-video": "image-to-video",
     "keyframe-control": "image-to-video",
@@ -175,11 +192,18 @@ MEDIA_CUSTOMIZATION_LANES = {
     "talking-head": "audio-driven-avatar",
     "video-editing": "video-editing-effects",
     "video-effects": "video-editing-effects",
-    "video-enhancement": "video-editing-effects",
     "face-swap": "video-editing-effects",
     "person-replacement": "video-editing-effects",
 }
-MEDIA_POST_IMAGE_PRIMARY_CAPABILITIES = {
+MEDIA_WORKFLOW_PRIMARY_CAPABILITIES = {
+    "image-enhancement",
+    "video-enhancement",
+    "segmentation-mask",
+    "pose-extraction",
+    "motion-extraction",
+    "depth-map",
+    "face-analysis",
+    "face-swap",
     "image-to-video",
     "reference-to-video",
     "keyframe-control",
@@ -195,7 +219,7 @@ MEDIA_POST_IMAGE_PRIMARY_CAPABILITIES = {
     "video-enhancement",
 }
 LOCAL_DEPLOYMENTS = {"gguf", "mlx", "quantized", "ollama-compatible", "on-device"}
-DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized"}
+DERIVATIVE_RELATIONS = {"adapter", "finetune", "merge", "quantized", "distilled"}
 LOCAL_QUERY_LIMIT = 200
 GLOBAL_TRENDING_LIMIT = 500
 GLOBAL_RECENT_LIMIT = 1_000
@@ -215,9 +239,9 @@ MODALITY_HOT_TRENDING = 4
 MODALITY_HOT_DOWNLOADS = 500
 MODALITY_HOT_LIKES = 10
 MODALITY_QUERY_LIMIT = 200
-MEDIA_CUSTOMIZATION_LIMIT = 8
+MEDIA_CUSTOMIZATION_LIMIT = 12
 MEDIA_OPEN_ACTIVITY_MIN = 3
-MEDIA_CUSTOMIZATION_PREFETCH_LIMIT = 24
+MEDIA_CUSTOMIZATION_PREFETCH_LIMIT = 30
 MEDIA_CUSTOMIZATION_UNKNOWN_PREFETCH_LIMIT = 12
 DATASET_HOT_TRENDING = 15
 DATASET_HOT_DOWNLOADS = 1_000
@@ -253,6 +277,15 @@ SHARDED_ARTIFACT_RE = re.compile(
 )
 
 PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
+    "mask-generation": {"input": ["image"], "output": ["mask"]},
+    "image-segmentation": {"input": ["image"], "output": ["mask"]},
+    "video-segmentation": {"input": ["video"], "output": ["mask"]},
+    "pose-estimation": {"input": ["image"], "output": ["pose"]},
+    "human-pose-estimation": {"input": ["image"], "output": ["pose"]},
+    "depth-estimation": {"input": ["image"], "output": ["depth"]},
+    "motion-extraction": {"input": ["video"], "output": ["motion"]},
+    "face-detection": {"input": ["image"], "output": ["face"]},
+    "face-landmarks": {"input": ["image"], "output": ["landmarks"]},
     "text-generation": {"input": ["text"], "output": ["text"]},
     "image-text-to-text": {"input": ["text", "image"], "output": ["text"]},
     "image-to-text": {"input": ["image"], "output": ["text"]},
@@ -275,11 +308,14 @@ PIPELINE_MODALITIES: dict[str, dict[str, list[str]]] = {
     "automatic-speech-recognition": {"input": ["audio"], "output": ["text"]},
     "text-to-speech": {"input": ["text"], "output": ["audio"]},
     "text-to-audio": {"input": ["text"], "output": ["audio"]},
+    "video-to-audio": {"input": ["video"], "output": ["audio"]},
+    "text-video-to-audio": {"input": ["text", "video"], "output": ["audio"]},
+    "audio-to-audio": {"input": ["audio"], "output": ["audio"]},
     "translation": {"input": ["text"], "output": ["text"]},
     "sentence-similarity": {"input": ["text"], "output": ["text"]},
     "robotics": {"input": ["robotics"], "output": ["robotics"]},
 }
-MODALITY_TOKENS = {"text", "image", "video", "audio", "speech", "robotics"}
+MODALITY_TOKENS = {"text", "image", "video", "audio", "speech", "robotics", "mask", "pose", "depth", "motion", "face", "landmarks"}
 
 CAPABILITY_TAGS = {
     "reasoning": "reasoning",
@@ -296,6 +332,33 @@ CAPABILITY_TAGS = {
     "automatic-speech-recognition": "stt",
     "sentence-similarity": "embedding",
 }
+
+AUDIO_TASK_TAGS = {
+    "text-to-sfx": "text-to-sfx",
+    "sound-effects": "text-to-sfx",
+    "video-to-sfx": "video-to-sfx",
+    "text-video-to-sfx": "text-video-to-sfx",
+    "audio-inpaint": "audio-inpaint",
+    "audio-inpainting": "audio-inpaint",
+    "audio-continuation": "audio-continuation",
+    "ambience-generation": "ambience-generation",
+    "text-to-music": "music-generation",
+    "music-generation": "music-generation",
+    "singing-voice-conversion": "singing-conversion",
+    "singing-voice-synthesis": "singing-synthesis",
+}
+AUDIO_TASKS = set(AUDIO_TASK_TAGS.values()) | {"song-generation"}
+
+
+def audio_tasks(row: dict[str, Any], override: dict[str, Any] | None = None) -> dict[str, Any]:
+    signals = [
+        {"task": task, "source": "hf-tag", "value": tag}
+        for tag, task in sorted(AUDIO_TASK_TAGS.items())
+        if tag in lower_tags(row)
+    ]
+    for task in (override or {}).get("audio_tasks", []):
+        signals.append({"task": task, "source": "registry", "value": row.get("id")})
+    return {"tasks": sorted({signal["task"] for signal in signals}), "evidence": signals} if signals else {}
 
 LOW_REFUSAL_TAGS = {"uncensored", "abliterated", "heretic", "decensored"}
 
@@ -579,6 +642,20 @@ def validate_registries(
         if entry.get("family") not in family_ids:
             raise ValueError(f"unknown family for model {model_id}")
         seen_models.add(model_id)
+    for role, entries in models.get("ecosystem_baseline_models", {}).items():
+        if role not in FLAGSHIP_ROLES:
+            raise ValueError(f"invalid ecosystem baseline role: {role}")
+        for entry in entries:
+            model_id = str(entry.get("id") or "")
+            if not model_id or model_id in seen_models:
+                raise ValueError(f"duplicate or empty ecosystem baseline model: {model_id}")
+            if entry.get("family") not in family_ids:
+                raise ValueError(f"unknown family for ecosystem baseline {model_id}")
+            seen_models.add(model_id)
+    for model_id, override in models.get("model_overrides", {}).items():
+        unknown = set(override.get("audio_tasks", [])) - AUDIO_TASKS
+        if unknown:
+            raise ValueError(f"invalid audio tasks for {model_id}: {sorted(unknown)}")
     for project in projects.get("projects", []):
         if project.get("openness") not in OPENNESS_LEVELS:
             raise ValueError(f"invalid openness for project {project.get('id')}")
@@ -604,6 +681,53 @@ def validate_registries(
         if not set(entry.get("roles", [])) <= ARTIFACT_ROLES:
             raise ValueError(f"invalid dataset role for {dataset_id}")
         seen_datasets.add(dataset_id)
+
+
+def validate_ecosystem_baselines(
+    architecture: dict[str, Any], development: dict[str, Any]
+) -> None:
+    ecosystems = architecture.get("ecosystems") or []
+    ecosystem_ids = [str(entry.get("id") or "") for entry in ecosystems]
+    if len(ecosystem_ids) != len(set(ecosystem_ids)) or not all(ecosystem_ids):
+        raise ValueError("duplicate or empty ecosystem id")
+    for ecosystem in ecosystems:
+        stages = ecosystem.get("stages") or []
+        stage_ids = [str(stage.get("id") or "") for stage in stages]
+        if len(stage_ids) != len(set(stage_ids)) or not all(stage_ids):
+            raise ValueError(f"duplicate or empty stage in {ecosystem['id']}")
+        for stage in stages:
+            if set(stage.get("upstream") or []) - set(stage_ids):
+                raise ValueError(f"unknown upstream stage in {ecosystem['id']}/{stage['id']}")
+            role = stage.get("query_role")
+            if role and role not in FLAGSHIP_ROLES:
+                raise ValueError(f"unknown query role in {ecosystem['id']}/{stage['id']}")
+    for kind in ("tools", "datasets"):
+        entries = development.get(kind) or []
+        ids = [str(entry.get("id") or "") for entry in entries]
+        if len(ids) != len(set(ids)) or not all(ids):
+            raise ValueError(f"duplicate or empty development {kind} id")
+        for entry in entries:
+            if set(entry.get("domains") or []) - set(ecosystem_ids):
+                raise ValueError(f"unknown development domain for {entry['id']}")
+    experiment_ids: set[str] = set()
+    for entry in development.get("local_experiments") or []:
+        experiment_id = str(entry.get("id") or "")
+        if not experiment_id or experiment_id in experiment_ids:
+            raise ValueError(f"duplicate or empty local experiment id: {experiment_id}")
+        if entry.get("method") not in {"sft", "offline-response-distillation", "rlvr-grpo", "decision-sft", "decision-rlvr", "video-t2v-lora", "video-ic-lora", "audio-sfx-lora", "audio-music-lora"}:
+            raise ValueError(f"invalid local experiment method: {experiment_id}")
+        if not all(entry.get(key) for key in ("model_id", "dataset_id", "dataset_config", "dataset_split", "required_columns", "tools", "evidence")):
+            raise ValueError(f"incomplete local experiment: {experiment_id}")
+        if entry.get("max_parameters") is None and entry.get("method") not in {"video-t2v-lora", "video-ic-lora"}:
+            raise ValueError(f"missing local experiment parameter cap: {experiment_id}")
+        if entry.get("max_parameters") is not None and (not isinstance(entry["max_parameters"], int) or entry["max_parameters"] <= 0):
+            raise ValueError(f"invalid local experiment parameter cap: {experiment_id}")
+        if entry.get("dataset_manifest") and not entry.get("model_weight_path"):
+            raise ValueError(f"missing video training checkpoint: {experiment_id}")
+        for tool in entry["tools"]:
+            if not all(tool.get(key) for key in ("project", "component", "role", "evidence")):
+                raise ValueError(f"incomplete local experiment tool: {experiment_id}")
+        experiment_ids.add(experiment_id)
 
 
 def hf_api_bases() -> list[str]:
@@ -716,6 +840,233 @@ def fetch_dataset(dataset_id: str) -> dict[str, Any]:
     return row
 
 
+def fetch_development_tool(repo_id: str) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo_id):
+        raise ValueError("invalid GitHub repository id")
+    row = json.loads(fetch_text(f"https://api.github.com/repos/{repo_id}", retries=0))
+    if not isinstance(row, dict) or not row.get("full_name"):
+        raise TypeError(f"unexpected GitHub response for {repo_id}")
+    try:
+        commits = json.loads(fetch_text(f"https://api.github.com/repos/{repo_id}/commits?per_page=1", retries=0))
+        if isinstance(commits, list) and commits:
+            commit = commits[0]
+            details = commit.get("commit") or {}
+            row["_latest_commit"] = {
+                "title": str(details.get("message") or "").splitlines()[0],
+                "date": str((details.get("committer") or {}).get("date") or "")[:10],
+                "url": str(commit.get("html_url") or ""),
+            }
+    except Exception:
+        pass
+    return row
+
+
+def development_updates(
+    baseline: dict[str, Any], start: dt.date, end: dt.date
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
+    """Check a small, explicit local-development baseline instead of broad dataset search."""
+    tool_specs = {str(item["id"]): item for item in baseline["tools"]}
+    dataset_specs = {str(item["id"]): item for item in baseline["datasets"]}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        tool_future = executor.submit(fetch_many, tool_specs, fetch_development_tool, 6)
+        dataset_future = executor.submit(fetch_many, dataset_specs, fetch_dataset, 6)
+        tool_rows, tool_errors = tool_future.result()
+        dataset_rows, dataset_errors = dataset_future.result()
+    items: dict[str, list[dict[str, Any]]] = {"tools": [], "datasets": []}
+    for repo_id, row in tool_rows.items():
+        spec = tool_specs[repo_id]
+        published = iso_date(row.get("created_at"))
+        pushed = iso_date(row.get("pushed_at"))
+        event = ("published", published) if published and start <= published <= end else (
+            ("repository-updated", pushed) if pushed and start <= pushed <= end else None
+        )
+        if event:
+            latest_commit = row.get("_latest_commit") or {}
+            latest_commit_date = iso_date(latest_commit.get("date"))
+            items["tools"].append({
+                "title": repo_id,
+                "url": spec["url"],
+                "date": event[1].isoformat(),
+                "event": event[0],
+                "category": "development-tool",
+                "metadata": {
+                    "domains": spec["domains"], "methods": spec["methods"],
+                    "entry": spec["entry"], "evidence": spec["evidence"],
+                    "stars": row.get("stargazers_count"),
+                    "change_evidence": {
+                        "ok": True,
+                        "commits": [latest_commit],
+                    } if latest_commit_date and start <= latest_commit_date <= end else {},
+                },
+            })
+    for repo_id, row in dataset_rows.items():
+        spec = dataset_specs[repo_id]
+        event = event_in_window(row, start, end)
+        if event:
+            items["datasets"].append({
+                "title": repo_id,
+                "url": spec["evidence"],
+                "date": event[1],
+                "event": event[0],
+                "category": "development-dataset",
+                "metadata": {"domains": spec["domains"], "methods": spec["methods"], "sample_unit": spec["sample_unit"], "downloads": row.get("downloads"), "likes": row.get("likes")},
+            })
+    for rows in items.values():
+        rows.sort(key=lambda item: (item["date"], item["title"]), reverse=True)
+    return items, {
+        "github_tools": source_status(tool_rows, tool_errors, len(items["tools"])),
+        "huggingface_development_datasets": source_status(dataset_rows, dataset_errors, len(items["datasets"])),
+    }
+
+
+def fetch_dataset_columns(dataset_id: str, config: str, split: str) -> list[str]:
+    query = urllib.parse.urlencode(
+        {"dataset": dataset_id, "config": config, "split": split}
+    )
+    row = json.loads(
+        fetch_text(
+            f"https://datasets-server.huggingface.co/first-rows?{query}",
+            retries=0,
+        )
+    )
+    if not isinstance(row, dict):
+        raise TypeError("unexpected Hugging Face dataset first-rows response")
+    return [str(value.get("name")) for value in row.get("features") or [] if value.get("name")]
+
+
+def development_opportunities(
+    baseline: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Verify evergreen small-model training pairs independently of update dates."""
+    specs = baseline.get("local_experiments") or []
+    if not specs:
+        return [], source_status({}, {}, 0)
+    model_ids = [str(spec["model_id"]) for spec in specs]
+    dataset_ids = [str(spec["dataset_id"]) for spec in specs]
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        models_future = executor.submit(fetch_many, model_ids, fetch_model, 4)
+        datasets_future = executor.submit(fetch_many, dataset_ids, fetch_dataset, 4)
+        files_future = executor.submit(fetch_many, model_ids, fetch_model_repository_files, 4)
+        model_rows, model_errors = models_future.result()
+        dataset_rows, dataset_errors = datasets_future.result()
+        file_rows, file_errors = files_future.result()
+    opportunities: list[dict[str, Any]] = []
+    errors = {
+        **{f"model:{key}": value for key, value in model_errors.items()},
+        **{f"dataset:{key}": value for key, value in dataset_errors.items()},
+        **{f"files:{key}": value for key, value in file_errors.items()},
+    }
+    for spec in specs:
+        experiment_id = str(spec["id"])
+        model_id = str(spec["model_id"])
+        dataset_id = str(spec["dataset_id"])
+        model = model_rows.get(model_id)
+        dataset = dataset_rows.get(dataset_id)
+        if model is None or dataset is None:
+            errors[experiment_id] = "model-or-dataset-unavailable"
+            continue
+        parameters = (model.get("safetensors") or {}).get("total")
+        if spec.get("max_parameters") and (not isinstance(parameters, int) or parameters > spec["max_parameters"]):
+            errors[experiment_id] = "model-scale-unverified-or-too-large"
+            continue
+        try:
+            manifest = spec.get("dataset_manifest")
+            if manifest:
+                manifest_url = f"https://huggingface.co/datasets/{dataset_id}/resolve/main/{urllib.parse.quote(manifest)}"
+                samples = json.loads(fetch_text(manifest_url, retries=0))
+                if not isinstance(samples, list) or not samples or not all(isinstance(row, dict) for row in samples):
+                    raise ValueError("invalid media manifest")
+                columns = sorted(set.intersection(*(set(row) for row in samples)))
+                paths = {row.get("rfilename") for row in dataset.get("siblings") or []}
+                for row in samples:
+                    for field in spec.get("media_columns") or []:
+                        if row.get(field) not in paths:
+                            raise ValueError("media path missing from repository")
+            else:
+                columns = fetch_dataset_columns(
+                    dataset_id,
+                    str(spec["dataset_config"]),
+                    str(spec["dataset_split"]),
+                )
+                if spec.get("media_columns"):
+                    query = urllib.parse.urlencode({
+                        "dataset": dataset_id,
+                        "config": spec["dataset_config"],
+                        "split": spec["dataset_split"],
+                    })
+                    preview = json.loads(fetch_text(
+                        f"https://datasets-server.huggingface.co/first-rows?{query}",
+                        retries=0,
+                    ))
+                    features = {row.get("name"): row.get("type") for row in preview.get("features") or []}
+                    for field in spec["media_columns"]:
+                        if (features.get(field) or {}).get("_type") != "Audio":
+                            raise ValueError("audio feature unavailable")
+        except Exception as exc:
+            errors[experiment_id] = f"dataset-schema-{type(exc).__name__}"
+            continue
+        missing = sorted(set(spec["required_columns"]) - set(columns))
+        if missing:
+            errors[experiment_id] = "missing-columns:" + ",".join(missing)
+            continue
+        repository = file_rows.get(model_id) or {}
+        artifact_files = [
+            row for row in repository.get("files") or []
+            if str(row.get("path") or "").lower().endswith(MODEL_ARTIFACT_SUFFIXES)
+        ]
+        options = [
+            option for option in build_artifact_options(artifact_files)
+            if option.get("component") == "model-weights" or (
+                spec.get("model_weight_path") and option.get("path") == spec["model_weight_path"]
+            )
+        ]
+        options = [
+            option for option in options
+            if option.get("bytes", 0) > 0
+            and option.get("complete", True)
+        ]
+        weight_path = spec.get("model_weight_path")
+        if weight_path:
+            options = [option for option in options if weight_path in (option.get("path"), *(option.get("paths") or []))]
+        main_weight = max(options, key=lambda value: int(value["bytes"])) if options else None
+        if main_weight is None:
+            errors[experiment_id] = "model-main-weight-unavailable"
+            continue
+        opportunities.append(
+            {
+                "id": experiment_id,
+                "method": spec["method"],
+                "model": {
+                    "id": model_id,
+                    "url": f"https://huggingface.co/{model_id}",
+                    "parameters": parameters,
+                    "main_weight": main_weight,
+                },
+                "dataset": {
+                    "id": dataset_id,
+                    "url": f"https://huggingface.co/datasets/{dataset_id}",
+                    "config": spec["dataset_config"],
+                    "split": spec["dataset_split"],
+                    "columns": columns,
+                    "required_columns": spec["required_columns"],
+                    "sample_unit": spec["sample_unit"],
+                    "downloads": dataset.get("downloads"),
+                    "likes": dataset.get("likes"),
+                },
+                "signal": spec["signal"],
+                "local_scope": spec["local_scope"],
+                "preparation": spec.get("preparation"),
+                "resource_evidence": spec.get("resource_evidence"),
+                "tools": spec["tools"],
+                "evidence": spec["evidence"],
+                "status": "metadata-verified-runtime-unmeasured",
+            }
+        )
+    return opportunities, source_status(
+        {item["id"]: item for item in opportunities}, errors, len(opportunities)
+    )
+
+
 def fetch_many(
     ids: Iterable[str],
     fetcher: Callable[[str], dict[str, Any]],
@@ -773,6 +1124,65 @@ def event_in_window(row: dict[str, Any], start: dt.date, end: dt.date) -> tuple[
 
 def lower_tags(row: dict[str, Any]) -> set[str]:
     return {str(tag).lower() for tag in row.get("tags", [])}
+
+
+def ecosystem_paths(
+    row: dict[str, Any], role: str, override: dict[str, Any] | None = None
+) -> list[dict[str, str]]:
+    """Map exact task evidence to the shared ecosystem graph."""
+    pipeline = str(row.get("pipeline_tag") or "").lower()
+    tags = lower_tags(row)
+    audio_stage_by_task = {
+        "song-generation": "song",
+        "music-generation": "song",
+        "text-to-sfx": "sound-effect",
+        "ambience-generation": "sound-effect",
+        "video-to-sfx": "video-foley",
+        "text-video-to-sfx": "video-foley",
+        "audio-inpaint": "audio-edit",
+        "audio-continuation": "audio-edit",
+        "singing-conversion": "singing-conversion",
+        "singing-synthesis": "singing-synthesis",
+    }
+    registered_audio_tasks = set((override or {}).get("audio_tasks", []))
+    derivative_roles = {
+        "llm-vlm": {"llm", "vlm"},
+        "media": {"image-generation", "video-generation", "media-conditioning", "media-enhancement"},
+        "speech": {"audio-tts", "audio-stt"},
+        "decision": {"decision"},
+        "music": {"audio-generation"},
+        "embodied": {"robotics"},
+    }
+    paths: list[dict[str, str]] = []
+    for ecosystem, stage in ECOSYSTEM_STAGES:
+        if stage["id"] == "local-derivative" and role not in derivative_roles[ecosystem["id"]]:
+            continue
+        evidence: tuple[str, str] | None = None
+        if pipeline in stage.get("pipeline_tags", []):
+            evidence = ("hf-pipeline_tag", pipeline)
+        else:
+            matched = sorted(tags & set(stage.get("tags", [])))
+            if matched:
+                evidence = ("hf-tag", matched[0])
+        if not evidence and ecosystem["id"] == "music":
+            task = next(
+                (task for task in sorted(registered_audio_tasks) if audio_stage_by_task.get(task) == stage["id"]),
+                None,
+            )
+            if task:
+                evidence = ("registry", task)
+        if not evidence and stage.get("query_role") == role and not any(
+            path["ecosystem"] == ecosystem["id"] for path in paths
+        ):
+            evidence = ("registered-role", role)
+        if evidence:
+            paths.append({
+                "ecosystem": ecosystem["id"],
+                "stage": stage["id"],
+                "source": evidence[0],
+                "value": evidence[1],
+            })
+    return paths
 
 
 def modality_tokens(value: str) -> list[str]:
@@ -843,6 +1253,179 @@ def base_model_links(row: dict[str, Any]) -> list[tuple[str, str]]:
     return list(links.items())
 
 
+def structured_base_model_signals(row: dict[str, Any]) -> list[dict[str, str]]:
+    """Retain each HF lineage assertion with its original source and relation."""
+    card = row.get("cardData") or {}
+    default_relation = str(card.get("base_model_relation") or "base_model")
+    raw = card.get("base_model")
+    values = raw if isinstance(raw, list) else [raw] if raw else []
+    signals: list[dict[str, str]] = []
+    for value in values:
+        repo_id = str(value or "").strip()
+        if re.fullmatch(r"[^/:\s]+/[^/:\s]+", repo_id):
+            signals.append({"repo_id": repo_id, "relation": default_relation,
+                            "source": "hf-card-data", "evidence": "cardData.base_model"})
+    for raw_tag in row.get("tags") or []:
+        tag = str(raw_tag)
+        if not tag.startswith("base_model:"):
+            continue
+        value = tag.removeprefix("base_model:")
+        parts = value.split(":", 1)
+        relation, repo_id = (parts[0], parts[1]) if len(parts) == 2 and parts[0] in BASE_MODEL_RELATIONS | {"distilled"} else (default_relation, value)
+        if re.fullmatch(r"[^/:\s]+/[^/:\s]+", repo_id):
+            signals.append({"repo_id": repo_id, "relation": relation,
+                            "source": "hf-tag", "evidence": tag})
+    return list({(s["repo_id"], s["relation"], s["source"]): s for s in signals}.values())
+
+
+def observed_canonical_references(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Count distinct, unambiguous direct HF base_model references in the sampled pool."""
+    children: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        child_id = str(row.get("id") or "")
+        parents = {signal["repo_id"] for signal in structured_base_model_signals(row)}
+        if not child_id or len(parents) != 1:
+            continue
+        parent_id = next(iter(parents))
+        if parent_id != child_id:
+            children.setdefault(parent_id, {})[child_id] = row
+    return {
+        parent_id: {
+            "direct_references_observed": len(by_id),
+            "active_derivatives_observed": sum(
+                bool(row.get("_trend") and is_hot_local(row))
+                for row in by_id.values()
+            ),
+            "active_derivative_ids": [
+                child_id for child_id, row in sorted(
+                    by_id.items(),
+                    key=lambda value: (
+                        int(value[1].get("trendingScore") or 0),
+                        int(value[1].get("likes") or 0),
+                        value[0],
+                    ),
+                    reverse=True,
+                )
+                if row.get("_trend") and is_hot_local(row)
+            ][:8],
+            "reference_source": "sampled-hf-base-model",
+        }
+        for parent_id, by_id in children.items()
+    }
+
+
+def canonical_model_trace(
+    model_id: str,
+    model_rows: dict[str, dict[str, Any]],
+    declared_canonical: str | None = None,
+    max_depth: int = 4,
+) -> dict[str, Any]:
+    """Trace typed HF base-model edges; stop rather than guess across gaps."""
+    hops: list[dict[str, Any]] = []
+    current = model_id
+    visited = {model_id}
+    for _ in range(max_depth):
+        row = model_rows.get(current)
+        if row is None:
+            status = "parent-unavailable"
+            break
+        signals = structured_base_model_signals(row)
+        parents = sorted({signal["repo_id"] for signal in signals})
+        if len(parents) > 1:
+            return {"status": "ambiguous", "canonical_model": None, "root_model": None,
+                    "declared_canonical": declared_canonical,
+                    "matches_declaration": None, "hops": hops, "alternatives": signals}
+        if not parents:
+            status = "resolved" if hops else "no-structured-parent"
+            break
+        parent = parents[0]
+        edge = [signal for signal in signals if signal["repo_id"] == parent]
+        typed_relations = {signal["relation"] for signal in edge if signal["relation"] != "base_model"}
+        if len(typed_relations) > 1:
+            return {"status": "conflicting-relations", "canonical_model": None, "root_model": None,
+                    "declared_canonical": declared_canonical,
+                    "matches_declaration": None, "hops": hops, "alternatives": edge}
+        chosen = next((signal for signal in edge if signal["relation"] in typed_relations and signal["source"] == "hf-tag"), None)
+        chosen = chosen or next((signal for signal in edge if signal["relation"] in typed_relations), edge[0])
+        hops.append({"from": current, "to": parent, "relation": chosen["relation"],
+                     "source": chosen["source"], "evidence": chosen["evidence"],
+                     "signals": edge})
+        if parent in visited:
+            status = "cycle"
+            break
+        visited.add(parent)
+        current = parent
+    else:
+        status = "depth-limit"
+    root_model = current if status == "resolved" else None
+    if not hops and declared_canonical and declared_canonical != model_id:
+        status = "registry-only" if status == "no-structured-parent" else status
+    path_nodes = [model_id] + [hop["to"] for hop in hops]
+    matches_declaration = (
+        declared_canonical in path_nodes if declared_canonical else None
+    )
+    if status in {"cycle", "ambiguous", "conflicting-relations", "depth-limit"}:
+        canonical = None
+    elif declared_canonical and matches_declaration:
+        canonical = declared_canonical
+    elif declared_canonical:
+        canonical = None
+    elif hops and hops[0]["relation"] in DERIVATIVE_RELATIONS:
+        canonical = hops[0]["to"]
+    else:
+        canonical = None
+    return {"status": status, "canonical_model": canonical,
+            "root_model": root_model,
+            "declared_canonical": declared_canonical,
+            "matches_declaration": matches_declaration,
+            "hops": hops}
+
+
+def attach_canonical_traces(
+    items: list[dict[str, Any]],
+    model_rows: dict[str, dict[str, Any]],
+    fetch_missing: bool = True,
+    max_depth: int = 4,
+) -> dict[str, str]:
+    """Fetch only selected models' structured ancestors and attach auditable paths."""
+    rows = dict(model_rows)
+    frontier = {str(item.get("title") or "") for item in items}
+    expanded: set[str] = set()
+    fetch_errors: dict[str, str] = {}
+    for _ in range(max_depth):
+        targets: set[str] = set()
+        for model_id in frontier - expanded:
+            row = rows.get(model_id)
+            if row is not None:
+                targets.update(signal["repo_id"] for signal in structured_base_model_signals(row))
+        expanded.update(frontier)
+        if not targets:
+            break
+        missing = sorted(targets - rows.keys() - fetch_errors.keys())
+        if missing and fetch_missing:
+            fetched, errors = fetch_many(missing, fetch_model, workers=8)
+            rows.update(fetched)
+            fetch_errors.update(errors)
+        frontier = {target for target in targets if target in rows and target not in expanded}
+        if not frontier:
+            break
+    for item in items:
+        metadata = item.setdefault("metadata", {})
+        model_id = str(item.get("title") or "")
+        declared = str(metadata.get("canonical_model") or "") or None
+        trace = canonical_model_trace(model_id, rows, declared, max_depth=max_depth)
+        if trace["status"] == "parent-unavailable" and trace["hops"]:
+            parent = trace["hops"][-1]["to"]
+            if parent in fetch_errors:
+                trace["fetch_error"] = fetch_errors[parent]
+        metadata["canonical_model_trace"] = trace
+        if trace["canonical_model"]:
+            metadata["canonical_model"] = trace["canonical_model"]
+        else:
+            metadata.pop("canonical_model", None)
+    return fetch_errors
+
+
 def derivation_facets(row: dict[str, Any]) -> list[str]:
     values = {
         relation
@@ -851,6 +1434,8 @@ def derivation_facets(row: dict[str, Any]) -> list[str]:
     }
     if lower_tags(row) & {"adapter", "lora"}:
         values.add("adapter")
+    if lower_tags(row) & {"distilled", "distillation"}:
+        values.add("distilled")
     return sorted(values)
 
 
@@ -901,6 +1486,16 @@ def media_customization_facet(row: dict[str, Any]) -> dict[str, Any]:
             capability = "audio-driven-video"
         elif "video" in outputs and "video" in inputs:
             capability = "video-editing"
+        elif "mask" in outputs and inputs & {"image", "video"}:
+            capability = "segmentation-mask"
+        elif "pose" in outputs and inputs & {"image", "video"}:
+            capability = "pose-extraction"
+        elif "motion" in outputs and "video" in inputs:
+            capability = "motion-extraction"
+        elif "depth" in outputs and inputs & {"image", "video"}:
+            capability = "depth-map"
+        elif outputs & {"face", "landmarks"} and inputs & {"image", "video"}:
+            capability = "face-analysis"
         if capability:
             signals.append(
                 {
@@ -1086,6 +1681,8 @@ def model_metadata(
             "inherited_from": modality_inherited_from,
         },
         "capabilities": capability_facets(row, override),
+        "ecosystem_paths": ecosystem_paths(row, str(record.get("role") or model_role(row)), override),
+        "audio_tasks": audio_tasks(row, override),
         "media_customization": media_customization_facet(row),
         "alignment": alignment_facet(row),
         "deployment": deployment,
@@ -1099,15 +1696,8 @@ def model_metadata(
             "level": family.get("openness", "unknown"),
             "evidence": family.get("evidence", []),
         },
-        "base_models": [model for model, _ in base_model_links(row)],
-        "base_model_dependencies": [
-            {
-                "repo_id": model,
-                "relation": relation or "base_model",
-                "source": "hf-structured",
-            }
-            for model, relation in base_model_links(row)
-        ],
+        "base_models": list(dict.fromkeys(signal["repo_id"] for signal in structured_base_model_signals(row))),
+        "base_model_dependencies": structured_base_model_signals(row),
         "derivation": derivation_facets(row),
         "pipeline_tag": row.get("pipeline_tag") or "",
         "downloads": row.get("downloads") or 0,
@@ -1120,12 +1710,17 @@ def model_metadata(
         "trend": row.get("_trend") or {},
         "selection": record.get("selection", []),
         "pending_registry": bool(record.get("pending_registry")),
+        "embodied_subtype": record.get("subtype"),
+        "ecosystem_activity": record.get("ecosystem_activity") or {},
     }
 
 
 ROLE_LABELS = {
+    "media-conditioning": "媒体控制信号模型",
+    "media-enhancement": "清晰度与分辨率增强模型",
     "llm": "旗舰 LLM",
     "vlm": "旗舰 VLM / 多模态模型",
+    "decision": "结构化决策模型",
     "image-generation": "图像生成模型",
     "video-generation": "视频生成模型",
     "audio-generation": "音频生成模型",
@@ -1134,7 +1729,7 @@ ROLE_LABELS = {
     "ocr": "OCR 模型",
     "translation": "翻译模型",
     "embedding": "Embedding 模型",
-    "robotics": "Robotics 模型",
+    "robotics": "机器人动作模型",
 }
 
 
@@ -1143,6 +1738,9 @@ def event_label(event: str) -> str:
         "published": "新发布",
         "repository-updated": "仓库更新",
         "trending-observed": "当前热门",
+        "derivatives-observed": "当前衍生活跃",
+        "engagement-observed": "当前站内关注",
+        "capability-observed": "专项能力参照",
     }.get(event, event)
 
 
@@ -1178,6 +1776,10 @@ def model_item(
             f"{model_id.split('/')[-1]} 来自{source_label}，"
             f"本窗口内发生{event_label(event_name)}，待纳入注册表确认。"
         )
+    elif track == "ecosystem-baseline":
+        summary = f"{model_id.split('/')[-1]} 是持续观察的机器人模型基线，当前元数据核于 {date}。"
+    elif event_name in {"trending-observed", "derivatives-observed", "engagement-observed", "capability-observed"}:
+        summary = f"{model_id.split('/')[-1]} 是已登记主模型，截至 {date} {event_label(event_name)}。"
     else:
         summary = f"{model_id.split('/')[-1]} 是白名单中的{ROLE_LABELS.get(role, role)}，本窗口内发生{event_label(event_name)}。"
     item = {
@@ -1187,7 +1789,7 @@ def model_item(
         "date": date,
         "event": event_name,
         "source": "Hugging Face Models",
-        "category": role if track in {"flagship", "discovery"} else "local",
+        "category": role if track in {"flagship", "discovery", "ecosystem-baseline"} else "local",
         "metadata": model_metadata(row, record, registry, inherited),
     }
     if track == "discovery":
@@ -1367,6 +1969,15 @@ def popularity_values(row: dict[str, Any]) -> tuple[float, int, int]:
 
 def is_hot_local(row: dict[str, Any]) -> bool:
     trending, downloads, likes = popularity_values(row)
+    if model_role(row) == "robotics":
+        task_ranks = (row.get("_trend") or {}).get("rankings") or {}
+        if any(
+            scope == "task:robotics"
+            and isinstance(value.get("rank"), int)
+            and value["rank"] <= 20
+            for scope, value in task_ranks.items()
+        ) and (downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES):
+            return True
     if model_role(row) in MODALITY_FOCUS_ROLES:
         return trending >= MODALITY_HOT_TRENDING and (
             downloads >= MODALITY_HOT_DOWNLOADS or likes >= MODALITY_HOT_LIKES
@@ -1455,6 +2066,84 @@ def local_signal(
     return None
 
 
+def watched_flagship_items(
+    flagship: dict[str, dict[str, Any]],
+    model_rows: dict[str, dict[str, Any]],
+    references: dict[str, dict[str, Any]],
+    registry: dict[str, Any],
+    start: dt.date,
+    end: dt.date,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Keep active canonical lines visible when their own repository is unchanged."""
+    ranked: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    for model_id, record in flagship.items():
+        row = model_rows.get(model_id)
+        if row is None or event_in_window(row, start, end):
+            continue
+        activity = references.get(model_id) or {}
+        trend = row.get("_trend") or {}
+        ranks = trend.get("rankings") or {}
+        global_rank = (ranks.get("global") or {}).get("rank")
+        task_rank = min(
+            (int(value["rank"]) for scope, value in ranks.items()
+             if scope.startswith("task:") and isinstance(value.get("rank"), int)),
+            default=None,
+        )
+        own_hot = is_hot_local(row) and (
+            isinstance(global_rank, int) and global_rank <= 100
+            or isinstance(task_rank, int) and task_rank <= 20
+            or bool({"hf-rank-rising", "hf-engagement-growing"} & set(trend.get("signals") or []))
+        )
+        audio_engagement = (
+            record.get("role") == "audio-generation"
+            and bool((registry.get("model_overrides") or {}).get(model_id, {}).get("audio_tasks"))
+            and int(row.get("likes") or 0) >= 50
+        )
+        registered_audio_tasks = set(
+            (registry.get("model_overrides") or {}).get(model_id, {}).get("audio_tasks") or []
+        )
+        multimodal_audio_reference = (
+            record.get("role") == "audio-generation"
+            and {"text-to-sfx", "video-to-sfx"} <= registered_audio_tasks
+            and bool({"music-generation", "song-generation"} & registered_audio_tasks)
+        )
+        ref_count = int(activity.get("direct_references_observed") or 0)
+        active_children = activity.get("active_derivative_ids") or []
+        derivative_activity = ref_count >= 3 and bool(active_children)
+        if not own_hot and not audio_engagement and not multimodal_audio_reference and not derivative_activity:
+            continue
+        event_name = (
+            "trending-observed" if own_hot else
+            "engagement-observed" if audio_engagement else
+            "capability-observed" if multimodal_audio_reference else "derivatives-observed"
+        )
+        selection = ["canonical-watch"]
+        if own_hot:
+            selection.append("current-hot")
+        if audio_engagement:
+            selection.append("current-engagement")
+        if multimodal_audio_reference:
+            selection.append("multimodal-audio-reference")
+        if derivative_activity:
+            selection.append("active-derivatives")
+        item = model_item(
+            row,
+            {**record, "selection": selection, "ecosystem_activity": activity},
+            registry,
+            (event_name, end.isoformat()),
+        )
+        score = (
+            bool({"hf-rank-rising", "hf-engagement-growing"} & set(trend.get("signals") or [])),
+            len(active_children),
+            ref_count,
+            int(row.get("trendingScore") or 0),
+            model_id,
+        )
+        ranked.append((score, item))
+    return [item for _, item in sorted(ranked, key=lambda value: value[0], reverse=True)[:limit]]
+
+
 def registered_local_selection(
     row: dict[str, Any],
     event: tuple[str, str] | None,
@@ -1473,8 +2162,13 @@ def registered_local_selection(
 def model_role(row: dict[str, Any], default: str = "unknown") -> str:
     pipeline = str(row.get("pipeline_tag") or "")
     capabilities = set(capability_facets(row))
+    enhancement_tags = {"image-upscaling", "image-super-resolution", "super-resolution", "image-restoration", "deblurring", "video-upscaling", "video-super-resolution", "video-restoration", "frame-interpolation"}
+    if lower_tags(row) & enhancement_tags:
+        return "media-enhancement"
     if "ocr" in capabilities:
         return "ocr"
+    if {"typed-decisions", "structured-prediction"} <= lower_tags(row):
+        return "decision"
     if pipeline == "translation":
         return "translation"
     if pipeline == "sentence-similarity":
@@ -1486,6 +2180,8 @@ def model_role(row: dict[str, Any], default: str = "unknown") -> str:
     modalities = modality_evidence(row)
     inputs = set(modalities["input"])
     outputs = set(modalities["output"])
+    if outputs & {"mask", "pose", "motion", "depth", "face", "landmarks"}:
+        return "media-conditioning"
     if "video" in outputs:
         return "video-generation"
     if "image" in outputs:
@@ -1513,12 +2209,17 @@ def find_local_root(
 ) -> tuple[str, dict[str, Any] | None] | None:
     frontier = [row]
     seen = {str(row.get("id") or "")}
+    roots: set[str] = set()
     for _ in range(max_depth):
         next_frontier: list[dict[str, Any]] = []
         for current in frontier:
-            for base_id, _ in base_model_links(current):
+            links = base_model_links(current)
+            if len({base_id for base_id, _ in links}) > 1:
+                return None
+            for base_id, _ in links:
                 if base_id in root_ids:
-                    return base_id, model_rows.get(base_id)
+                    roots.add(base_id)
+                    continue
                 if not base_id or base_id in seen:
                     continue
                 seen.add(base_id)
@@ -1529,6 +2230,9 @@ def find_local_root(
         if not next_frontier:
             break
         frontier = next_frontier
+    if len(roots) == 1:
+        root = next(iter(roots))
+        return root, model_rows.get(root)
     return None
 
 
@@ -1544,7 +2248,15 @@ def local_discovery_items(
     if not include_persistent_hot:
         return []
     flagship = flagship_index(registry)
-    root_ids = set(flagship) | {str(value) for value in registry.get("local_roots", [])}
+    baseline_records = {
+        str(entry["id"]): {**entry, "role": role}
+        for role, entries in registry.get("ecosystem_baseline_models", {}).items()
+        for entry in entries
+    }
+    root_ids = (set(flagship)
+                | {str(entry["id"]) for entries in registry.get("ecosystem_baseline_models", {}).values()
+                   for entry in entries}
+                | {str(value) for value in registry.get("local_roots", [])})
     local_publishers = {str(value) for value in registry.get("local_publishers", [])}
     items: list[dict[str, Any]] = []
     for row in rows:
@@ -1568,14 +2280,14 @@ def local_discovery_items(
         matched = find_local_root(row, root_ids, model_rows)
         canonical, inherited = matched if matched else (None, None)
         if inherited is None:
-            for base_id, relation in base_model_links(row):
+            direct_links = base_model_links(row)
+            if len({base_id for base_id, _ in direct_links}) == 1:
+                base_id, relation = direct_links[0]
                 base_row = model_rows.get(base_id)
-                if base_row is None:
-                    continue
-                inherited = base_row
-                if relation in DERIVATIVE_RELATIONS:
-                    canonical = base_id
-                break
+                if base_row is not None:
+                    inherited = base_row
+                    if relation in DERIVATIVE_RELATIONS:
+                        canonical = base_id
         publisher = model_id.split("/", 1)[0]
         trusted_publisher = publisher in local_publishers
         breakout = is_breakout_local(row)
@@ -1589,7 +2301,7 @@ def local_discovery_items(
             and not low_refusal
         ):
             continue
-        base_record = flagship.get(str(canonical or ""), {})
+        base_record = flagship.get(str(canonical or ""), baseline_records.get(str(canonical or ""), {}))
         selection = ["hot"]
         if canonical:
             selection.append("flagship-lineage")
@@ -1729,7 +2441,7 @@ def media_customization_items(
     end: dt.date,
     include_current_hot: bool = True,
 ) -> list[dict[str, Any]]:
-    """Build a bounded prefetch pool for the ComfyUI post-image media radar."""
+    """Build a bounded prefetch pool for the ComfyUI media workflow radar."""
     items: list[dict[str, Any]] = []
     for row in rows:
         facet = media_customization_facet(row)
@@ -1742,11 +2454,11 @@ def media_customization_items(
             or "comfyui" not in set(deployment_facets(row))
         ):
             continue
-        # Pure image generation/editing and text-only video generation belong to
-        # the general modality radar. Unknown pipelines remain eligible for a
-        # bounded model-card verification pass because many ComfyUI repositories
-        # omit HF's standard pipeline tag.
-        if structured_outputs and "video" not in structured_outputs:
+        # Conditioning outputs and explicit face-swap editing belong in the
+        # workflow. Generic image generation/editing remains in the model radar.
+        workflow_outputs = {"video", "mask", "pose", "motion", "depth", "face", "landmarks"}
+        image_workflow = bool({"face-swap", "image-enhancement"} & set(facet.get("capabilities") or []))
+        if structured_outputs and not (structured_outputs & workflow_outputs or ("image" in structured_outputs and image_workflow)):
             continue
         if structured_outputs and not (structured_inputs & {"image", "audio", "video"}):
             continue
@@ -1762,7 +2474,7 @@ def media_customization_items(
         if not event:
             continue
         role = model_role(row)
-        selection = ["post-image-media", "pending-registry"]
+        selection = ["media-workflow", "pending-registry"]
         if hot:
             selection.append("hot")
         if activity.get("high_activity"):
@@ -1801,10 +2513,12 @@ def media_customization_items(
     balanced_confirmed: list[dict[str, Any]] = []
     balanced_ids: set[str] = set()
     for lane in (
+        "media-conditioning",
         "image-to-video",
         "character-animation",
         "audio-driven-avatar",
         "video-editing-effects",
+        "media-enhancement",
     ):
         candidate = next(
             (
@@ -1849,6 +2563,9 @@ def build_comfyui_integration_guidance(item: dict[str, Any]) -> dict[str, Any]:
     profile = metadata.get("deployment_profile") or {}
     upstream: list[str] = []
     downstream: list[str] = []
+    if "media-conditioning" in lanes:
+        upstream.extend(["source-image-or-video", "select-subject-or-control-region"])
+        downstream.extend(["mask-pose-depth-or-motion-control", "animation-or-editing-workflow"])
     if "image-to-video" in lanes:
         upstream.extend(["source-image", "resize-crop-or-pad", "image-or-vision-encoder"])
     if "character-animation" in lanes:
@@ -1861,8 +2578,12 @@ def build_comfyui_integration_guidance(item: dict[str, Any]) -> dict[str, Any]:
             ]
         )
     if "video-editing-effects" in lanes:
-        upstream.extend(["source-video", "optional-mask-reference-or-control-signal"])
-    if lanes:
+        upstream.extend(["source-image-or-video", "optional-mask-reference-or-control-signal"])
+    if "media-enhancement" in lanes:
+        upstream.extend(["source-image-or-video", "target-resolution-or-frame-rate"])
+        downstream.extend(["quality-check-at-original-and-output-size", "final-export"])
+    output_modalities = set(modalities.get("output") or [])
+    if "video" in output_modalities or (not output_modalities and lanes - {"media-conditioning"}):
         downstream.extend(
             [
                 "frame-interpolation-if-needed",
@@ -1871,6 +2592,8 @@ def build_comfyui_integration_guidance(item: dict[str, Any]) -> dict[str, Any]:
                 "video-encode",
             ]
         )
+    elif "image" in output_modalities and "video-editing-effects" in lanes:
+        downstream.extend(["face-blend-or-restoration", "image-export-or-video-frame-reassembly"])
     return {
         "input_modalities": list(modalities.get("input") or []),
         "output_modalities": list(modalities.get("output") or []),
@@ -1915,7 +2638,7 @@ def attach_media_discovery_tracks(item: dict[str, Any]) -> dict[str, Any]:
 def finalize_media_customization_items(
     items: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep verified ComfyUI post-image capabilities and balance activity and lanes."""
+    """Keep verified ComfyUI workflow capabilities and balance activity and lanes."""
     eligible: list[dict[str, Any]] = []
     for item in items:
         metadata = item.get("metadata") or {}
@@ -1927,9 +2650,11 @@ def finalize_media_customization_items(
         outputs = set((metadata.get("modalities") or {}).get("output") or [])
         if "comfyui" not in runtimes or not capabilities:
             continue
-        if outputs and "video" not in outputs:
+        workflow_outputs = {"video", "mask", "pose", "motion", "depth", "face", "landmarks"}
+        image_workflow = "image" in outputs and bool({"face-swap", "image-enhancement"} & capabilities)
+        if outputs and not (outputs & workflow_outputs or image_workflow):
             continue
-        if not outputs and not (capabilities & MEDIA_POST_IMAGE_PRIMARY_CAPABILITIES):
+        if not outputs and not (capabilities & MEDIA_WORKFLOW_PRIMARY_CAPABILITIES):
             continue
         if not outputs and not any(
             signal.get("source") in {"model-card", "upstream-model-card"}
@@ -2317,12 +3042,9 @@ def select_diverse_datasets(items: list[dict[str, Any]], limit: int) -> list[dic
 
 def select_notable_discoveries(
     models: list[dict[str, Any]],
-    datasets: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
-    selected_datasets = select_diverse_datasets(datasets, NOTABLE_DATASET_MAX)
-    model_limit = max(0, NOTABLE_DISCOVERY_MAX - len(selected_datasets))
-    selected_models = select_diverse_models(models, model_limit)
-    total = len(selected_models) + len(selected_datasets)
+    selected_models = select_diverse_models(models, NOTABLE_DISCOVERY_MAX)
+    total = len(selected_models)
     if total < NOTABLE_DISCOVERY_MIN:
         missing = NOTABLE_DISCOVERY_MIN - total
         selected_titles = {str(item.get("title") or "") for item in selected_models}
@@ -2332,7 +3054,7 @@ def select_notable_discoveries(
             if str(item.get("title") or "") not in selected_titles
         ][:missing]
         selected_models.extend(extra_models)
-    return {"models": selected_models, "datasets": selected_datasets}
+    return {"models": selected_models}
 
 
 def extract_card_excerpt(text: str) -> str:
@@ -2572,7 +3294,21 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
         for value, pattern in offload_patterns.items()
         if re.search(pattern, lower, flags=re.IGNORECASE)
     }
+    media_spec_evidence = [
+        {
+            "source": "model-card",
+            "evidence": compact_markdown_evidence(html.unescape(line).strip(), 180),
+        }
+        for line in text.splitlines()
+        if re.search(r"\b(?:resolution|upscal(?:e|ing)|super[ -]?resolution|frame[ -]?rate|fps|deblur|restoration)\b", line, re.I)
+        and re.search(r"\b\d{3,4}\s*[x×]\s*\d{3,4}\b|\b\d{3,4}p\b|\b[248]x\b|\b\d{1,3}\s*fps\b", line, re.I)
+    ][:8]
     customization_patterns = {
+        "segmentation-mask": r"\b(?:segment anything|SAM 2|SAM 3|image segmentation|video segmentation|mask generation|object mask|video object segmentation)\b",
+        "pose-extraction": r"\b(?:pose estimation|pose extraction|extract(?:s|ing)? (?:human |body )?pose|body keypoints)\b",
+        "motion-extraction": r"\b(?:motion extraction|extract(?:s|ing)? (?:human |body )?motion|motion capture)\b",
+        "depth-map": r"\b(?:depth estimation|depth map)\b",
+        "face-analysis": r"\b(?:face detection|facial landmarks|face landmarks|face analysis)\b",
         "image-to-video": r"\bimage[ -]to[ -]video\b|\bi2v\b",
         "reference-to-video": r"\breference[ -]to[ -]video\b|\breference image(?:s)?[^\n]{0,80}\bvideo\b",
         "keyframe-control": r"\bfirst[ -](?:and|/)[ -]?last[ -]frame\b|\bstart[ -](?:and|/)[ -]?end[ -]frame\b",
@@ -2588,6 +3324,7 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
         "video-editing": r"\bvideo editing\b|\bvideo[ -]to[ -]video\b",
         "video-effects": r"\bvideo effects?\b|\bvideo (?:inpainting|outpainting|relighting)\b|\b(?:video|frames?)[^\n]{0,40}(?:background|object) replacement\b|\b(?:background|object) replacement[^\n]{0,40}(?:video|frames?)\b",
         "video-enhancement": r"\bframe interpolation\b|\bvideo upscal(?:e|ing)\b|\bvideo enhancement\b",
+        "image-enhancement": r"\b(?:image|photo)[ -]?(?:upscal(?:e|ing)|super[ -]?resolution|restoration)\b|\b(?:deblur(?:ring)?|denois(?:e|ing)) (?:image|photo)\b",
     }
     customization_signals = [
         {
@@ -2677,6 +3414,7 @@ def extract_media_deployment_evidence(text: str) -> dict[str, Any]:
         "steps": sorted(step_values),
         "step_evidence": step_evidence,
         "offload": sorted(offload),
+        "media_specs": {"evidence": media_spec_evidence} if media_spec_evidence else {},
         "dependencies": dependencies,
         "referenced_files": sorted(referenced_files)[:64],
         "customization": {
@@ -3006,6 +3744,7 @@ def build_media_deployment_profile(
             )[:8],
         },
         "offload": list(card_evidence.get("offload") or []),
+        "media_specs": card_evidence.get("media_specs") or {},
         "dependencies": dependencies,
         "footprint": {
             "repository_bytes": sum(int(row.get("size") or 0) for row in files),
@@ -3101,17 +3840,11 @@ def fetch_hf_change_evidence(
     return {"source": "Hugging Face commit history", "ok": True, "commits": commits}
 
 
-def needs_media_deployment_profile(item: dict[str, Any]) -> bool:
-    if str(item.get("repo_type") or "model") != "model":
-        return False
-    metadata = item.get("metadata") or {}
-    return (
-        str(metadata.get("role") or "") in MEDIA_DEPLOYMENT_ROLES
-        or bool(metadata.get("media_customization"))
-        or bool(
-            set(metadata.get("deployment") or []) & MEDIA_PROFILE_RUNTIME_TAGS
-        )
-    )
+def needs_artifact_profile(item: dict[str, Any]) -> bool:
+    # File sizes are a report field for every formal model, including LLM,
+    # speech and decision checkpoints. The profile also carries media-only
+    # details when the repository provides them.
+    return str(item.get("repo_type") or "model") == "model"
 
 
 def enrich_items_with_cards(
@@ -3160,7 +3893,7 @@ def enrich_items_with_cards(
                     )
                     break
         item["metadata"]["card"] = card
-        if needs_media_deployment_profile(item):
+        if needs_artifact_profile(item):
             repository = fetch_model_repository_files(repo_id)
             item["metadata"]["deployment_profile"] = build_media_deployment_profile(
                 item["metadata"], repository, deployment_evidence
@@ -3208,14 +3941,12 @@ def enrich_items_with_cards(
 def enrich_formal_groups(
     flagship_groups: dict[str, list[dict[str, Any]]],
     local_items: list[dict[str, Any]],
-    dataset_items: list[dict[str, Any]],
     notable_discoveries: dict[str, list[dict[str, Any]]],
     media_customization: list[dict[str, Any]],
     start: dt.date,
     end: dt.date,
 ) -> tuple[
     dict[str, list[dict[str, Any]]],
-    list[dict[str, Any]],
     list[dict[str, Any]],
     dict[str, list[dict[str, Any]]],
     list[dict[str, Any]],
@@ -3226,9 +3957,7 @@ def enrich_formal_groups(
     batches.extend(
         [
             ("local", None, local_items),
-            ("datasets", None, dataset_items),
             ("notable", "models", notable_discoveries["models"]),
-            ("notable", "datasets", notable_discoveries["datasets"]),
             ("media-customization", None, media_customization),
         ]
     )
@@ -3237,8 +3966,7 @@ def enrich_formal_groups(
 
     enriched_flagship = {role: [] for role in flagship_groups}
     enriched_local: list[dict[str, Any]] = []
-    enriched_datasets: list[dict[str, Any]] = []
-    enriched_notable = {"models": [], "datasets": []}
+    enriched_notable = {"models": []}
     enriched_media_customization: list[dict[str, Any]] = []
     cursor = 0
     for group, key, rows in batches:
@@ -3248,8 +3976,6 @@ def enrich_formal_groups(
             enriched_flagship[key] = batch
         elif group == "local":
             enriched_local = batch
-        elif group == "datasets":
-            enriched_datasets = batch
         elif group == "notable" and key is not None:
             enriched_notable[key] = batch
         elif group == "media-customization":
@@ -3257,7 +3983,6 @@ def enrich_formal_groups(
     return (
         enriched_flagship,
         enriched_local,
-        enriched_datasets,
         enriched_notable,
         enriched_media_customization,
     )
@@ -3792,6 +4517,16 @@ def select_popular_derivatives(items: list[dict[str, Any]]) -> list[dict[str, An
         if len(covered_publishers) >= LOCAL_PUBLISHER_COVERAGE_MAX:
             break
 
+    covered_roles = {
+        str((item.get("metadata") or {}).get("role") or "") for item in selected
+    }
+    for item in ranked:
+        role = str((item.get("metadata") or {}).get("role") or "")
+        if role and role not in covered_roles and add(item):
+            covered_roles.add(role)
+        if len(selected) >= LOCAL_REPORT_MAX:
+            return sort_local_items(selected)
+
     for facet in ["merge", "finetune", "adapter", "gguf", "mlx", "on-device", "quantized"]:
         for item in ranked:
             if facet in facets(item) and add(item):
@@ -3884,15 +4619,6 @@ def coverage_diagnostics(groups: dict[str, Any]) -> dict[str, Any]:
         for item in items
         if item.get("title")
     }
-    dataset_items = groups["datasets"]
-    notable_datasets = groups["notable_discoveries"]["datasets"]
-    dataset_titles = {
-        str(item.get("title") or "")
-        for item in dataset_items + notable_datasets
-        if item.get("title")
-    }
-    reproducible = groups["reproducible"]
-    coverage_keys = ("data", "training", "model", "evaluation", "deployment")
     return {
         "models_by_group_and_role": {
             name: count_by_model_role(items) for name, items in model_groups.items()
@@ -3905,19 +4631,6 @@ def coverage_diagnostics(groups: dict[str, Any]) -> dict[str, Any]:
         "media_by_discovery_track": count_metadata_values(
             media_items, "discovery_tracks"
         ),
-        "reproducible_projects": len({item.get("title") for item in reproducible}),
-        "reproducible_by_component": {
-            key: sum(
-                bool(((item.get("metadata") or {}).get("coverage") or {}).get(key))
-                for item in reproducible
-            )
-            for key in coverage_keys
-        },
-        "datasets_by_group": {
-            "registered": len(dataset_items),
-            "notable_discoveries": len(notable_datasets),
-            "unique_repositories": len(dataset_titles),
-        },
     }
 
 
@@ -3981,15 +4694,26 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
     else:
         keys = (
             "selection",
+            "domains",
+            "methods",
+            "entry",
+            "sample_unit",
+            "evidence",
+            "stars",
             "uses",
             "roles",
             "related_models",
             "related_projects",
             "size",
             "role",
+            "family",
             "canonical_model",
+            "canonical_model_trace",
+            "capabilities",
+            "ecosystem_paths",
             "modalities",
             "role_evidence",
+            "audio_tasks",
             "media_customization",
             "comfyui_integration",
             "activity_density",
@@ -4009,6 +4733,8 @@ def report_item(item: dict[str, Any]) -> dict[str, Any]:
             "likes",
             "trend",
             "pending_registry",
+            "embodied_subtype",
+            "ecosystem_activity",
         )
         for key in keys:
             if metadata.get(key) not in (None, "", [], {}):
@@ -4028,25 +4754,33 @@ def build_report_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "kind": payload["kind"],
         "window": payload["window"],
+        "ecosystem_architecture": payload.get("ecosystem_architecture", []),
+        "development_baselines": payload.get("development_baselines", {}),
         "groups": {
             "flagship": {
                 role: [report_item(item) for item in items]
                 for role, items in groups["flagship"].items()
             },
             "local": [report_item(item) for item in groups["local"]],
-            "reproducible": [report_item(item) for item in groups["reproducible"]],
-            "datasets": [report_item(item) for item in groups["datasets"]],
             "notable_discoveries": {
                 "models": [
                     report_item(item) for item in groups["notable_discoveries"]["models"]
-                ],
-                "datasets": [
-                    report_item(item) for item in groups["notable_discoveries"]["datasets"]
                 ],
             },
             "media_customization": [
                 report_item(item) for item in groups.get("media_customization", [])
             ],
+            "ecosystem_baselines": {
+                role: [report_item(item) for item in items]
+                for role, items in groups.get("ecosystem_baselines", {}).items()
+            },
+            "development": {
+                **{
+                    kind: [report_item(item) for item in groups.get("development", {}).get(kind, [])]
+                    for kind in ("tools", "datasets")
+                },
+                "opportunities": groups.get("development", {}).get("opportunities", []),
+            },
         },
     }
 
@@ -4073,7 +4807,7 @@ def emit_compact_payload(payload: dict[str, Any], output: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Collect registered and notable Hugging Face model and dataset updates in a fixed 7-day window."
+        description="Collect registered and notable Hugging Face model updates in a fixed 7-day window."
     )
     parser.add_argument("--date", help="Window start date, YYYY-MM-DD")
     parser.add_argument("--output", help="Write candidate JSON to this path; stdout when omitted")
@@ -4120,13 +4854,11 @@ def main() -> int:
     observed_at = dt.datetime.now(dt.timezone.utc).isoformat()
 
     model_registry = load_json(MODEL_REGISTRY_PATH)
-    project_registry = load_json(PROJECT_REGISTRY_PATH)
-    dataset_registry = load_json(DATASET_REGISTRY_PATH)
-    validate_registries(model_registry, project_registry, dataset_registry)
+    development_baselines = load_json(DEVELOPMENT_BASELINES_PATH)
+    validate_registries(model_registry, {"projects": []}, {"datasets": []})
+    validate_ecosystem_baselines(ECOSYSTEM_ARCHITECTURE, development_baselines)
     flagship = flagship_index(model_registry)
     local = local_index(model_registry)
-    project_model_ids, project_dataset_ids = artifact_specs(project_registry)
-    dataset_records = {str(entry["id"]): entry for entry in dataset_registry.get("datasets", [])}
     official_owners = list(
         dict.fromkeys(str(entry["owner"]) for entry in model_registry.get("families", []))
     )
@@ -4147,29 +4879,25 @@ def main() -> int:
     )
 
     phase_started = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         owner_future = executor.submit(query_owner_models, owners, start)
+        development_future = executor.submit(development_updates, development_baselines, start, end)
+        opportunity_future = (
+            executor.submit(development_opportunities, development_baselines)
+            if include_current_hot else None
+        )
         local_future = executor.submit(query_local_candidates) if include_current_hot else None
         modality_future = executor.submit(query_modality_candidates) if include_current_hot else None
         media_ecosystem_future = (
             executor.submit(query_media_ecosystem_candidates) if include_current_hot else None
         )
         global_future = executor.submit(query_global_models) if include_current_hot else None
-        dataset_future = executor.submit(
-            query_dataset_candidates,
-            official_owners,
-            include_current_hot,
-        )
-        project_url_future = executor.submit(query_project_urls, project_registry, start, end)
-        github_metrics_future = (
-            executor.submit(query_github_metrics, project_registry) if include_current_hot else None
-        )
         owner_rows_list, owner_coverage, owner_errors = owner_future.result()
         local_candidates = local_future.result() if local_future else []
         modality_candidates, modality_query_counts, modality_errors, modality_trending_scopes = (
             modality_future.result()
             if modality_future
-            else ([], {role: 0 for role in MODALITY_FOCUS_ROLES}, {}, {})
+            else ([], {role: 0 for role in MODALITY_QUERY_FILTERS}, {}, {})
         )
         media_ecosystem_candidates, media_ecosystem_counts, media_ecosystem_errors = (
             media_ecosystem_future.result()
@@ -4188,16 +4916,17 @@ def main() -> int:
         global_trending, global_recent, global_errors = (
             global_future.result() if global_future else ([], [], {})
         )
-        dataset_candidates, dataset_query_counts, dataset_query_errors = dataset_future.result()
-        project_url_rows, project_url_errors = project_url_future.result()
-        github_metrics, github_metric_errors = (
-            github_metrics_future.result() if github_metrics_future else ({}, {})
-        )
+        development_items, development_sources = development_future.result()
+        if opportunity_future:
+            opportunities, opportunity_source = opportunity_future.result()
+            development_items["opportunities"] = opportunities
+            development_sources["local_training_opportunities"] = opportunity_source
+        else:
+            development_items["opportunities"] = []
     timings["candidate_queries"] = time.perf_counter() - phase_started
 
     model_trending_scopes = {"global": global_trending, **modality_trending_scopes}
     annotate_trending_deltas(model_trending_scopes, previous_snapshot, observed_at)
-    annotate_github_deltas(github_metrics, previous_snapshot, observed_at)
     trend_by_model_id = {
         str(row.get("id") or ""): row.get("_trend") or {}
         for rows in model_trending_scopes.values()
@@ -4225,7 +4954,13 @@ def main() -> int:
         for row in open_candidates
         if row.get("id")
     }
-    relevant_model_ids = list(flagship) + list(local) + project_model_ids
+    baseline_registry = model_registry.get("ecosystem_baseline_models", {})
+    baseline_specs = {
+        str(entry["id"]): {**entry, "role": role, "track": "flagship"}
+        for role, entries in baseline_registry.items()
+        for entry in entries
+    }
+    relevant_model_ids = list(flagship) + list(local) + (list(baseline_specs) if include_current_hot else [])
     requested_model_ids: list[str] = []
     for model_id in dict.fromkeys(relevant_model_ids):
         if model_id in cached_model_rows:
@@ -4235,27 +4970,12 @@ def main() -> int:
             continue
         requested_model_ids.append(model_id)
 
-    dataset_candidate_rows = {
-        str(row.get("id") or ""): row
-        for row in dataset_candidates
-        if row.get("id")
-    }
-    requested_dataset_ids = [
-        dataset_id
-        for dataset_id in dict.fromkeys(list(dataset_records) + project_dataset_ids)
-        if dataset_id not in dataset_candidate_rows
-    ]
-
     phase_started = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        model_future = executor.submit(fetch_many, requested_model_ids, fetch_model)
-        dataset_exact_future = executor.submit(fetch_many, requested_dataset_ids, fetch_dataset)
-        exact_model_rows, exact_model_errors = model_future.result()
-        exact_dataset_rows, exact_dataset_errors = dataset_exact_future.result()
+    exact_model_rows, exact_model_errors = fetch_many(requested_model_ids, fetch_model)
     timings["exact_fetches"] = time.perf_counter() - phase_started
 
     model_rows = {**cached_model_rows, **exact_model_rows}
-    dataset_rows = {**dataset_candidate_rows, **exact_dataset_rows}
+    canonical_references = observed_canonical_references(open_candidates) if include_current_hot else {}
     model_errors = {
         **owner_errors,
         **modality_errors,
@@ -4263,16 +4983,45 @@ def main() -> int:
         **global_errors,
         **exact_model_errors,
     }
-    dataset_errors = {**dataset_query_errors, **exact_dataset_errors}
-    github_errors = {**project_url_errors, **github_metric_errors}
 
     phase_started = time.perf_counter()
     flagship_groups: dict[str, list[dict[str, Any]]] = {role: [] for role in FLAGSHIP_ROLES}
-    for model_id, record in flagship.items():
+    monitored_flagships = {
+        **flagship,
+        **(baseline_specs if include_current_hot else {}),
+    }
+    for model_id, record in monitored_flagships.items():
         row = model_rows.get(model_id)
         event = event_in_window(row or {}, start, end)
         if row is not None and event:
-            flagship_groups[record["role"]].append(model_item(row, record, model_registry, event))
+            flagship_groups[record["role"]].append(model_item(
+                row,
+                {**record, "ecosystem_activity": canonical_references.get(model_id) or {}},
+                model_registry,
+                event,
+            ))
+    if include_current_hot:
+        audio_flagships = {
+            model_id: record for model_id, record in flagship.items()
+            if record.get("role") == "audio-generation"
+        }
+        other_flagships = {
+            model_id: record for model_id, record in flagship.items()
+            if record.get("role") != "audio-generation"
+        }
+        for monitored, limit in (
+            (other_flagships, 8),
+            (audio_flagships, len(audio_flagships)),
+            (baseline_specs, len(baseline_specs)),
+        ):
+            for item in watched_flagship_items(
+                monitored, model_rows, canonical_references, model_registry, start, end, limit
+            ):
+                flagship_groups[str((item.get("metadata") or {}).get("role"))].append(item)
+
+    ecosystem_baselines: dict[str, list[dict[str, Any]]] = {
+        role: [] for role in baseline_registry
+    }
 
     local_items: list[dict[str, Any]] = []
     for model_id, record in local.items():
@@ -4299,7 +5048,7 @@ def main() -> int:
             )
         )
 
-    known_ids = set(flagship) | set(local)
+    known_ids = set(flagship) | set(local) | set(baseline_specs)
     local_items.extend(
         local_discovery_items(
             open_candidates,
@@ -4313,61 +5062,26 @@ def main() -> int:
     )
     local_items = list({item["title"]: item for item in local_items}.values())
 
-    dataset_items: list[dict[str, Any]] = []
-    for dataset_id, record in dataset_records.items():
-        row = dataset_rows.get(dataset_id)
-        event = event_in_window(row or {}, start, end)
-        priority = bool(record.get("priority"))
-        technical = bool(record.get("roles") or record.get("related_projects"))
-        hot = include_current_hot and is_hot_dataset(row or {})
-        if row is not None and event and (hot or priority or technical):
-            selection = (["priority"] if priority else []) + (["hot"] if hot else [])
-            if technical:
-                selection.append("technical-artifact")
-            dataset_items.append(dataset_item(row, {**record, "selection": selection}, event))
-
-    reproducible_items = project_items(
-        project_registry,
-        model_rows,
-        dataset_rows,
-        project_url_rows,
-        start,
-        end,
-        github_metrics,
-    )
-    reproducible_items = enrich_project_change_evidence(reproducible_items, start, end)
-    known_dataset_ids = set(dataset_records)
     model_discoveries = model_discovery_items(
         open_candidates,
-        known_ids | set(project_model_ids),
+        known_ids,
         model_registry,
         start,
         end,
         allow_unregistered_hot=include_current_hot,
     )
-    dataset_discoveries = new_dataset_items(
-        dataset_candidates,
-        known_dataset_ids | set(project_dataset_ids),
-        set(official_owners),
-        start,
-        end,
-        allow_hot_discovery=include_current_hot,
-    )
     if not include_current_hot:
         for rows in flagship_groups.values():
             strip_live_popularity(rows)
         strip_live_popularity(local_items)
-        strip_live_popularity(dataset_items)
         strip_live_popularity(model_discoveries)
-        strip_live_popularity(dataset_discoveries)
     discoveries = sorted(
-        model_discoveries + dataset_discoveries,
+        model_discoveries,
         key=lambda item: (item.get("date", ""), item.get("title", "")),
         reverse=True,
     )
     notable_discoveries = select_notable_discoveries(
         model_discoveries,
-        dataset_discoveries,
     )
     media_radar_rows = list(
         {
@@ -4392,32 +5106,46 @@ def main() -> int:
 
     flagship_groups = {role: sort_items(rows) for role, rows in flagship_groups.items()}
     local_items = select_popular_derivatives(collapse_local_variants(local_items))
-    dataset_items = sort_popular_items(dataset_items)
-    timings["selection_and_project_evidence"] = time.perf_counter() - phase_started
+    timings["selection"] = time.perf_counter() - phase_started
     phase_started = time.perf_counter()
     (
         flagship_groups,
         local_items,
-        dataset_items,
         notable_discoveries,
         media_customization,
     ) = enrich_formal_groups(
         flagship_groups,
         local_items,
-        dataset_items,
         notable_discoveries,
         media_customization,
         start,
         end,
     )
     media_customization = finalize_media_customization_items(media_customization)
+    primary_ids = {
+        str(item.get("title") or "")
+        for rows in list(flagship_groups.values()) + [local_items, notable_discoveries["models"]]
+        for item in rows
+    }
+    media_customization = [
+        item for item in media_customization
+        if str(item.get("title") or "") not in primary_ids
+    ]
+    formal_model_items = [
+        item
+        for rows in list(flagship_groups.values())
+        + list(ecosystem_baselines.values())
+        + [local_items, notable_discoveries["models"], media_customization]
+        for item in rows
+    ]
+    lineage_fetch_errors = attach_canonical_traces(formal_model_items, model_rows)
     timings["formal_enrichment"] = time.perf_counter() - phase_started
     flagship_count = sum(len(rows) for rows in flagship_groups.values())
     notable_model_count = len(notable_discoveries["models"])
-    notable_dataset_count = len(notable_discoveries["datasets"])
     profiled_model_items = [
         item
         for rows in list(flagship_groups.values())
+        + list(ecosystem_baselines.values())
         + [local_items, notable_discoveries["models"], media_customization]
         for item in rows
         if (item.get("metadata") or {}).get("deployment_profile")
@@ -4437,35 +5165,34 @@ def main() -> int:
     selected_groups = {
         "flagship": flagship_groups,
         "local": local_items,
-        "reproducible": reproducible_items,
-        "datasets": dataset_items,
         "notable_discoveries": notable_discoveries,
         "media_customization": media_customization,
+        "ecosystem_baselines": ecosystem_baselines,
+        "development": development_items,
     }
+    architecture_summary = [
+        {
+            "id": ecosystem["id"],
+            "label": ecosystem["label"],
+            "stages": [
+                {key: stage[key] for key in ("id", "label", "input", "output", "upstream") if key in stage}
+                for stage in ecosystem["stages"]
+            ],
+        }
+        for ecosystem in ECOSYSTEM_ARCHITECTURE["ecosystems"]
+    ]
     payload = {
         "kind": "ai-oss-models",
         "window": {"start": start.isoformat(), "end": end.isoformat()},
+        "ecosystem_architecture": architecture_summary,
+        "development_baselines": development_baselines,
         "sources": {
             "huggingface_models": source_status(
                 model_rows,
                 model_errors,
                 flagship_count + len(local_items) + notable_model_count,
             ),
-            "huggingface_datasets": source_status(
-                dataset_rows,
-                dataset_errors,
-                len(dataset_items) + notable_dataset_count,
-            ),
-            "github_projects": source_status(
-                {**project_url_rows, **github_metrics},
-                github_errors,
-                sum(
-                    1
-                    for item in reproducible_items
-                    for artifact in (item.get("metadata") or {}).get("artifacts", [])
-                    if str(artifact.get("url") or "").startswith("https://github.com/")
-                ),
-            ),
+            **development_sources,
         },
         "diagnostics": {
             "owner_candidates": len(owner_rows_list),
@@ -4497,14 +5224,13 @@ def main() -> int:
                 in set((item.get("metadata") or {}).get("discovery_tracks") or [])
                 for item in media_customization
             ),
-            "dataset_trending_candidates": dataset_query_counts.get("trending", 0),
-            "dataset_recent_candidates": dataset_query_counts.get("recent", 0),
-            "dataset_official_owner_candidates": dataset_query_counts.get("official_owner", 0),
-            "dataset_candidate_union": dataset_query_counts.get("union", 0),
-            "project_url_candidates": len(project_url_rows),
-            "github_metric_repositories": len(github_metrics),
             "deployment_profile_models": len(profiled_model_items),
             "deployment_profile_repository_errors": deployment_profile_errors,
+            "canonical_trace_statuses": dict(Counter(
+                ((item.get("metadata") or {}).get("canonical_model_trace") or {}).get("status", "missing")
+                for item in formal_model_items
+            )),
+            "canonical_trace_fetch_errors": lineage_fetch_errors,
             "coverage": coverage_diagnostics(selected_groups),
         },
         "groups": selected_groups,
@@ -4518,16 +5244,10 @@ def main() -> int:
             args.report_output,
         )
     if args.date is None and global_trending and snapshot_path is not None:
-        snapshot_github = github_snapshot_metrics(
-            project_registry,
-            github_metrics,
-            previous_snapshot,
-        )
         write_trending_snapshot_safely(
             snapshot_path,
             model_trending_scopes,
             observed_at,
-            snapshot_github,
         )
 
     timings["total"] = time.perf_counter() - run_started
@@ -4538,16 +5258,12 @@ def main() -> int:
                     "window": payload["window"],
                     "flagship": {role: len(rows) for role, rows in flagship_groups.items()},
                     "local": len(local_items),
-                    "reproducible": len(reproducible_items),
-                    "datasets": len(dataset_items),
                     "notable_discoveries": {
                         "models": notable_model_count,
-                        "datasets": notable_dataset_count,
-                        "total": notable_model_count + notable_dataset_count,
+                        "total": notable_model_count,
                     },
                     "discoveries": len(discoveries),
                     "exact_model_queries": len(requested_model_ids),
-                    "exact_dataset_queries": len(requested_dataset_ids),
                     "report_output_bytes": report_output_bytes,
                     "timings_seconds": {
                         key: round(value, 3) for key, value in timings.items()

@@ -2,6 +2,7 @@ import contextlib
 import datetime as dt
 import importlib.util
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,6 +30,420 @@ def model_row(model_id, **overrides):
     }
     row.update(overrides)
     return row
+
+
+class CanonicalActivityTests(unittest.TestCase):
+    def test_registered_audio_tasks_keep_distinct_old_models_visible(self):
+        registry = {"families": [], "model_overrides": {
+            "Lab/SoundEffect": {"audio_tasks": ["text-to-sfx"]},
+            "Lab/Song": {"audio_tasks": ["song-generation"]},
+            "Lab/Singer": {"audio_tasks": ["singing-conversion"]},
+        }, "local_publishers": []}
+        rows = {
+            model_id: model_row(model_id, pipeline_tag="text-to-audio",
+                                trendingScore=1, downloads=0, likes=80)
+            for model_id in registry["model_overrides"]
+        }
+        watched = MODULE.watched_flagship_items(
+            {model_id: {"id": model_id, "role": "audio-generation", "track": "flagship"}
+             for model_id in rows}, rows, {}, registry,
+            dt.date(2026, 9, 23), dt.date(2026, 9, 29), 3,
+        )
+        self.assertEqual({item["title"] for item in watched}, set(rows))
+        self.assertTrue(all(item["event"] == "engagement-observed" for item in watched))
+        self.assertEqual(
+            {task for item in watched for task in item["metadata"]["audio_tasks"]["tasks"]},
+            {"text-to-sfx", "song-generation", "singing-conversion"},
+        )
+
+    def test_multimodal_audio_reference_has_its_own_event(self):
+        model_id = "Lab/MultimodalAudio"
+        registry = {"families": [], "model_overrides": {model_id: {
+            "audio_tasks": ["text-to-sfx", "video-to-sfx", "music-generation"]
+        }}, "local_publishers": []}
+        row = model_row(model_id, pipeline_tag="text-to-audio",
+                        trendingScore=0, downloads=22, likes=4)
+        watched = MODULE.watched_flagship_items(
+            {model_id: {"id": model_id, "role": "audio-generation", "track": "flagship"}},
+            {model_id: row}, {}, registry,
+            dt.date(2026, 9, 23), dt.date(2026, 9, 29),
+        )
+        self.assertEqual(watched[0]["event"], "capability-observed")
+        self.assertIn("multimodal-audio-reference", watched[0]["metadata"]["selection"])
+
+    def test_vla_baseline_with_robotics_task_rank_is_watched(self):
+        parent = model_row(
+            "lerobot/smolvla_base", pipeline_tag="robotics",
+            trendingScore=3, downloads=72_093, likes=451,
+            _trend={"rankings": {"task:robotics": {"rank": 7}}},
+        )
+        self.assertTrue(MODULE.is_hot_local(parent))
+        watched = MODULE.watched_flagship_items(
+            {parent["id"]: {"id": parent["id"], "role": "robotics", "track": "flagship"}},
+            {parent["id"]: parent}, {},
+            {"families": [], "model_overrides": {}, "local_publishers": []},
+            dt.date(2026, 9, 22), dt.date(2026, 9, 28),
+        )
+        self.assertEqual([item["title"] for item in watched], [parent["id"]])
+        self.assertEqual(watched[0]["event"], "trending-observed")
+
+    def test_vla_child_inherits_robotics_role_from_registered_baseline(self):
+        registry = {
+            "families": [], "model_overrides": {}, "local_publishers": [],
+            "flagship_models": {},
+            "ecosystem_baseline_models": {"robotics": [
+                {"id": "lerobot/smolvla_base", "family": "lerobot", "subtype": "vla-policy"}
+            ]},
+        }
+        parent = model_row("lerobot/smolvla_base", pipeline_tag="robotics")
+        child = model_row(
+            "Community/SmolVLA-Adapter", pipeline_tag="robotics",
+            tags=["base_model:adapter:lerobot/smolvla_base"],
+            _trend={"rankings": {"task:robotics": {"rank": 8}}},
+        )
+        items = MODULE.local_discovery_items(
+            [child], registry, {parent["id"]: parent, child["id"]: child},
+            dt.date(2026, 9, 22), dt.date(2026, 9, 28), {parent["id"]},
+        )
+        self.assertEqual([item["title"] for item in items], [child["id"]])
+        self.assertEqual(items[0]["metadata"]["role"], "robotics")
+        self.assertEqual(items[0]["metadata"]["canonical_model"], parent["id"])
+
+    def test_hot_vla_derivative_keeps_task_coverage_at_global_limit(self):
+        items = [
+            {"title": f"Publisher{index}/LLM-{index}", "date": "2026-09-28",
+             "metadata": {"role": "llm", "trendingScore": 100 - index,
+                          "likes": 100, "downloads": 10_000, "selection": ["hot"]}}
+            for index in range(25)
+        ]
+        items.append({
+            "title": "Community/SmolVLA-Adapter", "date": "2026-09-28",
+            "metadata": {"role": "robotics", "trendingScore": 4,
+                         "likes": 30, "downloads": 1_000, "selection": ["hot"],
+                         "derivation": ["adapter"]},
+        })
+        selected = MODULE.select_popular_derivatives(items)
+        self.assertEqual(len(selected), MODULE.LOCAL_REPORT_MAX)
+        self.assertIn("Community/SmolVLA-Adapter", {item["title"] for item in selected})
+
+    def test_sampled_direct_references_keep_unchanged_canonical_visible(self):
+        parent = model_row("Lab/Base", trendingScore=0, downloads=0, likes=0)
+        children = [
+            model_row(
+                f"Community/Variant-{index}",
+                tags=["base_model:finetune:Lab/Base"],
+                _trend={"rank": index + 1, "signals": ["hf-global-trending"]}
+                if index == 0 else {},
+            )
+            for index in range(3)
+        ]
+        references = MODULE.observed_canonical_references([parent, *children])
+        self.assertEqual(references["Lab/Base"]["direct_references_observed"], 3)
+        self.assertEqual(references["Lab/Base"]["active_derivative_ids"], ["Community/Variant-0"])
+        watched = MODULE.watched_flagship_items(
+            {"Lab/Base": {"id": "Lab/Base", "role": "llm", "track": "flagship"}},
+            {"Lab/Base": parent},
+            references,
+            {"families": [], "model_overrides": {}, "local_publishers": []},
+            dt.date(2026, 8, 9),
+            dt.date(2026, 8, 15),
+        )
+        self.assertEqual([item["title"] for item in watched], ["Lab/Base"])
+        self.assertEqual(watched[0]["event"], "derivatives-observed")
+        self.assertEqual(watched[0]["metadata"]["ecosystem_activity"]["direct_references_observed"], 3)
+
+    def test_single_snapshot_does_not_claim_growth_or_persistent_hot(self):
+        parent = model_row("Lab/Base", trendingScore=30, downloads=5_000, likes=50)
+        watched = MODULE.watched_flagship_items(
+            {"Lab/Base": {"id": "Lab/Base", "role": "llm", "track": "flagship"}},
+            {"Lab/Base": parent}, {},
+            {"families": [], "model_overrides": {}, "local_publishers": []},
+            dt.date(2026, 8, 9), dt.date(2026, 8, 15),
+        )
+        self.assertEqual(watched, [])
+        parent["_trend"] = {"rankings": {"global": {"rank": 40}}, "signals": ["hf-global-trending"]}
+        watched = MODULE.watched_flagship_items(
+            {"Lab/Base": {"id": "Lab/Base", "role": "llm", "track": "flagship"}},
+            {"Lab/Base": parent}, {},
+            {"families": [], "model_overrides": {}, "local_publishers": []},
+            dt.date(2026, 8, 9), dt.date(2026, 8, 15),
+        )
+        self.assertEqual(watched[0]["event"], "trending-observed")
+        self.assertNotIn("hf-engagement-growing", watched[0]["metadata"]["trend"]["signals"])
+
+
+class EcosystemArchitectureTests(unittest.TestCase):
+    def test_essential_trunks_drive_queries_and_evidence_paths(self):
+        self.assertEqual(
+            [entry["id"] for entry in MODULE.ECOSYSTEM_ARCHITECTURE["ecosystems"]],
+            ["llm-vlm", "media", "speech", "decision", "music", "embodied"],
+        )
+        self.assertIn("image-upscaling", MODULE.MEDIA_CUSTOMIZATION_QUERY_FILTERS)
+        self.assertIn("mask-generation", MODULE.MODALITY_QUERY_FILTERS["media-conditioning"])
+        self.assertIn("text-to-audio", MODULE.MODALITY_QUERY_FILTERS["audio-generation"])
+        self.assertIn("robotics", MODULE.MODALITY_QUERY_FILTERS["robotics"])
+        self.assertIn("robotics", MODULE.MODALITY_FOCUS_ROLES)
+        sam = MODULE.ecosystem_paths(
+            model_row("Example/SAM", pipeline_tag="mask-generation"), "media-conditioning"
+        )
+        self.assertIn(("media", "conditioning"), {(path["ecosystem"], path["stage"]) for path in sam})
+        decision = MODULE.ecosystem_paths(model_row("Example/JEV"), "decision")
+        self.assertIn(("decision", "native-prediction"), {(path["ecosystem"], path["stage"]) for path in decision})
+        music = MODULE.ecosystem_paths(
+            model_row("Example/SFX", pipeline_tag="text-to-audio"),
+            "audio-generation",
+            {"audio_tasks": ["text-to-sfx"]},
+        )
+        self.assertIn(("music", "sound-effect"), {(path["ecosystem"], path["stage"]) for path in music})
+        video_quant = MODULE.ecosystem_paths(
+            model_row("Example/VideoQ", pipeline_tag="image-to-video", tags=["gguf"]),
+            "video-generation",
+        )
+        self.assertIn(("media", "local-derivative"), {(path["ecosystem"], path["stage"]) for path in video_quant})
+        self.assertNotIn(("llm-vlm", "local-derivative"), {(path["ecosystem"], path["stage"]) for path in video_quant})
+        vla = MODULE.ecosystem_paths(
+            model_row("Example/VLA", pipeline_tag="robotics", tags=["vision-language-action"]),
+            "robotics",
+        )
+        self.assertIn(("embodied", "vla-policy"), {(path["ecosystem"], path["stage"]) for path in vla})
+        generic = MODULE.ecosystem_paths(model_row("Example/Robot", pipeline_tag="robotics"), "robotics")
+        self.assertNotIn(("embodied", "vla-policy"), {(path["ecosystem"], path["stage"]) for path in generic})
+
+    def test_vla_baselines_are_distinct_from_window_flagships(self):
+        registry = MODULE.load_json(MODULE.MODEL_REGISTRY_PATH)
+        MODULE.validate_registries(registry, {"projects": []}, {"datasets": []})
+        baseline = {entry["id"] for entry in registry["ecosystem_baseline_models"]["robotics"]}
+        window = {entry["id"] for entry in registry["flagship_models"]["robotics"]}
+        self.assertTrue({"lerobot/smolvla_base", "openvla/openvla-7b"} <= baseline)
+        self.assertFalse(baseline & window)
+        self.assertEqual(
+            {entry["id"] for entry in registry["flagship_models"]["robotics"]},
+            {
+                "black-forest-labs/flux-3-action-base",
+                "black-forest-labs/flux-3-action-so101",
+                "black-forest-labs/flux-3-action-droid",
+            },
+        )
+
+    def test_development_radar_keeps_only_registered_window_updates(self):
+        baseline = {
+            "tools": [{"id": "owner/tool", "url": "https://github.com/owner/tool", "domains": ["llm-vlm"], "methods": ["sft"], "entry": "LoRA", "evidence": "https://github.com/owner/tool"}],
+            "datasets": [{"id": "owner/data", "domains": ["llm-vlm"], "methods": ["sft"], "sample_unit": "instruction/response", "evidence": "https://huggingface.co/datasets/owner/data"}],
+        }
+        tool = {"full_name": "owner/tool", "created_at": "2025-01-01T00:00:00Z", "pushed_at": "2026-08-14T00:00:00Z", "stargazers_count": 20}
+        dataset = {"id": "owner/data", "createdAt": "2025-01-01T00:00:00Z", "lastModified": "2026-08-14T00:00:00Z"}
+        with mock.patch.object(MODULE, "fetch_development_tool", return_value=tool), mock.patch.object(MODULE, "fetch_dataset", return_value=dataset):
+            items, sources = MODULE.development_updates(baseline, dt.date(2026, 8, 9), dt.date(2026, 8, 15))
+        self.assertEqual([item["title"] for item in items["tools"]], ["owner/tool"])
+        self.assertEqual([item["title"] for item in items["datasets"]], ["owner/data"])
+        self.assertEqual(sources["github_tools"]["selected"], 1)
+
+    def test_local_training_opportunity_verifies_model_and_dataset_columns(self):
+        baseline = {"local_experiments": [{
+            "id": "math-rlvr", "method": "rlvr-grpo",
+            "max_parameters": 3_000_000_000,
+            "model_id": "Example/Small", "dataset_id": "Example/Math",
+            "dataset_config": "default", "dataset_split": "train",
+            "required_columns": ["prompt", "solution"],
+            "sample_unit": "prompt/solution", "signal": "exact match",
+            "local_scope": "small sampled run", "tools": [{"project": "example/trainer", "component": "Trainer", "role": "train", "evidence": "https://example.test"}], "evidence": ["https://example.test"],
+        }]}
+        model = model_row("Example/Small", safetensors={"total": 500_000_000})
+        dataset = {"id": "Example/Math", "downloads": 10, "likes": 2}
+        files = {"ok": True, "files": [{"path": "model.safetensors", "size": 1_000_000_000}]}
+        with (
+            mock.patch.object(MODULE, "fetch_model", return_value=model),
+            mock.patch.object(MODULE, "fetch_dataset", return_value=dataset),
+            mock.patch.object(MODULE, "fetch_model_repository_files", return_value=files),
+            mock.patch.object(MODULE, "fetch_dataset_columns", return_value=["prompt", "solution"]),
+        ):
+            items, source = MODULE.development_opportunities(baseline)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["model"]["main_weight"]["bytes"], 1_000_000_000)
+        self.assertEqual(items[0]["status"], "metadata-verified-runtime-unmeasured")
+        self.assertEqual(source["selected"], 1)
+
+    def test_local_training_opportunity_rejects_missing_reward_column(self):
+        baseline = {"local_experiments": [{
+            "id": "math-rlvr", "method": "rlvr-grpo",
+            "max_parameters": 3_000_000_000,
+            "model_id": "Example/Small", "dataset_id": "Example/Math",
+            "dataset_config": "default", "dataset_split": "train",
+            "required_columns": ["prompt", "solution"],
+            "sample_unit": "prompt/solution", "signal": "exact match",
+            "local_scope": "small sampled run", "tools": [{"project": "example/trainer", "component": "Trainer", "role": "train", "evidence": "https://example.test"}], "evidence": ["https://example.test"],
+        }]}
+        with (
+            mock.patch.object(MODULE, "fetch_model", return_value=model_row("Example/Small", safetensors={"total": 500_000_000})),
+            mock.patch.object(MODULE, "fetch_dataset", return_value={"id": "Example/Math"}),
+            mock.patch.object(MODULE, "fetch_model_repository_files", return_value={"ok": True, "files": []}),
+            mock.patch.object(MODULE, "fetch_dataset_columns", return_value=["prompt"]),
+        ):
+            items, source = MODULE.development_opportunities(baseline)
+        self.assertEqual(items, [])
+        self.assertEqual(source["errors"]["math-rlvr"], "missing-columns:solution")
+
+    def test_local_training_opportunity_rejects_large_model(self):
+        baseline = {"local_experiments": [{
+            "id": "too-large", "method": "sft", "max_parameters": 3_000_000_000,
+            "model_id": "Example/Large", "dataset_id": "Example/Chat",
+            "dataset_config": "default", "dataset_split": "train",
+            "required_columns": ["messages"], "sample_unit": "messages",
+            "signal": "assistant response", "local_scope": "sampled run",
+            "tools": [{"project": "example/trainer", "component": "Trainer", "role": "train", "evidence": "https://example.test"}],
+            "evidence": ["https://example.test"],
+        }]}
+        with (
+            mock.patch.object(MODULE, "fetch_model", return_value=model_row("Example/Large", safetensors={"total": 7_000_000_000})),
+            mock.patch.object(MODULE, "fetch_dataset", return_value={"id": "Example/Chat"}),
+            mock.patch.object(MODULE, "fetch_model_repository_files", return_value={"ok": True, "files": []}),
+            mock.patch.object(MODULE, "fetch_dataset_columns") as columns,
+        ):
+            items, source = MODULE.development_opportunities(baseline)
+        self.assertEqual(items, [])
+        self.assertEqual(source["errors"]["too-large"], "model-scale-unverified-or-too-large")
+        columns.assert_not_called()
+
+    def test_video_lora_requires_manifest_media_files_and_exact_checkpoint(self):
+        spec = {
+            "id": "video-lora", "method": "video-ic-lora", "model_id": "Example/Video",
+            "model_weight_path": "transformer/dev.safetensors",
+            "dataset_id": "Example/Clips", "dataset_config": "repository",
+            "dataset_split": "dataset.json", "dataset_manifest": "dataset.json",
+            "required_columns": ["video", "reference_video", "caption"],
+            "media_columns": ["video", "reference_video"],
+            "sample_unit": "paired clips", "signal": "target video", "local_scope": "measure VRAM",
+            "tools": [{"project": "Example/Trainer", "component": "train.py", "role": "train", "evidence": "https://example.test"}],
+            "evidence": ["https://example.test"],
+        }
+        files = {"ok": True, "files": [{"path": "transformer/dev.safetensors", "size": 42_000_000_000}]}
+        dataset = {"id": "Example/Clips", "siblings": [
+            {"rfilename": "videos/a.mp4"}, {"rfilename": "videos/b.mp4"},
+        ]}
+        manifest = [{"video": "videos/a.mp4", "reference_video": "videos/b.mp4", "caption": "scene"}]
+        with (
+            mock.patch.object(MODULE, "fetch_model", return_value=model_row("Example/Video")),
+            mock.patch.object(MODULE, "fetch_dataset", return_value=dataset),
+            mock.patch.object(MODULE, "fetch_model_repository_files", return_value=files),
+            mock.patch.object(MODULE, "fetch_text", return_value=json.dumps(manifest)),
+        ):
+            items, source = MODULE.development_opportunities({"local_experiments": [spec]})
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["model"]["main_weight"]["bytes"], 42_000_000_000)
+        self.assertEqual(source["selected"], 1)
+
+        dataset["siblings"] = [{"rfilename": "videos/a.mp4"}]
+        with (
+            mock.patch.object(MODULE, "fetch_model", return_value=model_row("Example/Video")),
+            mock.patch.object(MODULE, "fetch_dataset", return_value=dataset),
+            mock.patch.object(MODULE, "fetch_model_repository_files", return_value=files),
+            mock.patch.object(MODULE, "fetch_text", return_value=json.dumps(manifest)),
+        ):
+            items, source = MODULE.development_opportunities({"local_experiments": [spec]})
+        self.assertEqual(items, [])
+        self.assertEqual(source["errors"]["video-lora"], "dataset-schema-ValueError")
+
+    def test_resolution_and_frame_rate_need_card_line_evidence(self):
+        evidence = MODULE.extract_media_deployment_evidence(
+            "Upscale input 512x512 to output 1024x1024 at 24 fps.\n"
+            "The model also improves quality.\n"
+        )
+        lines = evidence["media_specs"]["evidence"]
+        self.assertEqual(len(lines), 1)
+        self.assertIn("1024x1024", lines[0]["evidence"])
+
+    def test_distilled_tag_is_a_local_derivative_without_invented_base(self):
+        row = model_row("Example/Student", tags=["distilled"])
+        self.assertIn("distilled", MODULE.derivation_facets(row))
+        self.assertEqual(MODULE.base_model_links(row), [])
+
+    def test_canonical_trace_records_every_derivative_hop_and_source(self):
+        rows = {
+            "Example/Base": model_row("Example/Base"),
+            "Example/Finetune": model_row(
+                "Example/Finetune",
+                tags=["base_model:finetune:Example/Base"],
+            ),
+            "Example/GGUF": model_row(
+                "Example/GGUF",
+                cardData={"base_model": "Example/Finetune", "base_model_relation": "quantized"},
+            ),
+        }
+        trace = MODULE.canonical_model_trace("Example/GGUF", rows, "Example/Base")
+        self.assertEqual(trace["status"], "resolved")
+        self.assertEqual(trace["canonical_model"], "Example/Base")
+        self.assertEqual(trace["root_model"], "Example/Base")
+        self.assertEqual([hop["relation"] for hop in trace["hops"]], ["quantized", "finetune"])
+        self.assertEqual([hop["source"] for hop in trace["hops"]], ["hf-card-data", "hf-tag"])
+        self.assertTrue(trace["matches_declaration"])
+
+    def test_canonical_trace_preserves_card_and_tag_corroboration(self):
+        rows = {
+            "Example/Base": model_row("Example/Base"),
+            "Example/GGUF": model_row(
+                "Example/GGUF",
+                cardData={"base_model": "Example/Base"},
+                tags=["base_model:quantized:Example/Base"],
+            ),
+        }
+        trace = MODULE.canonical_model_trace("Example/GGUF", rows)
+        self.assertEqual(trace["status"], "resolved")
+        self.assertEqual(trace["hops"][0]["relation"], "quantized")
+        self.assertEqual({row["source"] for row in trace["hops"][0]["signals"]}, {"hf-card-data", "hf-tag"})
+
+    def test_canonical_stays_on_declared_family_model_while_root_traces_further(self):
+        rows = {
+            "Example/Pretrain": model_row("Example/Pretrain"),
+            "Example/Finetune": model_row("Example/Finetune", tags=["base_model:finetune:Example/Pretrain"]),
+            "Example/GGUF": model_row("Example/GGUF", tags=["base_model:quantized:Example/Finetune"]),
+        }
+        trace = MODULE.canonical_model_trace("Example/GGUF", rows, "Example/Finetune")
+        self.assertEqual(trace["canonical_model"], "Example/Finetune")
+        self.assertEqual(trace["root_model"], "Example/Pretrain")
+        self.assertTrue(trace["matches_declaration"])
+
+    def test_canonical_trace_keeps_ambiguous_and_registry_only_unresolved(self):
+        ambiguous = model_row(
+            "Example/Merge",
+            tags=["base_model:merge:Example/A", "base_model:merge:Example/B"],
+        )
+        trace = MODULE.canonical_model_trace("Example/Merge", {"Example/Merge": ambiguous}, "Example/A")
+        self.assertEqual(trace["status"], "ambiguous")
+        self.assertIsNone(trace["canonical_model"])
+        self.assertEqual({row["repo_id"] for row in trace["alternatives"]}, {"Example/A", "Example/B"})
+        registry = MODULE.canonical_model_trace(
+            "Example/Adapter", {"Example/Adapter": model_row("Example/Adapter")}, "Example/Base"
+        )
+        self.assertEqual(registry["status"], "registry-only")
+        self.assertIsNone(registry["canonical_model"])
+
+    def test_attach_canonical_trace_keeps_direct_parent_without_claiming_root(self):
+        item = {"title": "Example/GGUF", "metadata": {"canonical_model": "Example/Base"}}
+        row = model_row("Example/GGUF", tags=["base_model:quantized:Example/Base"])
+        MODULE.attach_canonical_traces([item], {"Example/GGUF": row}, fetch_missing=False)
+        self.assertEqual(item["metadata"]["canonical_model_trace"]["status"], "parent-unavailable")
+        self.assertEqual(item["metadata"]["canonical_model"], "Example/Base")
+        self.assertIsNone(item["metadata"]["canonical_model_trace"]["root_model"])
+
+    def test_compact_report_retains_canonical_trace(self):
+        item = {"title": "Example/GGUF", "url": "https://huggingface.co/Example/GGUF",
+                "date": "2026-09-28", "event": "published", "category": "local",
+                "metadata": {"canonical_model": "Example/Base"}}
+        rows = {
+            "Example/GGUF": model_row("Example/GGUF", tags=["base_model:quantized:Example/Base"]),
+            "Example/Base": model_row("Example/Base"),
+        }
+        MODULE.attach_canonical_traces([item], rows, fetch_missing=False)
+        compact = MODULE.report_item(item)
+        self.assertEqual(compact["metadata"]["canonical_model"], "Example/Base")
+        self.assertEqual(compact["metadata"]["canonical_model_trace"]["hops"][0]["source"], "hf-tag")
+
+    def test_local_root_does_not_pick_one_branch_of_a_merge(self):
+        merge = model_row("Example/Merge", tags=[
+            "base_model:merge:Example/Root", "base_model:merge:Example/Other"
+        ])
+        rows = {"Example/Merge": merge, "Example/Root": model_row("Example/Root")}
+        self.assertIsNone(MODULE.find_local_root(merge, {"Example/Root"}, rows))
 
 
 class CurrentHotSignalTests(unittest.TestCase):
@@ -877,25 +1292,41 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
         self.assertIn("deployment_profile", compact)
         self.assertIn("media_customization", compact)
 
-    def test_generic_llm_runtime_tag_does_not_trigger_media_profile(self):
-        self.assertFalse(
-            MODULE.needs_media_deployment_profile(
-                {
-                    "metadata": {
-                        "role": "llm",
-                        "deployment": ["vllm", "transformers"],
-                    }
-                }
+    def test_artifact_profile_covers_llm_and_excludes_non_models(self):
+        self.assertTrue(
+            MODULE.needs_artifact_profile(
+                {"metadata": {"role": "llm", "deployment": ["vllm"]}}
             )
         )
         self.assertTrue(
-            MODULE.needs_media_deployment_profile(
+            MODULE.needs_artifact_profile(
                 {"metadata": {"role": "llm", "deployment": ["comfyui"]}}
             )
         )
+        self.assertFalse(MODULE.needs_artifact_profile({"repo_type": "dataset"}))
 
-    def test_media_customization_radar_excludes_image_only_and_keeps_post_image_video(self):
+    def test_media_workflow_keeps_segmentation_swap_and_video_but_excludes_generic_image(self):
         rows = [
+            {
+                "id": "Example/SAM",
+                "pipeline_tag": "mask-generation",
+                "tags": ["comfyui", "mask-generation"],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": 10,
+                "downloads": 1000,
+                "likes": 20,
+            },
+            {
+                "id": "Example/GenericImage",
+                "pipeline_tag": "image-to-image",
+                "tags": ["comfyui", "image-to-image"],
+                "createdAt": "2026-08-14T00:00:00Z",
+                "lastModified": "2026-08-14T00:00:00Z",
+                "trendingScore": 10,
+                "downloads": 1000,
+                "likes": 20,
+            },
             {
                 "id": "Example/FaceSwap",
                 "pipeline_tag": "image-to-image",
@@ -933,11 +1364,13 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
             dt.date(2026, 8, 9),
             dt.date(2026, 8, 15),
         )
-        self.assertEqual([item["title"] for item in items], ["Example/ImageToVideo"])
         self.assertEqual(
-            items[0]["metadata"]["media_customization"]["capabilities"],
-            ["image-to-video"],
+            {item["title"] for item in items},
+            {"Example/SAM", "Example/FaceSwap", "Example/ImageToVideo"},
         )
+        sam = next(item for item in items if item["title"] == "Example/SAM")
+        self.assertEqual(sam["metadata"]["media_customization"]["capabilities"], ["segmentation-mask"])
+        self.assertEqual(MODULE.model_role(rows[0]), "media-conditioning")
 
     def test_text_to_video_with_motion_control_is_not_post_image_media(self):
         row = {
@@ -1038,6 +1471,51 @@ Required files: `model_fp8.safetensors` and `video_vae_bf16.safetensors`.
         self.assertIn("character-reference", integration["upstream"])
         self.assertIn("video-encode", integration["downstream"])
         self.assertEqual(integration["workflow_status"], "repository-workflow-present")
+
+    def test_conditioning_model_connects_to_animation_without_video_output(self):
+        item = {
+            "title": "Example/ComfySAM",
+            "metadata": {
+                "modalities": {"input": ["image"], "output": ["mask"], "signals": [{"source": "pipeline_tag", "value": "mask-generation"}]},
+                "deployment": ["comfyui"],
+                "media_customization": MODULE.media_customization_facet({"pipeline_tag": "mask-generation", "tags": ["comfyui"]}),
+                "deployment_profile": {"runtimes": ["comfyui"]},
+            },
+        }
+        selected = MODULE.finalize_media_customization_items([item])
+        self.assertEqual(len(selected), 1)
+        integration = selected[0]["metadata"]["comfyui_integration"]
+        self.assertIn("mask-pose-depth-or-motion-control", integration["downstream"])
+        self.assertNotIn("video-encode", integration["downstream"])
+
+    def test_pose_motion_and_face_analysis_keep_distinct_control_outputs(self):
+        cases = [
+            ("pose-estimation", "pose", "pose-extraction"),
+            ("motion-extraction", "motion", "motion-extraction"),
+            ("depth-estimation", "depth", "depth-map"),
+            ("face-landmarks", "landmarks", "face-analysis"),
+        ]
+        for pipeline, output, capability in cases:
+            with self.subTest(pipeline=pipeline):
+                row = {"pipeline_tag": pipeline, "tags": ["comfyui", pipeline]}
+                self.assertIn(output, MODULE.modality_evidence(row)["output"])
+                self.assertIn(capability, MODULE.media_customization_facet(row)["capabilities"])
+                self.assertEqual(MODULE.model_role(row), "media-conditioning")
+
+    def test_image_face_swap_finishes_as_image_or_reassembled_frames(self):
+        row = {"pipeline_tag": "image-to-image", "tags": ["comfyui", "face-swap"]}
+        item = {
+            "title": "Example/Swap",
+            "metadata": {
+                "modalities": MODULE.modality_evidence(row),
+                "media_customization": MODULE.media_customization_facet(row),
+                "deployment": ["comfyui"],
+                "deployment_profile": {"runtimes": ["comfyui"]},
+            },
+        }
+        integration = MODULE.finalize_media_customization_items([item])[0]["metadata"]["comfyui_integration"]
+        self.assertIn("image-export-or-video-frame-reassembly", integration["downstream"])
+        self.assertNotIn("video-encode", integration["downstream"])
 
     def test_comfyui_package_can_use_explicit_upstream_model_card_capability(self):
         item = {
@@ -1208,11 +1686,7 @@ class PerformancePipelineTests(unittest.TestCase):
         flagship = {role: [] for role in MODULE.FLAGSHIP_ROLES}
         flagship["llm"] = [{"title": "Official/flagship", "metadata": {}}]
         local = [{"title": "Community/local", "metadata": {}}]
-        datasets = [{"title": "Official/data", "repo_type": "dataset", "metadata": {}}]
-        notable = {
-            "models": [{"title": "Official/new", "metadata": {}}],
-            "datasets": [],
-        }
+        notable = {"models": [{"title": "Official/new", "metadata": {}}]}
 
         def enrich(items, *_):
             return [{**item, "enriched": True} for item in items]
@@ -1225,7 +1699,6 @@ class PerformancePipelineTests(unittest.TestCase):
             result = MODULE.enrich_formal_groups(
                 flagship,
                 local,
-                datasets,
                 notable,
                 [],
                 dt.date(2026, 7, 28),
@@ -1236,13 +1709,11 @@ class PerformancePipelineTests(unittest.TestCase):
         (
             enriched_flagship,
             enriched_local,
-            enriched_datasets,
             enriched_notable,
             enriched_media_customization,
         ) = result
         self.assertTrue(enriched_flagship["llm"][0]["enriched"])
         self.assertTrue(enriched_local[0]["enriched"])
-        self.assertTrue(enriched_datasets[0]["enriched"])
         self.assertTrue(enriched_notable["models"][0]["enriched"])
         self.assertEqual(enriched_media_customization, [])
 
@@ -1756,6 +2227,7 @@ class HistoricalMainTests(unittest.TestCase):
             mock.patch.object(MODULE, "query_global_models", side_effect=AssertionError("live global query")),
             mock.patch.object(MODULE, "query_dataset_candidates", dataset_query),
             mock.patch.object(MODULE, "query_project_urls", return_value=({}, {})),
+            mock.patch.object(MODULE, "development_updates", return_value=({"tools": [], "datasets": []}, {"github_tools": {"ok": True, "count": 0, "selected": 0, "errors": {}}, "huggingface_development_datasets": {"ok": True, "count": 0, "selected": 0, "errors": {}}})),
             mock.patch.object(MODULE, "fetch_many", return_value=({}, {})),
             mock.patch.object(MODULE, "enrich_items_with_cards", side_effect=lambda items, *args: items),
             mock.patch.object(MODULE, "emit_payload", side_effect=capture_payload),
@@ -1763,8 +2235,10 @@ class HistoricalMainTests(unittest.TestCase):
         ):
             self.assertEqual(MODULE.main(), 0)
 
-        dataset_query.assert_called_once()
-        self.assertFalse(dataset_query.call_args.args[1])
+        dataset_query.assert_not_called()
+        self.assertNotIn("datasets", captured["groups"])
+        self.assertNotIn("reproducible", captured["groups"])
+        self.assertEqual(set(captured["sources"]), {"huggingface_models", "github_tools", "huggingface_development_datasets"})
         local_items = captured["groups"]["local"]
         self.assertEqual([item["title"] for item in local_items], [local_id])
         metadata = local_items[0]["metadata"]
@@ -1940,9 +2414,8 @@ class CoverageDiagnosticsTests(unittest.TestCase):
             coverage["media_customization_by_capability"],
             {"lip-sync": 1, "video-editing": 1},
         )
-        self.assertEqual(coverage["reproducible_by_component"]["training"], 1)
-        self.assertEqual(coverage["reproducible_by_component"]["deployment"], 0)
-        self.assertEqual(coverage["datasets_by_group"]["unique_repositories"], 2)
+        self.assertNotIn("reproducible_by_component", coverage)
+        self.assertNotIn("datasets_by_group", coverage)
 
 
 if __name__ == "__main__":

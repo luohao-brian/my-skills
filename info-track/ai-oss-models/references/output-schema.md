@@ -1,56 +1,21 @@
 # 候选结构
 
-顶层 JSON：
+采集器的完整 `--output` 用于核对来源、召回和证据；`--report-output` 保留成稿所需的 `kind`、`window`、`ecosystem_architecture`、`development_baselines` 和 `groups`。两个文件的正式候选顺序与数量一致。
 
 ```json
 {
   "kind": "ai-oss-models",
   "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
-  "sources": {
-    "huggingface_models": {"ok": true, "count": 0, "selected": 0, "errors": {}},
-    "huggingface_datasets": {"ok": true, "count": 0, "selected": 0, "errors": {}},
-    "github_projects": {"ok": true, "count": 0, "selected": 0, "errors": {}}
-  },
+  "ecosystem_architecture": [],
+  "development_baselines": {"tools": [], "datasets": []},
+  "sources": {"huggingface_models": {"ok": true, "count": 0, "selected": 0, "errors": {}}, "github_tools": {"ok": true, "count": 0, "selected": 0, "errors": {}}, "huggingface_development_datasets": {"ok": true, "count": 0, "selected": 0, "errors": {}}},
   "diagnostics": {
     "owner_candidates": 0,
     "local_filter_candidates": 0,
     "modality_query_candidates": 0,
-    "modality_query_by_role": {"image-generation": 0, "video-generation": 0, "audio-tts": 0},
+    "modality_query_by_role": {"llm": 0, "vlm": 0, "decision": 0, "media-conditioning": 0, "media-enhancement": 0, "image-generation": 0, "video-generation": 0, "audio-generation": 0, "audio-tts": 0, "audio-stt": 0},
     "media_ecosystem_candidates": 0,
-    "media_ecosystem_by_filter": {
-      "comfyui": 0,
-      "audio-driven-video": 0,
-      "audio-to-video": 0,
-      "avatar": 0,
-      "camera-control": 0,
-      "character-animation": 0,
-      "character-consistency": 0,
-      "digital-human": 0,
-      "face-swap": 0,
-      "faceswap": 0,
-      "first-last-frame-to-video": 0,
-      "identity-consistency": 0,
-      "image-to-video": 0,
-      "image-text-to-video": 0,
-      "lip-sync": 0,
-      "lipsync": 0,
-      "motion-control": 0,
-      "motion-transfer": 0,
-      "multi-shot-video": 0,
-      "pose-control": 0,
-      "person-replacement": 0,
-      "reference-to-video": 0,
-      "speech-to-video": 0,
-      "talking-head": 0,
-      "video-editing": 0,
-      "video-effects": 0,
-      "video-inpainting": 0,
-      "video-outpainting": 0,
-      "video-relighting": 0,
-      "video-to-video": 0,
-      "frame-interpolation": 0,
-      "video-upscaling": 0
-    },
+    "media_ecosystem_by_filter": {"comfyui": 0, "mask-generation": 0, "pose-estimation": 0, "face-swap": 0},
     "global_trending_candidates": 0,
     "global_recent_candidates": 0,
     "open_candidate_union": 0,
@@ -59,397 +24,152 @@
     "model_discoveries": 0,
     "media_customization_selected": 0,
     "media_open_activity_selected": 0,
-    "dataset_trending_candidates": 0,
-    "dataset_recent_candidates": 0,
-    "dataset_official_owner_candidates": 0,
-    "dataset_candidate_union": 0,
-    "project_url_candidates": 0,
-    "github_metric_repositories": 0,
     "deployment_profile_models": 0,
     "deployment_profile_repository_errors": 0,
     "coverage": {
-      "models_by_group_and_role": {
-        "flagship": {"llm": 0, "vlm": 0, "unknown": 0},
-        "local": {"llm": 0, "vlm": 0, "unknown": 0},
-        "notable_discoveries": {"llm": 0, "vlm": 0, "unknown": 0},
-        "media_customization": {"llm": 0, "vlm": 0, "unknown": 0}
-      },
+      "models_by_group_and_role": {"flagship": {}, "local": {}, "notable_discoveries": {}, "media_customization": {}},
       "unique_model_repositories": 0,
-      "local_by_deployment": {"gguf": 0, "mlx": 0},
-      "media_customization_by_capability": {"image-to-video": 0, "motion-transfer": 0, "lip-sync": 0, "video-editing": 0},
-      "media_by_discovery_track": {"open-activity": 0},
-      "reproducible_projects": 0,
-      "reproducible_by_component": {
-        "data": 0,
-        "training": 0,
-        "model": 0,
-        "evaluation": 0,
-        "deployment": 0
-      },
-      "datasets_by_group": {
-        "registered": 0,
-        "notable_discoveries": 0,
-        "unique_repositories": 0
-      }
+      "local_by_deployment": {},
+      "media_customization_by_capability": {},
+      "media_by_discovery_track": {}
     }
   },
   "groups": {
-    "flagship": {
-      "llm": [],
-      "vlm": [],
-      "image-generation": [],
-      "video-generation": [],
-      "audio-generation": [],
-      "audio-tts": [],
-      "audio-stt": [],
-      "ocr": [],
-      "translation": [],
-      "embedding": [],
-      "robotics": []
-    },
+    "flagship": {"llm": [], "vlm": [], "decision": [], "media-conditioning": [], "media-enhancement": [], "image-generation": [], "video-generation": [], "audio-generation": [], "audio-tts": [], "audio-stt": [], "ocr": [], "translation": [], "embedding": [], "robotics": []},
     "local": [],
-    "reproducible": [],
-    "datasets": [],
-    "notable_discoveries": {
-      "models": [],
-      "datasets": []
-    },
-    "media_customization": []
+    "notable_discoveries": {"models": []},
+    "media_customization": [],
+    "ecosystem_baselines": {"robotics": []},
+    "development": {"tools": [], "datasets": [], "opportunities": []}
   },
   "discoveries": []
 }
 ```
 
-正式候选包含：
+`media_ecosystem_by_filter` 的实际键来自 `ecosystem-architecture.json` 的精确过滤器。`flagship` 的每个角色固定存在；当前运行可含本期无仓库更新、但仍热门或有活跃衍生引用的已登记主模型，历史 `--date` 只保留窗口发布/更新。此类条目的 `metadata.ecosystem_activity` 包含本次候选池的直接引用数、活跃衍生仓 ID 与采样来源，不能视为全站衍生总量。已登记 VLA 模型参与 `groups.flagship.robotics` 的当前热榜和活跃衍生筛选；`groups.ecosystem_baselines.robotics` 保留空数组以兼容旧输入。`groups.media_customization` 是兼容字段名，报告标题使用“ComfyUI 媒体工作流生态”。`discoveries` 是未确认模型审计池，不直接进入报告。
+
+## 模型候选
 
 ```json
 {
   "title": "owner/repo",
-  "url": "https://huggingface.co/...",
+  "url": "https://huggingface.co/owner/repo",
   "summary": "候选事实摘要",
   "date": "YYYY-MM-DD",
-  "event": "published",
+  "event": "published | repository-updated | trending-observed | derivatives-observed | engagement-observed | capability-observed",
   "source": "Hugging Face Models",
-  "category": "llm",
-  "metadata": {}
+  "category": "media-conditioning",
+  "metadata": {
+    "selection": ["hot", "priority"],
+    "role": "media-conditioning",
+    "ecosystem_paths": [{"ecosystem": "media", "stage": "conditioning", "source": "hf-pipeline_tag", "value": "mask-generation"}],
+    "canonical_model": "owner/base",
+    "canonical_model_trace": {"status": "resolved", "canonical_model": "owner/base", "root_model": "owner/base", "declared_canonical": "owner/base", "matches_declaration": true, "hops": [{"from": "owner/quantized", "to": "owner/base", "relation": "quantized", "source": "hf-tag", "evidence": "base_model:quantized:owner/base"}]},
+    "modalities": {"input": ["image"], "output": ["mask"], "signals": [{"source": "pipeline_tag", "value": "mask-generation"}]},
+    "architecture": "unknown",
+    "architecture_classes": ["ExampleModel"],
+    "scale": {"parameters": 0, "source": "safetensors.total", "inherited": false},
+    "papers": [{"id": "2606.19348", "arxiv_url": "https://arxiv.org/abs/2606.19348", "hf_paper_url": "https://huggingface.co/papers/2606.19348"}],
+    "card": {"ok": true, "excerpt": "模型卡当前状态摘要"},
+    "change_evidence": {"ok": true, "commits": [{"title": "Add model weights", "date": "YYYY-MM-DD"}]}
+  }
 }
 ```
 
-当前运行的热门衍生/本地部署模型和数据集的 `metadata` 包含：
+字段缺失时省略，不能把示例零值写进报告。`event=repository-updated` 只证明 HF 仓库时间戳变化；具体改动须由 `change_evidence.commits` 支持。`card.excerpt` 只说明当前能力，不证明窗口内变化。`card` 可另含 `architecture_excerpt` 和 `evaluation`；评测的 `source=model-card` 表示发布方自述，需同时读 `caveats`。`architecture_classes` 直接来自 config，论文只来自精确 `arxiv:` tag。
+
+热门衍生与本地模型可包含：
 
 ```json
 {
-  "selection": ["hot", "priority"],
+  "derivation": ["adapter", "finetune", "merge", "quantized", "distilled"],
+  "deployment": ["gguf", "mlx", "quantized", "ollama-compatible", "on-device"],
+  "base_model_dependencies": [{"repo_id": "owner/base", "relation": "adapter", "source": "hf-tag", "evidence": "base_model:adapter:owner/base"}],
+  "variants": [],
   "trendingScore": 100,
   "downloads": 10000,
-  "likes": 100
+  "likes": 100,
+  "trend": {"rank_scope": "task:mask-generation", "rank": 12, "rank_delta": 5, "score_delta": 8, "downloads_delta": 1200, "likes_delta": 4, "signals": ["hf-rank-rising"], "previous_observed_at": "YYYY-MM-DD"}
 }
 ```
 
-模型候选还可包含发布者和当前趋势信息：
+`canonical_model_trace.hops` 从当前仓逐跳指向上游，每跳保存 HF cardData 或精确 tag 来源；同一跳的全部原始信号保留在 `signals`。`canonical_model` 是路径中验证过的衍生线主模型；`root_model` 是已取得结构化父链的最远唯一终点，二者可能不同。`status=resolved` 表示链在已获取的 HF 字段中到达唯一终点；`ambiguous`、`conflicting-relations`、`cycle`、`depth-limit` 不产出唯一主模型。`parent-unavailable` 可以保留已经由当前仓直接证实的 `canonical_model`，但没有 `root_model`。`declared_canonical` 留存注册表或筛选阶段的原声明；`matches_declaration=false` 表示声明不在追溯路径上，不能悄悄覆盖证据。完整审计 JSON 另有各状态计数和父仓获取错误。`selection` 的 `hot`、`priority`、`trusted-publisher`、`global-discovery`、`pending-registry`、`derivative`、`low-refusal` 等值是召回原因；`groups.local` 是采集入口，不是一级模型类别。历史运行只纳入注册表中的重点本地模型，省略实时热度与趋势。只有注册表明确声明 `variant_group` 时才折叠同发布者变体。
+
+低拒绝模型还可带 `alignment.profile=low-refusal` 和精确 HF tag 信号。只识别 `uncensored`、`abliterated`、`heretic`、`decensored`；这是发布者定位，不证明能力或质量。
+
+音频细分任务由 `metadata.audio_tasks.tasks` 记录，并附精确 tag 或注册表来源。`text-to-audio`、`video-to-audio` 只给输入输出方向，不自动证明歌曲、音效或 Foley。决策模型的 `role=decision` 与原生 `choice`、`score`、`noul`、JEV 协议兼容、语义正确率是不同证据，报告分别说明。
+
+## ComfyUI 媒体工作流候选
+
+`metadata.media_customization` 只在有精确任务、tag 或模型卡证据时出现。环节映射如下：
+
+| `lanes` | `capabilities` 示例 | 实际产物及下游 |
+| --- | --- | --- |
+| `media-conditioning` | `segmentation-mask`, `pose-extraction`, `motion-extraction`, `depth-map`, `face-analysis` | mask、关键点、运动、深度或人脸框，供动画与编辑使用 |
+| `image-to-video` | `image-to-video`, `reference-to-video`, `keyframe-control` | 视频片段，供后期编辑使用 |
+| `character-animation` | `character-animation`, `motion-transfer`, `motion-control` | 受动作或姿态控制的视频 |
+| `audio-driven-avatar` | `audio-driven-video`, `lip-sync`, `talking-head` | 语音驱动的角色视频 |
+| `video-editing-effects` | `face-swap`, `person-replacement`, `video-editing`, `video-effects` | 替换或修补后的帧/视频 |
+| `media-enhancement` | `image-enhancement`, `video-enhancement` | 清晰度、分辨率或帧率增强后的图像/视频 |
 
 ```json
 {
-  "publisher_tier": "unregistered",
-  "trend": {
-    "rank_scope": "task:text-to-speech",
-    "rank": 12,
-    "rank_delta": 5,
-    "rankings": {
-      "global": {"rank": 120, "rank_delta": 8},
-      "task:text-to-speech": {"rank": 12, "rank_delta": 5}
-    },
-    "score_delta": 8,
-    "downloads_delta": 1200,
-    "likes_delta": 4,
-    "signals": ["hf-task-trending", "hf-rank-rising", "hf-engagement-growing"],
-    "previous_observed_at": "YYYY-MM-DD"
-  }
+  "media_customization": {
+    "lanes": ["media-conditioning"],
+    "capabilities": ["segmentation-mask"],
+    "signals": [{"capability": "segmentation-mask", "source": "hf-pipeline_tag", "value": "mask-generation"}]
+  },
+  "comfyui_integration": {
+    "input_modalities": ["image"],
+    "output_modalities": ["mask"],
+    "upstream": ["source-image-or-video", "select-subject-or-control-region"],
+    "core": {"runtime": "comfyui", "capabilities": ["segmentation-mask"], "components": [], "dependencies": []},
+    "downstream": ["mask-pose-depth-or-motion-control", "animation-or-editing-workflow"],
+    "workflow_files": [],
+    "topology_source": "capability-template",
+    "workflow_status": "recommended-topology-not-validated-workflow"
+  },
+  "activity_density": {"high_activity": true, "signals": ["high-trending"], "repository_age_days": 3, "downloads_per_day": 2000.0, "likes_per_day": 10.0},
+  "discovery_tracks": ["open-activity"]
 }
 ```
 
-`rank_delta > 0` 表示 `rank_scope` 对应的官方榜单排名上升；`rankings` 分别保留全局或 `task:<pipeline_tag>` 榜单。首次观察、上次快照没有该仓库，或两次运行仍在同一 UTC 自然日时，各增量为 `null`。`signals` 是可核验的来源标签，不是综合分或质量结论。`diagnostics` 只用于检查召回漏斗，不进入最终报告。
+`hf-pipeline_tag` 和 `hf-tag` 是 HF 结构化任务或精确标签；`model-card` 是当前仓自述；`upstream-model-card` 是 ComfyUI 打包仓明确链接的一层原模型自述，须保留 `repo_id`。没有结构化任务的候选必须有模型卡证据。`topology_source=capability-template` 只给建议连接；`workflow_files` 只证明仓库交付了 JSON 工作流文件，不代表当前环境已运行。分割等控制模型输出不会自动带补帧、音频混流或视频编码。
 
-`diagnostics.coverage` 是正式入选结果的热力图投影：模型按展示分组和结构化方向计数，本地模型另按部署格式计数，媒体定制按精确能力信号计数，可复现项目按交付链组件计数。一个模型可能同时进入媒体定制与其他展示分组，因此分组单元格不可相加；使用 `unique_model_repositories` 读取跨分组去重总数。
+每个正式模型候选都采集 `deployment_profile`，可包含 `runtimes`、按文件归类的 `components`、最多 32 个 `artifact_options`、`workflow_files`、`precisions`、`acceleration.methods/steps/step_evidence`、`offload`、`media_specs.evidence`、`dependencies`、`footprint` 和 `repository_files_ok`。`media_specs.evidence` 只保存模型卡中同时出现分辨率、倍率或 fps 数值和任务词的原句；按原句区分输入与输出，不能把两者颠倒。`components` 和 `footprint.repository_bytes` 覆盖仓库全部权重，可能包含互斥精度；不能当成单次部署显存。报告从 `artifact_options` 选当前仓实际交付的主权重或组件文件，注明精度、分片和备选关系；不能把仓库大小或参数量当作权重文件大小。`artifact_options` 中 `required_all=true` 的分片必须一并下载。没有完整 bundle manifest 时，`complete_runtime_bytes=null` 且状态为 `partial` 或 `unknown`。外部依赖只记录，不递归估算占用。
 
-热门衍生/本地部署模型还包含 `derivation` 和 `deployment`：
+`activity_density.signals` 与 `discovery_tracks` 只表示高 Trending、近期活动、日均下载/点赞速度或跨日增量等透明观察条件，不合成为质量分。正式 ComfyUI 候选必须有精确 `comfyui` 证据；只有 SAM 基础权重而没有 ComfyUI 证据的仓库留在基础模型或发现分节。
+
+## 本地训练候选
+
+`development_baselines.local_experiments` 登记 SFT、离线 response 蒸馏、RLVR、文生视频 LoRA、视频 IC-LoRA、音效 LoRA、音乐 LoRA 的精确模型/数据集组合。当前运行的 `groups.development.opportunities` 独立于 7 天窗口，核验模型与数据集可访问。常规数据集通过 HF dataset server 核指定 config/split 必需列；音频还核 Audio 特征；视频通过仓库 JSON manifest 核全部必需列及所引用的视频路径。它不表示本机已完成训练。结构示例：
 
 ```json
 {
-  "derivation": ["merge", "finetune", "adapter", "quantized"],
-  "deployment": ["gguf", "mlx", "quantized", "ollama-compatible", "on-device"]
+  "id": "small-math-rlvr",
+  "method": "rlvr-grpo",
+  "model": {"id": "Qwen/Qwen2.5-0.5B-Instruct", "parameters": 494032768, "main_weight": {"path": "model.safetensors", "bytes": 988097824}},
+  "dataset": {"id": "trl-lib/DeepMath-103K", "config": "default", "split": "train", "required_columns": ["prompt", "solution"], "columns": ["prompt", "solution"]},
+  "signal": "对生成答案运行可程序验证的数学正确率奖励",
+  "tools": [{"project": "huggingface/trl", "component": "GRPOTrainer", "role": "采样生成并执行 RLVR 更新", "evidence": "https://huggingface.co/docs/trl/grpo_trainer"}],
+  "local_scope": "先抽样，再测生成长度与峰值显存",
+  "status": "metadata-verified-runtime-unmeasured"
 }
 ```
 
-模型存在 HF 精确低拒绝 tags 时还包含 `alignment`：
+`main_weight` 是实际文件或完整分片大小，不是训练显存。小模型参数量须有 HF `safetensors.total` 结构化证据且不超过登记的 `max_parameters`；视频大模型可缺此字段，但须明确 `model_weight_path` 并验证当前仓文件字节数。若必需列或媒体路径缺失、音频特征不符、参数量超出上限、权重文件不完整或上游接口不可访问，该组合不进入 `opportunities`，错误写入 `sources.local_training_opportunities.errors`。媒体组合另有 `preparation`（文件转换和预处理）与 `resource_evidence`（官方资源说明）；官方数字不得写作本机实测。指定历史 `--date` 时 `opportunities=[]`。`tools` 说明具体组件和职责，其文档证据不等于在本机成功运行。
+
+`groups.development.tools` 和 `.datasets` 仍只收本窗口精确登记仓库的发布或更新，供审计使用：
 
 ```json
 {
-  "alignment": {
-    "profile": "low-refusal",
-    "signals": [
-      {"source": "hf-tag", "value": "uncensored"},
-      {"source": "hf-tag", "value": "heretic"}
-    ]
-  }
+  "tools": [{"title": "huggingface/trl", "event": "repository-updated", "date": "YYYY-MM-DD", "category": "development-tool", "metadata": {"domains": ["llm-vlm"], "methods": ["sft", "dpo", "grpo", "distillation"], "entry": "官方训练入口", "evidence": "https://huggingface.co/docs/trl/grpo_trainer", "stars": 0}}],
+  "datasets": [{"title": "HuggingFaceH4/ultrafeedback_binarized", "event": "repository-updated", "date": "YYYY-MM-DD", "category": "development-dataset", "metadata": {"domains": ["llm-vlm"], "methods": ["dpo"], "sample_unit": "chosen/rejected preference pair", "downloads": 0, "likes": 0}}]
 }
 ```
 
-只识别 `uncensored`、`abliterated`、`heretic` 和 `decensored` 精确 tags，不从仓库名或 model card 文案推断。该字段表示发布者声明的低拒绝定位，不证明零拒绝、能力保持或安全质量。命中时当前热门本地候选的 `selection` 还包含 `low-refusal`。
-
-只有注册表通过 `model_overrides.<repo>.variant_group` 显式声明同组时，同一发布者下的多个仓库才折叠为一个代表条目，并在 `metadata.variants` 中列出仓库 ID、链接、部署格式和热度指标。不同发布者不跨发布者折叠；仅有相同 `base_model` 不触发折叠。
-
-当前运行的热门衍生/本地部署模型 `selection` 必须包含 `hot`，还可包含 `priority`、`flagship-lineage`、`trusted-publisher`、`local-ecosystem-publisher`、`breakout`、`derivative` 或 `low-refusal`。历史运行只纳入注册表中的重点本地模型，`selection` 包含 `priority` 且不包含 `hot`，metadata 省略实时 `trendingScore`、`downloads`、`likes` 和 `trend`。正式数据集可由 `hot`、`priority` 或 `technical-artifact` 入选；`technical-artifact` 表示注册表确认其属于数据、训练、偏好、评测等开发链路。`groups.local` 为兼容字段名，报告标题使用“热门衍生与本地部署模型”。
-
-`groups.notable_discoveries` 是从发现池自动选出的成稿候选：
-
-- 模型来自已登记官方发布者时，`selection` 包含 `trusted-publisher` 和 `pending-registry`；当前运行中未登记 owner 的热门模型包含 `hot`、`global-discovery` 和 `pending-registry`。
-- 当前运行中未登记 owner 的数据集须满足 HF 热门条件，`selection` 包含 `hot` 和 `pending-registry`；已登记主要厂商 owner 的窗口内新数据集可包含 `trusted-publisher` 和 `pending-registry`，不强制包含 `hot`。历史运行只保留后一类已登记 owner 发现。
-- 模型与数据集合计最多 12 条，数据集最多 5 条；候选充足时至少 8 条。
-- `repo_type` 为 `model` 或 `dataset`，`metadata.pending_registry` 为 `true`；方向分类是暂定展示字段，不等于旗舰身份确认。
-
-重点旗舰模型、正式数据集和重点新发现还可包含：
-
-```json
-{
-  "metadata": {
-    "card": {
-      "url": "https://huggingface.co/.../blob/main/README.md",
-      "excerpt": "model card 的短证据片段",
-      "ok": true
-    }
-  }
-}
-```
-
-模型的结构化技术字段还包含：
-
-```json
-{
-  "metadata": {
-    "architecture": "moe | diffusion | unknown",
-    "architecture_classes": ["ExampleForConditionalGeneration"],
-    "scale": {"parameters": 304180418494, "source": "safetensors.total", "inherited": false},
-    "papers": [
-      {
-        "id": "2606.19348",
-        "arxiv_url": "https://arxiv.org/abs/2606.19348",
-        "hf_paper_url": "https://huggingface.co/papers/2606.19348"
-      }
-    ]
-  }
-}
-```
-
-`architecture_classes` 直接来自 config；`papers` 只来自精确 `arxiv:` tag。数据集也可包含同结构的 `papers`。`card` 在找到明确的 Architecture / Model Architecture / Architecture Overview 小节时还包含 `architecture_excerpt`。
-
-模型方向的通用证据包含：
-
-```json
-{
-  "metadata": {
-    "modalities": {"input": ["image", "text"], "output": ["audio", "video"]},
-    "role_evidence": {
-      "pipeline_tag": "image-text-to-audio-video",
-      "task_signals": [
-        {"source": "pipeline_tag", "value": "image-text-to-audio-video"}
-      ]
-    }
-  }
-}
-```
-
-最终入选的媒体模型，以及命中 ComfyUI/diffusers 媒体运行时或后图像媒体能力的模型，还可包含部署画像与 ComfyUI 上下游建议：
-
-```json
-{
-  "metadata": {
-    "media_customization": {
-      "lanes": ["audio-driven-avatar", "character-animation"],
-      "capabilities": ["audio-driven-video", "lip-sync", "motion-transfer", "identity-consistency"],
-      "signals": [
-        {"capability": "motion-transfer", "source": "upstream-model-card", "value": "motion transfer", "repo_id": "owner/original-model"}
-      ]
-    },
-    "activity_density": {
-      "high_activity": true,
-      "signals": ["high-trending", "high-download-velocity"],
-      "repository_age_days": 3,
-      "downloads_per_day": 2000.0,
-      "likes_per_day": 10.0
-    },
-    "discovery_tracks": ["open-activity"],
-    "comfyui_integration": {
-      "input_modalities": ["image", "audio"],
-      "output_modalities": ["video"],
-      "upstream": ["character-reference", "pose-motion-or-camera-control", "audio-cleanup-and-model-required-resampling"],
-      "core": {
-        "runtime": "comfyui",
-        "capabilities": ["audio-driven-video", "motion-transfer"],
-        "components": ["transformer", "video-vae"],
-        "dependencies": ["owner/component"]
-      },
-      "downstream": ["frame-interpolation-if-needed", "video-upscale-or-restoration", "audio-mux", "video-encode"],
-      "workflow_files": ["workflows/example-comfy-workflow.json"],
-      "topology_source": "capability-template",
-      "workflow_status": "repository-workflow-present"
-    },
-    "deployment_profile": {
-      "runtimes": ["comfyui", "diffusers"],
-      "components": [
-        {
-          "type": "transformer",
-          "file_count": 4,
-          "bytes": 123,
-          "precisions": ["bf16", "fp8"],
-          "source": "hf-repository-files"
-        }
-      ],
-      "artifact_options": [
-        {
-          "path": "distilled/model-Q4_K_M.gguf",
-          "bytes": 15687639424,
-          "component": "transformer",
-          "precisions": ["q4"]
-        },
-        {
-          "path_pattern": "model-{00001..00018}-of-00018.safetensors",
-          "bytes": 54000000000,
-          "component": "model-weights",
-          "precisions": ["bf16"],
-          "file_count": 18,
-          "shard_count": 18,
-          "required_all": true,
-          "complete": true
-        }
-      ],
-      "workflow_files": ["workflows/example-comfy-workflow.json"],
-      "precisions": ["bf16", "fp8"],
-      "acceleration": {
-        "methods": ["distilled", "turbo"],
-        "steps": [4, 8],
-        "step_evidence": [
-          {"value": 4, "source": "model-card", "evidence": "..."}
-        ]
-      },
-      "offload": ["cpu-offload"],
-      "dependencies": [
-        {"repo_id": "owner/component", "relation": "text-encoder", "source": "model-card"}
-      ],
-      "footprint": {
-        "repository_bytes": 123,
-        "artifact_bytes": 120,
-        "artifact_file_count": 4,
-        "complete_runtime_bytes": null,
-        "complete_runtime_status": "partial",
-        "referenced_files": ["model_fp8.safetensors"],
-        "unresolved_referenced_files": [],
-        "source": "hf-repository-files+model-card"
-      },
-      "repository_files_ok": true
-    },
-    "base_model_dependencies": [
-      {"repo_id": "owner/base", "relation": "adapter", "source": "hf-structured"}
-    ]
-  }
-}
-```
-
-- `components` 和 `repository_bytes` 汇总当前 HF 仓库全部权重文件，可能同时包含多个可选精度或工作流，不能直接视为单次部署占用。
-- `artifact_options` 保留最多 32 个独立权重选项；索引分片先合并为一个 `required_all=true` 的 bundle，并用 `complete` 标记仓库是否包含全部分片。`workflow_files` 只保留位于 `workflow(s)/`、`example(s)/` 目录，或文件名有独立 `workflow` token 的 JSON；仅含 `comfy` 的配置文件不算工作流。这些字段复用同一次 model detail，不增加调用。
-- model card 中出现的权重文件只记为 `referenced_files`，不擅自认定为全部必需文件。因此没有显式部署 bundle manifest 时，`complete_runtime_bytes` 为 `null`，`complete_runtime_status` 为 `partial` 或 `unknown`。
-- `dependencies` 合并 HF 结构化 `base_model` 关系和 model card 中带依赖语境的 HF 模型链接；它描述部署组件依赖，不做许可证判断，也不递归推算依赖仓库占用。
-- `media_customization` 只记录可解析的 HF 结构化任务、精确 HF tags、当前模型卡明确措辞，或 ComfyUI 打包仓明确链接的单层上游原模型卡；不从仓库名猜测图生视频、动作迁移、数字人或视频编辑能力。没有完整 `image/audio/video -> video` 结构化任务时，精确 tag 只能参与召回，正式入选仍须存在 `model-card` 或 `upstream-model-card` 信号。`upstream-model-card` 信号同时保留 `repo_id`。兼容字段名保持不变，但本节语义是图片之后的媒体链路。
-- `comfyui_integration` 把已确认能力映射为通用上下游拓扑，供报告解释输入准备、核心节点和后处理连接。`topology_source=capability-template` 始终表示建议，不是实机验证；`workflow_status=repository-workflow-present` 只表示仓库存在路径形态符合工作流约定的 JSON，未解析 JSON 拓扑，也不表示实机运行通过。
-- `activity_density` 保存透明活动证据，不生成综合分。仓库创建超过 120 天时不计算全生命周期日均速度；跨日增长只来自同一 `--state-dir` 的成熟快照。
-- `discovery_tracks=open-activity` 只表示候选命中透明活动条件。采集器不读取下游平台模型注册表，也不在输入中编码消费方的覆盖、缺口或验证优先级。
-
-方向分类先读取 HF 标准 `pipeline_tag`，再用能解析出完整输入/输出的任务 tags 补充；组合信号按 `<输入模态>-to-<输出模态>` 解析，不依赖模型 ID、发布者或仓库名。`text-to-speech` 归入 TTS，其他音频输出归入音频生成，避免把 voice conversion 或音乐生成误写成 TTS。无法得到完整输入和输出时保留空数组并使用“待确认”。
-
-模型卡存在 Evaluation、Benchmark、Leaderboard 等明确小节，或存在以 `Benchmark` 为表头的结果表时，`card` 还包含：
-
-```json
-{
-  "evaluation": {
-    "source": "model-card",
-    "excerpt": "评测设置、对照项、代表性结果和表格的紧凑证据",
-    "caveats": "Limitations / Caveats 小节中的评测边界"
-  }
-}
-```
-
-`evaluation.excerpt` 保留表格单元格和必要上下文，供成稿提炼，不直接长段复制。`caveats` 为可选字段；出现小样本、内部基准、未完整评测、仅验证单一量化版本等说明时必须随结果一起处理。`source: model-card` 表示发布者仓库自述，不等于独立评测。
-
-`card.excerpt` 只用于概括当前能力、用途和交付件，不代表该内容在本窗口发生变更。`ok` 为 `false` 时不根据仓库名补写能力。
-
-`repository-updated` 候选还可包含提交证据：
-
-```json
-{
-  "metadata": {
-    "change_evidence": {
-      "source": "Hugging Face commit history",
-      "ok": true,
-      "commits": [
-        {
-          "id": "commit sha",
-          "title": "Update README.md",
-          "date": "YYYY-MM-DD",
-          "url": "https://huggingface.co/.../commit/..."
-        }
-      ]
-    }
-  }
-}
-```
-
-可复现项目的每个 `metadata.artifacts[]` 可包含相同的 `change_evidence`；GitHub 子目录证据额外包含 `path`，且提交已经按该路径过滤。`ok: false` 或空提交列表表示只能确认仓库时间戳，不能说明具体变化。
-
-已登记 GitHub 交付件还可包含：
-
-```json
-{
-  "github": {
-    "url": "https://github.com/owner/repo",
-    "stars": 1200,
-    "forks": 80,
-    "open_issues": 12,
-    "pushed_at": "ISO-8601",
-    "trend": {
-      "stars_delta": 50,
-      "forks_delta": 4,
-      "signals": ["github-stars-growing", "github-forks-growing"],
-      "previous_observed_at": "YYYY-MM-DD"
-    }
-  }
-}
-```
-
-GitHub 指标只来自 [reproducible-projects.json](reproducible-projects.json) 已登记仓库。它们表达工程关注与采用，不代替提交证据，也不证明模型质量。
-
-`event` 使用：
-
-- `published`：`createdAt` 位于窗口内。
-- `repository-updated`：`lastModified` 位于窗口内。
-- `trending-observed`：仅当前运行使用；仓库在观察日仍满足 HF 热门条件，但窗口内没有发布或更新时间。
-- `artifact-updated`：可复现项目有 HF 交付件发布/更新，或已登记 GitHub 仓库的 `pushed_at` 位于窗口内。
-
-顶层 `discoveries` 是全部待确认模型和热门新数据集的审计池，不直接进入最终报告；其中入选成稿的条目会以完整结构复制到 `groups.notable_discoveries`。
-
-最终报告遵循 [format.md](format.md)。
+这些窗口条目不直接进入报告第四节。工具若有本窗口 GitHub 最新提交，还可带 `metadata.change_evidence`；提交若只改 README 或没有文件差异证据，仍不能说明新增了哪种训练能力。单卡训练是否可行仍需实际测量，不能从模型参数量或工具支持 LoRA/GRPO 就推断能在 L20/5090 上训练。
 
 ## 紧凑成稿输入
 
-传入 `--report-output <path>` 时，采集器额外写出单行紧凑 JSON。该文件只包含：
-
-```json
-{
-  "kind": "ai-oss-models",
-  "window": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
-  "groups": {}
-}
-```
-
-`groups` 的候选顺序和数量与完整审计 JSON 完全一致，但会删除顶层 `discoveries`、`diagnostics`、来源抓取状态，以及不参与成稿的候选摘要、许可证、开放度等字段。提交证据只保留 `ok`、提交标题和日期；model card 只保留 `ok`、状态摘要、架构摘要、评测证据与 caveats。
-
-完整 `--output` 用于审计和排查召回，`--report-output` 用于模型成稿。不得为了节省上下文从紧凑输入再次删减正式候选。
+`--report-output` 为单行紧凑 JSON，包含 `kind`、`window`、两份基线摘要与 `groups`。每个模型候选保留输入输出、生态阶段、任务、热度、评测、依赖、工作流和提交证据，删除抓取状态、诊断和候选摘要。完整 `--output` 用于审计和覆盖诊断；不要从紧凑输入再次删减正式候选。
