@@ -18,6 +18,9 @@
     "references/runtime-directory.md",
     "references/runtime-dependencies.md",
     "references/runtime-media.md",
+    "scripts/image_backends/backend_ark.py",
+    "scripts/image_backends/backend_ark_api.py",
+    "scripts/image_backends/backend_ark_plan.py",
     "scripts/tests/test_image_provider_bridge.py",
     "scripts/tts_backends/backend_volcengine.py",
     "scripts/tests/test_tts_provider_bridge.py"

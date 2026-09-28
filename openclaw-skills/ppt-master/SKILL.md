@@ -11,7 +11,7 @@ PPT Master is a routed presentation workflow. This entry owns global execution d
 
 ## Downstream Runtime Boundary
 
-This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Agent Plan media execution.
+This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Ark media execution.
 
 ## Mandatory Load Order
 

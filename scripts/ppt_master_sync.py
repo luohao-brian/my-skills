@@ -125,7 +125,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         "PPT Master is a routed presentation workflow. This entry owns global execution discipline and route selection only; each selected route owns its procedure.\n",
         "PPT Master is a routed presentation workflow. This entry owns global execution discipline and route selection only; each selected route owns its procedure.\n\n"
         "## Downstream Runtime Boundary\n\n"
-        "This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Agent Plan media execution.\n",
+        "This OpenClaw/Hermes distribution follows upstream authoring, font selection, validation, and export. Read [`references/runtime.md`](references/runtime.md) for project directories, dependency/capability discovery, and Ark media execution.\n",
         1,
     )
     load_pattern = re.compile(

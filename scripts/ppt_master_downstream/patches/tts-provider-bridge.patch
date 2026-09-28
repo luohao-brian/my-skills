@@ -1,8 +1,7 @@
 diff --git a/scripts/notes_to_audio.py b/scripts/notes_to_audio.py
-index d105d0f..8b634d8 100644
 --- a/scripts/notes_to_audio.py
 +++ b/scripts/notes_to_audio.py
-@@ -14,6 +14,7 @@ Usage:
+@@ -14,6 +14,7 @@
      python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
      python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
      python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
@@ -10,7 +9,7 @@ index d105d0f..8b634d8 100644
      python3 skills/ppt-master/scripts/notes_to_audio.py --list-common-voices
      python3 skills/ppt-master/scripts/notes_to_audio.py --list-voices --locale zh-CN
  
-@@ -23,6 +24,8 @@ Dependencies:
+@@ -23,6 +24,8 @@
      MINIMAX_API_KEY=<key> for --provider minimax
      QWEN_API_KEY or DASHSCOPE_API_KEY=<key> for --provider qwen
      COSYVOICE_API_KEY or DASHSCOPE_API_KEY=<key> for --provider cosyvoice
@@ -19,7 +18,7 @@ index d105d0f..8b634d8 100644
  """
  
  from __future__ import annotations
-@@ -52,6 +55,7 @@ from tts_backends import (
+@@ -52,6 +55,7 @@
      backend_elevenlabs,
      backend_minimax,
      backend_qwen,
@@ -27,7 +26,7 @@ index d105d0f..8b634d8 100644
  )
  from tts_backends.backend_common import temporary_path
  
-@@ -67,6 +71,8 @@ class AudioBackend:
+@@ -67,6 +71,8 @@
      extension: str
      api_key: str = ""
      voice_id: str = ""
@@ -36,7 +35,7 @@ index d105d0f..8b634d8 100644
  
  
  @dataclass(frozen=True)
-@@ -90,6 +96,8 @@ def _load_tts_env_file() -> None:
+@@ -90,6 +96,8 @@
          "QWEN_",
          "DASHSCOPE_",
          "COSYVOICE_",
@@ -45,7 +44,7 @@ index d105d0f..8b634d8 100644
      ))
  
  
-@@ -307,6 +315,10 @@ def _provider_manifest_details(
+@@ -307,6 +315,10 @@
              "optimize_instructions": args.qwen_optimize_instructions,
              "custom_instructions": True if args.qwen_instructions else None,
          }
@@ -56,15 +55,15 @@ index d105d0f..8b634d8 100644
      return args.cosyvoice_model, {
          "volume": args.cosyvoice_volume,
          "rate": args.cosyvoice_rate,
-@@ -434,6 +446,7 @@ def _normalize_voice_option_args(argv: list[str]) -> list[str]:
+@@ -434,6 +446,7 @@
  
  def main(argv: list[str] | None = None) -> int:
      _load_tts_env_file()
-+    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "edge"
++    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "ark-agent-plan"
  
      parser = argparse.ArgumentParser(
          description=__doc__,
-@@ -443,9 +456,19 @@ def main(argv: list[str] | None = None) -> int:
+@@ -443,9 +456,19 @@
      parser.add_argument("-o", "--output", type=Path, default=None)
      parser.add_argument(
          "--provider",
@@ -82,12 +81,12 @@ index d105d0f..8b634d8 100644
 +        default=default_provider,
 +        help=(
 +            "audio generation backend (default: TTS_PROVIDER, "
-+            "otherwise edge)"
++            "otherwise ark-agent-plan)"
 +        ),
      )
      parser.add_argument(
          "--voice",
-@@ -590,12 +613,21 @@ def main(argv: list[str] | None = None) -> int:
+@@ -590,12 +613,21 @@
              "support them"
          ),
      )
@@ -109,7 +108,7 @@ index d105d0f..8b634d8 100644
  
      if args.list_common_voices:
          backend_edge.print_common_voices()
-@@ -613,6 +645,8 @@ def main(argv: list[str] | None = None) -> int:
+@@ -613,6 +645,8 @@
                  backend_qwen.print_voices()
              elif args.provider == "cosyvoice":
                  backend_cosyvoice.print_voices()
@@ -118,7 +117,7 @@ index d105d0f..8b634d8 100644
              else:
                  asyncio.run(backend_edge.print_voices(args.locale))
          except Exception as exc:
-@@ -624,6 +658,11 @@ def main(argv: list[str] | None = None) -> int:
+@@ -624,6 +658,11 @@
          parser.error("project_path is required unless --list-voices or --list-common-voices is used")
  
      voice_id = args.voice_id or args.voice
@@ -130,10 +129,11 @@ index d105d0f..8b634d8 100644
  
      if args.provider == "edge" and not args.voice:
          parser.error(
-@@ -723,6 +762,21 @@ def main(argv: list[str] | None = None) -> int:
+@@ -722,6 +761,21 @@
+             extension=extension,
              api_key=api_key,
              voice_id=voice_id,
-         )
++        )
 +    elif args.provider in backend_volcengine.SUPPORTED_PROFILES:
 +        try:
 +            profile = backend_volcengine.resolve_profile(args.provider)
@@ -148,11 +148,10 @@ index d105d0f..8b634d8 100644
 +            voice_id=voice_id,
 +            base_url=profile.base_url,
 +            model=profile.model,
-+        )
+         )
      else:
          backend = AudioBackend(
-             provider=args.provider,
-@@ -888,6 +942,20 @@ def main(argv: list[str] | None = None) -> int:
+@@ -888,6 +942,20 @@
                          subtitle_path=subtitle_path,
                          subtitle_max_chars=args.subtitle_max_chars,
                      )

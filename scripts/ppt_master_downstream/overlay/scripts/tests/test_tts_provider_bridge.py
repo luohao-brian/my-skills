@@ -124,14 +124,14 @@ class TtsProviderBridgeTests(unittest.TestCase):
                     self.assertEqual(notes_to_audio.main(), 0)
                 printer.assert_called_once()
 
-    def test_unconfigured_provider_retains_edge_default(self) -> None:
+    def test_unconfigured_provider_uses_agent_plan_default(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
             notes_to_audio, "_load_tts_env_file"
-        ), mock.patch.object(notes_to_audio.backend_edge, "print_voices", new_callable=mock.AsyncMock) as voices, mock.patch.object(
+        ), mock.patch.object(notes_to_audio.backend_volcengine, "print_voices") as voices, mock.patch.object(
             sys, "argv", ["notes_to_audio.py", "--list-voices"]
         ):
             self.assertEqual(notes_to_audio.main(), 0)
-        voices.assert_awaited_once()
+        voices.assert_called_once()
 
     def test_configured_agent_plan_generates_upstream_audio_manifest(self) -> None:
         audio = b"ID3-test-audio"

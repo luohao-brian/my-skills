@@ -149,7 +149,7 @@ def verify_runtime_files(errors: list[str]) -> None:
     if "metadata: {\"openclaw\":" not in skill_text:
         errors.append("SKILL.md does not contain single-line OpenClaw metadata")
     if '\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\"' not in skill_text:
-        errors.append("SKILL.md does not expose the default Agent Plan credential as primaryEnv")
+        errors.append("SKILL.md does not expose the Agent Plan credential as primaryEnv")
     metadata_line = next(line for line in skill_text.splitlines() if line.startswith("metadata: "))
     metadata = json.loads(metadata_line.removeprefix("metadata: "))
     if "ARK_AGENT_PLAN_API_KEY" in metadata["openclaw"].get("requires", {}).get("env", []):
@@ -228,12 +228,15 @@ def verify_patch_effects(errors: list[str]) -> None:
     ):
         errors.append("upstream formal release fail-closed gate is missing")
     image_gen = (SKILL / "scripts" / "image_gen.py").read_text(encoding="utf-8")
-    if '"ark-agent-plan": {' not in image_gen:
-        errors.append("optional Agent Plan image backend is missing")
+    for name in ('"ark": {', '"ark-agent-plan": {', '"ark-api": {'):
+        if name not in image_gen:
+            errors.append(f"Ark image route is missing {name}")
     volcengine = (SKILL / "scripts" / "image_backends" / "backend_volcengine.py").read_text(encoding="utf-8")
-    for marker in ("ARK_AGENT_PLAN_ENDPOINT", "ARK_AGENT_PLAN_API_KEY"):
-        if marker not in volcengine:
-            errors.append(f"Volcengine image profile patch is missing {marker}")
+    if '"ARK_API_KEY"' in volcengine:
+        errors.append("LAS backend still accepts ARK_API_KEY")
+    for module in ("backend_ark.py", "backend_ark_api.py", "backend_ark_plan.py"):
+        if not (SKILL / "scripts" / "image_backends" / module).is_file():
+            errors.append(f"Ark image adapter is missing {module}")
     notes_to_audio = (SKILL / "scripts" / "notes_to_audio.py").read_text(encoding="utf-8")
     if "backend_volcengine.SUPPORTED_PROFILES" not in notes_to_audio:
         errors.append("provider TTS bridge core patch is not active")

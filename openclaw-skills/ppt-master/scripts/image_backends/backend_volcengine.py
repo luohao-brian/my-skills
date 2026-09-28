@@ -3,10 +3,9 @@
 Volcengine Seedream image generation backend.
 
 Configuration keys:
-  LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY   (required)
+  LAS_API_KEY                         (required)
   VOLCENGINE_BASE_URL                (optional)
   VOLCENGINE_MODEL                   (optional; Seedream 4.5 only)
-  With IMAGE_BACKEND=ark-agent-plan, use ARK_AGENT_PLAN_API_KEY instead.
 """
 
 import sys
@@ -45,8 +44,6 @@ from image_backends.backend_common import (
 
 DEFAULT_ENDPOINT = "https://operator.las.cn-beijing.volces.com/api/v1/images/generations"
 DEFAULT_MODEL = "doubao-seedream-4-5-251128"
-ARK_AGENT_PLAN_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
-ARK_AGENT_PLAN_MODEL = "doubao-seedream-5.0-lite"
 DEFAULT_IMAGE_SIZE = "2K"
 SUPPORTED_MODELS = {DEFAULT_MODEL}
 
@@ -75,16 +72,11 @@ ASPECT_RATIO_SIZE_MAP = {
 
 
 def _validate_model(model: str) -> str:
-    """Validate the model for the selected Volcengine service."""
-    supported = (
-        {ARK_AGENT_PLAN_MODEL}
-        if os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
-        else SUPPORTED_MODELS
-    )
+    """Limit the backend to the Seedream 4.5 contract implemented below."""
     resolved = model.strip()
-    if resolved not in supported:
+    if resolved not in SUPPORTED_MODELS:
         raise ValueError(
-            f"Unsupported Volcengine model '{model}'. Supported: {sorted(supported)}"
+            f"Unsupported Volcengine model '{model}'. Supported: {sorted(SUPPORTED_MODELS)}"
         )
     return resolved
 
@@ -169,28 +161,17 @@ def generate(prompt: str,
              output_dir: str = None, filename: str = None,
              model: str = None, max_retries: int = MAX_RETRIES) -> str:
     """Generate an image with retries using the Volcengine backend."""
-    agent_plan = os.environ.get("IMAGE_BACKEND", "").strip().lower() == "ark-agent-plan"
-    resolved_model = model or (
-        ARK_AGENT_PLAN_MODEL if agent_plan else os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
-    )
+    resolved_model = model or os.environ.get("VOLCENGINE_MODEL") or DEFAULT_MODEL
     _validate_model(resolved_model)
     normalized_size = normalize_image_size(image_size)
     _resolve_size(aspect_ratio, normalized_size)
     api_key = require_api_key(
-        *(("ARK_AGENT_PLAN_API_KEY",) if agent_plan else (
-            "LAS_API_KEY", "VOLCENGINE_API_KEY", "ARK_API_KEY",
-        )),
+        "LAS_API_KEY",
         message=(
-            "No Agent Plan image key found. Set ARK_AGENT_PLAN_API_KEY."
-            if agent_plan else
-            "No API key found. Set LAS_API_KEY, VOLCENGINE_API_KEY, or "
-            "ARK_API_KEY in the current environment or a .env file."
+            "No LAS image key found. Set LAS_API_KEY."
         ),
     )
-    base_url = (
-        ARK_AGENT_PLAN_ENDPOINT if agent_plan
-        else os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
-    )
+    base_url = os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT
 
     last_error = None
     for attempt in range(max_retries + 1):

@@ -446,7 +446,7 @@ def _normalize_voice_option_args(argv: list[str]) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     _load_tts_env_file()
-    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "edge"
+    default_provider = os.environ.get("TTS_PROVIDER", "").strip().lower() or "ark-agent-plan"
 
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -467,7 +467,7 @@ def main(argv: list[str] | None = None) -> int:
         default=default_provider,
         help=(
             "audio generation backend (default: TTS_PROVIDER, "
-            "otherwise edge)"
+            "otherwise ark-agent-plan)"
         ),
     )
     parser.add_argument(

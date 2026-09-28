@@ -2,7 +2,7 @@
 
 Use the pinned upstream routes, authoring rules, font selection, quality checks,
 and export commands. This runtime contract owns project directories, dependency
-discovery, and Agent Plan media execution.
+discovery, and Ark image/TTS routing.
 
 ## Mandatory load order
 

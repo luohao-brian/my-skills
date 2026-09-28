@@ -1,9 +1,9 @@
 # Dependency and Capability Contract
 
 The calling runtime owns its Python launcher, environment, dependency manager,
-browser installation, model/provider selection, credentials, retries, billing,
-and process lifecycle. PPT Master consumes capabilities and does not provision
-or select them.
+browser installation, credentials, billing, and process lifecycle. This
+distribution selects Ark Agent Plan by default for images and TTS; image
+generation can fall back to Ark API. Explicit provider settings take precedence.
 
 ## Python and browser
 
@@ -21,15 +21,15 @@ or select them.
 ## Image generation and search
 
 Follow the upstream acquisition path, image workflow, and manifests. For API
-generation, select the caller-configured service through `IMAGE_BACKEND` or
-`image_gen.py --backend`; the command-line option takes precedence. Agent Plan
-is available as `ark-agent-plan` alongside the upstream backends. Read
-[`runtime-media.md`](runtime-media.md) when using it.
+generation, the downstream default is `ark`: Agent Plan first, with Ark API
+fallback on service failure. `image_gen.py --backend ark` or `IMAGE_BACKEND=ark`
+selects the same route explicitly.
+`--backend ark-agent-plan` and `--backend ark-api` select either service alone.
+The command-line option takes precedence. Read [`runtime-media.md`](runtime-media.md).
 
 ## TTS
 
 Use upstream `notes_to_audio.py` and its per-slide audio/manifest contract.
 Select the service with `--provider` or the optional `TTS_PROVIDER` environment
 variable; the command-line option takes precedence. Without either setting,
-the upstream `edge` default applies. Agent Plan is available as
-`ark-agent-plan`; read [`runtime-media.md`](runtime-media.md) when using it.
+the downstream default is `ark-agent-plan`. Read [`runtime-media.md`](runtime-media.md).
