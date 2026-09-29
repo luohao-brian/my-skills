@@ -89,11 +89,11 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 - [`al-site`](https://github.com/2B-AL/al-site-skill)
 - [`al-sandbox`](https://github.com/2B-AL/al-sandbox-skill)
 
-## 本地维护的 skill（22）
+## 本地维护的 skill（21）
 
 以下目录是部署输入。功能、依赖声明、运行时适配和验证规则都随本仓库版本发布。
 
-### AI 信息追踪（5）
+### AI 信息追踪（4）
 
 | Skill | 源码 | 用途 |
 | --- | --- | --- |
@@ -101,7 +101,6 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | `ai-labs-tracker` | [`info-track/ai-labs-tracker/`](info-track/ai-labs-tracker/) | AI 厂商产品、API、工程与研究动态 |
 | `ai-news` | [`info-track/ai-news/`](info-track/ai-news/) | 中文 AI 新闻简报 |
 | `ai-oss-models` | [`info-track/ai-oss-models/`](info-track/ai-oss-models/) | 开放模型、数据集与本地部署动态 |
-| `ai-tech-blogs` | [`info-track/ai-tech-blogs/`](info-track/ai-tech-blogs/) | 中文 AI 技术博客聚合 |
 
 ### Ark（9）
 
