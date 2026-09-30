@@ -37,6 +37,13 @@
       "url": "https://tensorfeed.ai/api/news"
     },
     {
+      "id": "aihot",
+      "name": "AIHOT",
+      "role": "aggregator",
+      "kind": "aihot",
+      "url": "https://aihot.news/api/v1/items"
+    },
+    {
       "id": "tmtpost-edge-ai-daily",
       "name": "TMTPost Edge AI Daily",
       "role": "aggregator",
@@ -49,15 +56,6 @@
       "role": "aggregator",
       "kind": "maomu_timeline",
       "url": "https://maomu.com/news"
-    },
-    {
-      "id": "hex2077",
-      "name": "Hex 2077",
-      "role": "aggregator",
-      "kind": "html_daily",
-      "url": "https://hex2077.dev/docs/",
-      "date_url": "https://hex2077.dev/docs/{YYYY-MM}/{YYYY-MM-DD}/",
-      "verify": {"minRaw": 1}
     },
     {
       "id": "openai-news",

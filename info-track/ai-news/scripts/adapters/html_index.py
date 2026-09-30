@@ -16,7 +16,6 @@ from .common import absolutize_url, fetch_text, first_text, strip_html
 
 
 LINK_RE = re.compile(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
-TIME_RE = re.compile(r"<time\b[^>]*(?:datetime=[\"']([^\"']+)[\"'])?[^>]*>(.*?)</time>", re.IGNORECASE | re.DOTALL)
 ANCHOR_TIME_RE = re.compile(r"<time\b[^>]*>(.*?)</time>", re.IGNORECASE | re.DOTALL)
 TITLE_SPAN_RE = re.compile(
     r"<span\b[^>]*class=[\"'][^\"']*title[^\"']*[\"'][^>]*>(.*?)</span>", re.IGNORECASE | re.DOTALL
@@ -42,35 +41,13 @@ def _page_description(html: str) -> str:
     return ""
 
 
-def _visible_times(html: str) -> list[str]:
-    values: list[str] = []
-    for datetime_value, text_value in TIME_RE.findall(html):
-        value = first_text(datetime_value, text_value)
-        if value:
-            values.append(value)
-    return values
-
-
-def _fallback_published_at(window: dict[str, Any] | None) -> str:
-    if not window:
-        return ""
-    if window.get("date"):
-        return str(window["date"])
-    end = window.get("end")
-    if hasattr(end, "isoformat"):
-        return end.isoformat(timespec="seconds")
-    return ""
-
-
 def fetch_generic_html(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
     url = str(source["url"])
     html = fetch_text(url)
     description = _page_description(html)
-    times = _visible_times(html)
-    fallback_date = _fallback_published_at(window)
     items: list[dict[str, str]] = []
 
-    for index, (href, body) in enumerate(LINK_RE.findall(html)):
+    for href, body in LINK_RE.findall(html):
         title = strip_html(body)
         if len(title) < 8:
             continue
@@ -78,7 +55,7 @@ def fetch_generic_html(source: dict[str, Any], window: dict[str, Any] | None = N
             {
                 "title": title,
                 "source_url": absolutize_url(url, href),
-                "published_at": times[index] if index < len(times) else fallback_date,
+                "published_at": "",
                 "summary_basis": title,
             }
         )
@@ -90,7 +67,7 @@ def fetch_generic_html(source: dict[str, Any], window: dict[str, Any] | None = N
             {
                 "title": description[:120],
                 "source_url": url,
-                "published_at": fallback_date,
+                "published_at": "",
                 "summary_basis": description,
             }
         )
@@ -175,7 +152,7 @@ def fetch_anthropic(source: dict[str, Any], window: dict[str, Any] | None = None
         date_patterns=(r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+20\d{2}",),
         source_id=str(source.get("id", "")),
     )
-    return items or fetch_generic_html(source, window)
+    return items
 
 
 def fetch_tmtpost(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
@@ -368,8 +345,8 @@ def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[
             continue
         title = strip_html(strong_match.group(1))
         summary = strip_html(strong_re.sub("", body, count=1))
-        link_text = strip_html(href_match.group(2))
-        summary = summary.replace(link_text, "").strip(" 。")
+        summary = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff，。；：！？])", "", summary)
+        summary = summary.strip(" 。")
         source_url = absolutize_url(url, href_match.group(1))
         if not title or not summary or "/docs/" in source_url:
             continue
@@ -383,5 +360,3 @@ def _parse_hex2077_article(html: str, url: str, published_at: str) -> list[dict[
         )
 
     return items
-
-

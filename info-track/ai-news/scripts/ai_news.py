@@ -266,6 +266,13 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                 "source_role": source_role,
                 "published_at": published.isoformat(timespec="seconds"),
             }
+            if source_kind == "aihot":
+                selected_item.update({
+                    "original_url": str(raw.get("original_url") or ""),
+                    "original_source": str(raw.get("original_source") or ""),
+                    "discovered_at": str(raw.get("discovered_at") or ""),
+                    "external_id": str(raw.get("external_id") or ""),
+                })
             key = article_key(selected_item)
             if key in source_article_keys:
                 source_exact_duplicates += 1
@@ -308,9 +315,10 @@ def public_document(data: dict[str, Any]) -> dict[str, Any]:
     role_rows: dict[str, dict[str, int]] = {}
     for row in data["_sources"]:
         role = str(row["role"])
-        aggregate = role_rows.setdefault(role, {"sources": 0, "selected": 0})
+        aggregate = role_rows.setdefault(role, {"sources": 0, "selected": 0, "window_candidates": 0})
         aggregate["sources"] += 1
         aggregate["selected"] += int(row["candidates"])
+        aggregate["window_candidates"] += int(row["candidates"])
     return {
         "window": data["window"],
         "sources": {
@@ -318,6 +326,7 @@ def public_document(data: dict[str, Any]) -> dict[str, Any]:
                 "ok": row["ok"],
                 "count": row["candidates"],
                 "raw": row["raw"],
+                "window_candidates": row["candidates"],
                 "selected": row["candidates"],
                 "unique_urls": len(urls_by_source.get(row["source_id"], set())),
                 "unique_articles": len(articles_by_source.get(row["source_id"], set())),

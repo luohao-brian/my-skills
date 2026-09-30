@@ -4,6 +4,7 @@ import argparse
 import gzip
 import importlib.util
 import io
+import json
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -18,12 +19,178 @@ SPEC.loader.exec_module(MODULE)
 
 from adapters import common as COMMON
 from adapters import html_index as HTML_INDEX
+from adapters import aihot as AIHOT
+import editorial as EDITORIAL
 
 
 TZ = timezone(timedelta(hours=8))
 
 
 class AiNewsDiagnosticsTests(unittest.TestCase):
+    def test_default_sources_exclude_hex2077_daily_digest(self) -> None:
+        registry = json.loads((SCRIPT.parents[1] / "references" / "sources.json").read_text())
+        self.assertNotIn("hex2077", {source["id"] for source in registry["sources"]})
+
+    def test_hex_parser_keeps_linked_words_in_summary(self) -> None:
+        html = '<li><strong>安全研究新进展</strong>据<a href="https://example.com/report">报告</a>，报告披露了研究方法。</li>'
+        rows = HTML_INDEX._parse_hex2077_article(html, "https://hex2077.dev/docs/2026-09/2026-09-29/", "2026-09-29")
+        self.assertEqual(rows[0]["summary_basis"], "据报告，报告披露了研究方法")
+
+    def test_aihot_pages_keep_original_attribution_and_window(self) -> None:
+        start = datetime(2026, 9, 29, tzinfo=TZ)
+        window = {"start": start, "end": start + timedelta(days=1)}
+        source = {"url": "https://aihot.news/api/v1/items"}
+        pages = [
+            {"items": [{"id": "1", "title": "News one", "summary": "Summary one", "publishedAt": "2026-09-29T10:00:00+08:00", "links": {"aihot": "https://aihot.news/items/1", "original": "https://example.com/one"}, "source": {"name": "Original source"}}], "page": {"hasMore": True, "nextCursor": "next"}},
+            {"items": [{"id": "2", "title": "Old news", "summary": "Old", "publishedAt": "2026-09-28T10:00:00+08:00", "links": {"aihot": "https://aihot.news/items/2", "original": "https://example.com/two"}}], "page": {"hasMore": False, "nextCursor": None}},
+        ]
+        with (mock.patch.object(AIHOT, "fetch_text", side_effect=[json.dumps(p) for p in pages]) as fetch,
+              mock.patch.object(AIHOT, "datetime") as date):
+            date.now.return_value = datetime(2026, 9, 30, tzinfo=TZ)
+            date.fromisoformat.side_effect = datetime.fromisoformat
+            rows = AIHOT.fetch_aihot(source, window)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["original_url"], "https://example.com/one")
+        self.assertEqual(rows[0]["source_url"], "https://aihot.news/items/1")
+
+    def test_aihot_old_window_fails_explicitly(self) -> None:
+        start = datetime(2026, 9, 1, tzinfo=TZ)
+        with mock.patch.object(AIHOT, "datetime") as date:
+            date.now.return_value = datetime(2026, 9, 30, tzinfo=TZ)
+            with self.assertRaisesRegex(ValueError, "last 7 days"):
+                AIHOT.fetch_aihot({"url": "https://aihot.news/api/v1/items"}, {"start": start, "end": start + timedelta(days=1)})
+
+    def test_editorial_groups_original_link_but_not_shared_digest(self) -> None:
+        original = {"title": "Introducing a new model", "url": "https://example.com/model", "summary": "Model released", "source_id": "official", "source": "Official", "source_role": "official", "published_at": "2026-09-29T10:00:00+08:00"}
+        aihot = {"title": "某公司发布新模型", "url": "https://aihot.news/items/1", "original_url": "https://example.com/model", "summary": "该公司发布模型", "source_id": "aihot", "source": "AIHOT", "source_role": "aggregator", "published_at": "2026-09-29T10:00:00+08:00"}
+        digest_a = {"title": "Unrelated news A", "url": "https://digest.example/daily", "summary": "A", "source_id": "digest", "source": "Digest", "source_role": "aggregator", "published_at": "2026-09-29T10:00:00+08:00"}
+        digest_b = {"title": "Unrelated news B", "url": "https://digest.example/daily", "summary": "B", "source_id": "digest", "source": "Digest", "source_role": "aggregator", "published_at": "2026-09-29T10:00:00+08:00"}
+        aihot_digest_a = {**digest_a, "title": "Unrelated news C", "url": "https://aihot.news/items/a", "original_url": "https://digest.example/daily"}
+        aihot_digest_b = {**digest_b, "title": "Unrelated news D", "url": "https://aihot.news/items/b", "original_url": "https://digest.example/daily"}
+        doc = {"window": {"label": "test"}, "sources": {}, "candidates": [original, aihot, digest_a, digest_b, aihot_digest_a, aihot_digest_b]}
+        prepared = EDITORIAL.prepare_document(doc)
+        self.assertEqual(len(prepared["events"]), 5)
+        self.assertEqual(sorted(len(e["members"]) for e in prepared["events"]), [1, 1, 1, 1, 2])
+        singles = [e["event_id"] for e in prepared["events"] if len(e["members"]) == 1]
+        merged = EDITORIAL.merge_reviewed_events(prepared, [singles[:2]])
+        self.assertEqual(len(merged["events"]), 4)
+        self.assertEqual(merged["group_links"][-1]["reason"], "manual_same_event")
+
+    def test_bilingual_aggregator_titles_share_specific_anchors(self) -> None:
+        english = {"title": "NVIDIA Kumo Tabular sets a new benchmark", "url": "https://feed.example/item", "source_role": "aggregator"}
+        chinese = {"title": "NVIDIA 发布 Kumo Tabular 表格模型", "url": "https://aihot.news/items/kumo", "original_url": "https://feed.example/item", "source_role": "aggregator"}
+        self.assertEqual(EDITORIAL.same_event(english, chinese), (True, "same_original_url_bilingual"))
+        chinese["title"] = "NVIDIA 发布其他产品"
+        self.assertEqual(EDITORIAL.same_event(english, chinese), (False, ""))
+
+    def test_all_events_keeps_pending_and_puts_chinese_first(self) -> None:
+        doc = {"window": {"label": "test"}, "events": [
+            {"event_id": "en", "members": [{"title": "English release", "summary": "The company released a product.", "url": "https://example.com/en", "source": "English", "source_role": "media", "published_at": "2026-09-30T10:00:00+08:00"}], "review": {"decision": "pending", "display_summary": "The company released a product.", "display_summary_source_url": "https://example.com/en"}},
+            {"event_id": "zh", "members": [{"title": "中文发布", "summary": "公司发布了一款产品。", "url": "https://example.com/zh", "source": "中文", "source_role": "aggregator", "published_at": "2026-09-29T10:00:00+08:00"}], "review": {"decision": "pending", "display_summary": "公司发布了一款产品。", "display_summary_source_url": "https://example.com/zh"}},
+        ]}
+        output = EDITORIAL.render_all_events(doc)
+        self.assertTrue(output.startswith("# AI 新闻简报｜test\n"))
+        self.assertIn("收录 2 条资讯", output)
+        self.assertLess(output.index("\n### 中文发布"), output.index("\n### English release"))
+        self.assertEqual(output.count("\n### "), 2)
+        self.assertIn("[English](https://example.com/en)", output)
+        self.assertEqual(output.count("\n摘要："), 2)
+        self.assertNotIn("未逐项核验", output)
+
+    def test_all_events_aligns_reviewed_and_pending_headings(self) -> None:
+        item = {"title": "New model", "url": "https://example.com/model", "summary": "A model was released", "source_id": "official", "source": "Official", "source_role": "official", "published_at": "2026-09-29T10:00:00+08:00"}
+        pending = {"title": "中文模型动态", "url": "https://example.com/product", "summary": "该公司介绍了模型更新。", "source_id": "media", "source": "Media", "source_role": "media", "published_at": "2026-09-29T09:00:00+08:00"}
+        doc = EDITORIAL.prepare_document({"window": {"label": "test"}, "sources": {}, "candidates": [item, pending]})
+        selected = next(e for e in doc["events"] if e["members"][0]["url"] == item["url"])
+        selected["review"] = {"decision": "select", "category": "model_research", "title_zh": "发布新模型", "summary_zh": "原文称已发布新模型。", "verified_url": item["url"]}
+        pending_event = next(e for e in doc["events"] if e is not selected)
+        pending_event["review"].update({"display_summary": "该公司介绍了模型更新。", "display_summary_source_url": pending["url"]})
+        output = EDITORIAL.render_all_events(doc)
+        self.assertIn("\n## 🧠 模型 / 研究（2）\n\n### 发布新模型\n摘要：", output)
+        self.assertIn("\n### 中文模型动态\n摘要：该公司介绍了模型更新。", output)
+        self.assertEqual(output.count("\n## 🧠 模型 / 研究"), 1)
+        self.assertEqual(output.count("\n### "), 2)
+
+    def test_all_events_requires_a_complete_summary(self) -> None:
+        doc = {"window": {"label": "test"}, "events": [
+            {"event_id": "short", "members": [{"title": "Research update", "summary": "A clipped description...", "url": "https://example.com/item", "source": "Example", "published_at": "2026-09-30T10:00:00+08:00"}], "review": {"decision": "pending"}},
+        ]}
+        with self.assertRaisesRegex(ValueError, "source-backed editorial summaries required for: short"):
+            EDITORIAL.render_all_events(doc)
+        self.assertEqual(EDITORIAL.summary_queue(doc)[0]["sources"][0]["url"], "https://example.com/item")
+        doc["events"][0]["review"]["display_summary"] = "The report describes a product update."
+        with self.assertRaisesRegex(ValueError, "display_summary_source_url must be a member link"):
+            EDITORIAL.render_all_events(doc)
+        doc["events"][0]["review"]["display_summary_source_url"] = "https://example.com/item"
+        self.assertIn("The report describes a product update.", EDITORIAL.render_all_events(doc))
+
+    def test_summary_queue_reuses_one_collected_text_per_original_url(self) -> None:
+        url = "https://example.com/research"
+        doc = {"events": [{"event_id": "one", "members": [
+            {"title": "Research", "url": url, "summary": "Short."},
+            {"title": "研究", "url": "https://aihot.news/items/1", "original_url": url,
+             "summary": "研究团队提出新方法，并公布了评估结果。"},
+        ], "review": {"decision": "pending"}}]}
+        item = EDITORIAL.summary_queue(doc)[0]
+        self.assertEqual(len(item["sources"]), 1)
+        self.assertEqual(item["sources"][0]["complete_excerpt"], "研究团队提出新方法，并公布了评估结果。")
+
+    def test_all_events_requires_category_review_for_unknown_title(self) -> None:
+        doc = {"window": {"label": "test"}, "events": [{
+            "event_id": "unclear", "members": [{"title": "A cryptic headline", "url": "https://example.com/item"}],
+            "review": {"decision": "pending", "display_summary": "文章讨论一款 AI 产品的实际使用体验。",
+                       "display_summary_source_url": "https://example.com/item"},
+        }]}
+        with self.assertRaisesRegex(ValueError, "category review required for: unclear"):
+            EDITORIAL.render_all_events(doc)
+        doc["events"][0]["review"]["category"] = "products"
+        self.assertIn("## 🚀 产品 / 应用（1）", EDITORIAL.render_all_events(doc))
+
+    def test_long_source_summary_is_not_clipped_into_a_fragment(self) -> None:
+        source = "1." + "牛津大学宣布与 OpenAI 合作数字化馆藏，官方公告称便利研究者查阅；" * 3 + "报道还援引内部纪要。"
+        result = EDITORIAL.short_summary(source)
+        self.assertEqual(result, "")
+        self.assertEqual(EDITORIAL.short_summary("arXiv:2609.31784v1 Announce Type: new Abstract: Open-weight models are often released, fine-tuned, and…"), "")
+        self.assertEqual(EDITORIAL.short_summary("arXiv:2609.31784v1 Announce Type: new Abstract: The method compares model checkpoints. Longer notes follow..."), "The method compares model checkpoints.")
+
+    def test_pending_title_keeps_project_identity_and_review_override(self) -> None:
+        github = {"title": "逆向技能包登上开源趋势榜。", "url": "https://github.com/zhaoxuya520/reverse-skill"}
+        event = {"members": [github], "review": {"decision": "pending"}}
+        self.assertTrue(EDITORIAL._pending_title(event, github).startswith("reverse-skill："))
+        event["review"]["display_title"] = "reverse-skill：逆向技能路由包"
+        self.assertEqual(EDITORIAL._pending_title(event, github), "reverse-skill：逆向技能路由包")
+
+    def test_pending_category_recognizes_science_and_safety_titles(self) -> None:
+        for title, expected in (
+            ("Anthropic Says It Discovered a Crispr-Like System. Now What?", "science"),
+            ("OpenAI被曝排查数万起失控事件。", "safety_governance"),
+            ("AI工程学习库星标近六万。", "opensource"),
+        ):
+            url = "https://github.com/rohitg00/ai-engineering-from-scratch" if "学习库" in title else "https://example.com/item"
+            event = {"members": [{"title": title, "url": url}], "review": {"decision": "pending"}}
+            self.assertEqual(EDITORIAL._pending_category(event)[0], expected)
+
+    def test_reviewed_report_accepts_new_category_with_label(self) -> None:
+        item = {"title": "Chip update", "url": "https://example.com/chip", "summary": "New chip", "source_id": "official", "source": "Official", "source_role": "official", "published_at": "2026-09-29T10:00:00+08:00"}
+        doc = EDITORIAL.prepare_document({"window": {"label": "test"}, "sources": {}, "candidates": [item]})
+        doc["events"][0]["review"] = {"decision": "select", "category": "compute", "category_label": "🧩 芯片 / 算力", "title_zh": "芯片更新", "summary_zh": "发布新芯片。", "verified_url": "https://example.com/chip"}
+        report = EDITORIAL.render_report(doc)
+        self.assertIn("## 🧩 芯片 / 算力", report)
+
+    def test_report_needs_reviewed_evidence(self) -> None:
+        item = {"title": "New model", "url": "https://example.com/model", "summary": "A model was released", "source_id": "official", "source": "Official", "source_role": "official", "published_at": "2026-09-29T10:00:00+08:00"}
+        doc = {"window": {"label": "test"}, "sources": {}, "candidates": [item]}
+        prepared = EDITORIAL.prepare_document(doc)
+        with self.assertRaisesRegex(ValueError, "unreviewed events"):
+            EDITORIAL.render_report(prepared)
+        self.assertIn("简报样例", EDITORIAL.render_report(prepared, allow_partial=True))
+        prepared["events"][0]["review"] = {"decision": "select", "category": "model_research", "title_zh": "发布新模型", "summary_zh": "原文称已发布新模型。", "verified_url": "https://example.com/model"}
+        self.assertIn("发布新模型", EDITORIAL.render_report(prepared))
+        prepared["events"][0]["review"]["verified_url"] = "https://invented.example/nope"
+        with self.assertRaisesRegex(ValueError, "not a member link"):
+            EDITORIAL.render_report(prepared)
+
     def test_canonical_url_removes_tracking_without_losing_location(self) -> None:
         self.assertEqual(
             MODULE.canonical_url("https://Example.com/news/item/?utm_source=x&id=1#part"),
@@ -62,6 +229,7 @@ class AiNewsDiagnosticsTests(unittest.TestCase):
         self.assertEqual(candidate["published_at"], "2026-08-16T08:00:00+08:00")
         self.assertEqual(document["sources"]["official-feed"]["raw"], 2)
         self.assertEqual(document["sources"]["official-feed"]["selected"], 1)
+        self.assertEqual(document["sources"]["official-feed"]["window_candidates"], 1)
         self.assertEqual(document["sources"]["official-feed"]["exact_duplicate_rows"], 1)
 
     def test_diagnostics_distinguish_rows_from_unique_urls(self) -> None:
@@ -325,7 +493,7 @@ class DatedAnchorParserTests(unittest.TestCase):
         self.assertEqual(items, [])
         self.assertIn("markup may have changed", stderr.getvalue())
 
-    def test_generic_html_falls_back_when_times_run_out(self) -> None:
+    def test_generic_html_does_not_invent_dates_from_page_chrome(self) -> None:
         html = (
             "<html><body><time>2026-09-27T08:00:00+08:00</time>"
             '<a href="/first">first sufficiently long title</a>'
@@ -338,8 +506,8 @@ class DatedAnchorParserTests(unittest.TestCase):
             )
 
         self.assertEqual(len(items), 2)
-        self.assertEqual(items[0]["published_at"], "2026-09-27T08:00:00+08:00")
-        self.assertEqual(items[1]["published_at"], "2026-09-26")
+        self.assertEqual(items[0]["published_at"], "")
+        self.assertEqual(items[1]["published_at"], "")
 
     def test_resolve_fetcher_is_kind_driven(self) -> None:
         self.assertIs(MODULE.resolve_fetcher({"id": "a", "kind": "rss"}), MODULE.FETCHERS["rss"])
