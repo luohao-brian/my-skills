@@ -109,6 +109,18 @@ def short_summary(value: str) -> str:
     return ""
 
 
+def editorial_summary(value: str) -> str:
+    """Keep a complete reviewed summary without silently dropping later facts."""
+    summary = re.sub(r"\s+", " ", value).strip()
+    if not summary or summary.endswith(("...", "…")):
+        return ""
+    if len(summary) > (180 if _has_chinese(summary) else 280):
+        return ""
+    if not summary.endswith(("。", "！", "？", ".", "!", "?")):
+        return ""
+    return summary
+
+
 def markdown_link(label: str, url: str) -> str:
     destination = f"<{url}>" if any(mark in url for mark in "() ") else url
     return f"[{label}]({destination})"
@@ -242,9 +254,9 @@ def render_report(document: dict, *, allow_partial: bool = False, category_level
             source_line = "来源链接：" + markdown_link("原文", verified)
         category = str(review["category"])
         headings[category] = CATEGORY_LABELS.get(category, str(review.get("category_label")))
-        summary = short_summary(str(review["summary_zh"]))
+        summary = editorial_summary(str(review["summary_zh"]))
         if not summary:
-            raise ValueError(f"{event.get('event_id')}: selected summary needs one complete short sentence")
+            raise ValueError(f"{event.get('event_id')}: selected summary needs one or two complete sentences within the length limit")
         sections.setdefault(category, []).append(
             f"{'#' * (category_level + 1)} {review['title_zh']}\n摘要：{summary}\n{source_line}"
         )
@@ -274,6 +286,7 @@ PENDING_EXTRA_CATEGORIES = (
     ("analysis", "📚 技术解读 / 观点", r"教程|指南|解读|详解|综述|评论|观点|专访|复盘|实测|呼吁|争论|为何|\b(?:guide|tutorial|analysis|opinion|review|interview|framework|why|roundtables)\b"),
 )
 PENDING_LABELS = {**CATEGORY_LABELS, **{key: label for key, label, _ in PENDING_EXTRA_CATEGORIES}, "other": "📰 其他动态"}
+EXTRA_CATEGORY_KEYS = set(PENDING_LABELS) - set(CATEGORY_LABELS) - {"other"}
 
 
 def _pending_category(event: dict) -> tuple[str, str]:
@@ -324,7 +337,7 @@ def summary_queue(document: dict) -> list[dict]:
         summary = str(review.get("display_summary") or "")
         source_url = str(review.get("display_summary_source_url") or "")
         valid_urls = {str(source.get(key) or "") for source in event["members"] for key in ("url", "original_url")}
-        if summary and short_summary(summary) == summary.strip() and source_url in valid_urls:
+        if editorial_summary(summary) and source_url in valid_urls:
             continue
         sources_by_url: dict[str, dict] = {}
         for source in event["members"]:
@@ -346,6 +359,29 @@ def summary_queue(document: dict) -> list[dict]:
     return queue
 
 
+def category_review_queue(document: dict) -> list[dict]:
+    """Find fixed-category assignments that mask a plausible dynamic category."""
+    queue = []
+    for event in document["events"]:
+        review = event.get("review") or {}
+        assigned = str(review.get("category") or "")
+        if review.get("decision") == "reject" or assigned not in CATEGORY_LABELS:
+            continue
+        candidate = {**event, "review": {**review, "category": ""}}
+        suggested, label = _pending_category(candidate)
+        if suggested not in EXTRA_CATEGORY_KEYS or review.get("category_reviewed") is True:
+            continue
+        queue.append({
+            "event_id": event["event_id"],
+            "title": str(review.get("title_zh") or _pending_title(event, _display_member(event))),
+            "current_category": assigned,
+            "suggested_category": suggested,
+            "suggested_label": label,
+            "display_summary": str(review.get("summary_zh") or review.get("display_summary") or ""),
+        })
+    return queue
+
+
 def render_all_events(document: dict) -> str:
     """Render every non-rejected event in one consistent public layout."""
     events = [e for e in document["events"] if (e.get("review") or {}).get("decision") != "reject"]
@@ -363,7 +399,7 @@ def render_all_events(document: dict) -> str:
         member = _display_member(event)
         if review:
             title = str(review["title_zh"])
-            summary = short_summary(str(review["summary_zh"]))
+            summary = editorial_summary(str(review["summary_zh"]))
             key = str(review["category"])
             headings[key] = CATEGORY_LABELS.get(key, str(review.get("category_label")))
         else:
@@ -374,9 +410,7 @@ def render_all_events(document: dict) -> str:
                 valid_urls = {str(source.get(key) or "") for source in event["members"] for key in ("url", "original_url")}
                 if source_url not in valid_urls or not source_url:
                     raise ValueError(f"{event['event_id']}: display_summary_source_url must be a member link")
-            summary = short_summary(display_summary)
-            if summary != display_summary.strip():
-                summary = ""
+            summary = editorial_summary(display_summary)
             key, category_label = _pending_category(event)
             headings[key] = category_label
             if key == "other":
@@ -388,6 +422,9 @@ def render_all_events(document: dict) -> str:
         raise ValueError("source-backed editorial summaries required for: " + ", ".join(missing))
     if uncategorized:
         raise ValueError("category review required for: " + ", ".join(uncategorized))
+    category_candidates = category_review_queue(document)
+    if category_candidates:
+        raise ValueError("dynamic category candidates require review; run category-queue: " + ", ".join(item["event_id"] for item in category_candidates))
     for key in [*PENDING_LABELS, *(key for key in groups if key not in PENDING_LABELS)]:
         rows = groups.get(key)
         if not rows:
@@ -429,6 +466,11 @@ def main() -> int:
     queue.add_argument("--out", type=Path)
     queue.add_argument("--limit", type=int, default=25)
     queue.add_argument("--offset", type=int, default=0)
+    category_queue = sub.add_parser("category-queue")
+    category_queue.add_argument("--input", type=Path, required=True)
+    category_queue.add_argument("--out", type=Path)
+    category_queue.add_argument("--limit", type=int, default=25)
+    category_queue.add_argument("--offset", type=int, default=0)
     render = sub.add_parser("render")
     render.add_argument("--input", type=Path, required=True)
     render.add_argument("--out", type=Path)
@@ -446,10 +488,11 @@ def main() -> int:
         result = merge_reviewed_events(load_json(args.input), pairs)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    elif args.command == "summary-queue":
+    elif args.command in {"summary-queue", "category-queue"}:
         if args.limit < 1 or args.offset < 0:
-            raise ValueError("summary-queue requires --limit >= 1 and --offset >= 0")
-        items = summary_queue(load_json(args.input))
+            raise ValueError(f"{args.command} requires --limit >= 1 and --offset >= 0")
+        document = load_json(args.input)
+        items = summary_queue(document) if args.command == "summary-queue" else category_review_queue(document)
         result = json.dumps({"total": len(items), "offset": args.offset, "items": items[args.offset:args.offset + args.limit]}, ensure_ascii=False, indent=2) + "\n"
         if args.out:
             args.out.parent.mkdir(parents=True, exist_ok=True)

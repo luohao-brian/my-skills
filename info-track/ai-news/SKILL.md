@@ -1,50 +1,40 @@
 ---
 name: ai-news
-description: 采集固定来源及 AIHOT 精选入口的 AI 新闻，联合归并中英文重复报道并生成中文优先的资讯清单。适用于 AI 日报、今日快讯、行业动态汇总和最新进展追踪。
+description: 从固定来源及 AIHOT 采集 AI 新闻，合并中英文重复报道，按事件主题分栏并生成中文优先的简报。适用于 AI 日报、快讯和行业动态汇总。
 metadata: {"openclaw":{"skillKey":"ai-news","emoji":"🗞️","homepage":"https://github.com/luohao-brian/my-skills/tree/main/info-track/ai-news","requires":{"bins":["python3"]}}}
 ---
 
 # AI 新闻简报
 
-运行采集器生成候选 JSON，归并同一事件的中英文报道，按中文优先输出去重清单。
+采集候选，合并同一事件，保留去重后的有效新闻。按本期事件主题组织栏目；栏目不限于预设的五类。
 
-读取规则：
+## 执行
 
-- 生成简报前读取 [references/output-schema.md](references/output-schema.md) 和 [references/brief-format.md](references/brief-format.md)。
-- 需要确认固定来源时读取 [references/sources.json](references/sources.json)。
-- 逐事件审核前读取 [references/editorial.md](references/editorial.md)。
-- 分析来源覆盖或生成热力图时读取 [references/source-diagnostics.md](references/source-diagnostics.md)。
+1. 运行 `collect` 和 `prepare`，检查来源状态及事件归并。审核前读取 [事件审核规则](references/editorial.md)。
+2. 读取 [简报格式](references/brief-format.md)，按队列补齐有来源依据的完整摘要，复核可能被预设栏目遮住的主题。分批任务不得把 `category` 限定为五选一。
+3. 两个队列均清空后运行 `render --all-events`。缺摘要、未归类或分类待复核时，按报出的事件 ID 修正后重跑。
 
 ```bash
 python3 {baseDir}/scripts/ai_news.py collect --out candidates.json
 python3 {baseDir}/scripts/editorial.py prepare --input candidates.json --out events.json
-# 核对相似事件后，可用 merge --input events.json --pairs pairs.json --out events.json 合并
-# 审核跨语言同事件；不相关的事件可在 review.decision 标记 reject
 python3 {baseDir}/scripts/editorial.py summary-queue --input events.json --limit 25 --out summary-queue.json
-# 分批处理：先用已采集的正文提炼，材料不足时再读原始链接；写入 review.display_summary 和 display_summary_source_url，直到队列清空
+python3 {baseDir}/scripts/editorial.py category-queue --input events.json --limit 25 --out category-queue.json
 python3 {baseDir}/scripts/editorial.py render --all-events --input events.json --out brief.md
 ```
 
-目标网络需要代理时，在同一次采集命令中显式传入：
+`summary-queue` 与 `category-queue` 每批写回 `events.json` 后重跑，直到 `total` 为零。相似事件的人工合并用 `editorial.py merge`；命令、字段和判断规则见 [事件审核规则](references/editorial.md)。只刊载逐项核验事件时，使用不带 `--all-events` 的 `render`。
 
-```bash
-python3 {baseDir}/scripts/ai_news.py collect \
-  --http-proxy <proxy-url> \
-  --https-proxy <proxy-url> \
-  --no-proxy <comma-separated-hosts> \
-  --out candidates.json
-```
+## 按需读取
 
-调用合同：
+- 需要查看 JSON 字段或成稿错误时读取 [输出结构](references/output-schema.md)。
+- 核对固定来源时读取 [来源清单](references/sources.json)。
+- 分析来源覆盖或生成热力图时读取 [来源诊断](references/source-diagnostics.md)。
 
-1. `collect` 使用可选的 `--date YYYY-MM-DD`、`--out`、`--http-proxy`、`--https-proxy` 和 `--no-proxy`；没有指定自然日时不传 `--date`。
-2. `editorial.py prepare` 从候选生成事件，保守自动归并中英文报道；`merge` 记录额外确认的同事件对。`summary-queue` 分页列出尚缺来源对应摘要的事件，同一原文链接只给出一份采集文本；先利用采集文本成句，信息不足时再读取原文，逐批写回并重跑队列。`render --all-events` 为全部未标记 `reject` 的事件按栏目编排，每个栏目只出现一次，栏目内中文条目靠前，组内全部来源保留；缺摘要会报错。栏目可按事件内容扩展，没有每栏条数上限。`render` 不带此参数时只刊载已核验且标记 `select` 的事件。原有 `ai_news.py render` 仅用于查看全部原始候选。
-3. 代理参数只作用于本次采集进程，不持久化、不写入候选 JSON，也不读取 Agent 专属代理配置；`localhost`、`127.0.0.1` 和 `::1` 始终绕过代理。需要代理时必须在唯一一次 `collect` 调用中显式传入。
+默认保留去重后的事件；只排除明确无关或误采的事件。完整页按栏目编排，每个事件刊载一次，组内保留全部来源链接，栏目内中文条目靠前。
 
 ## 时间窗口
 
-- 不传 `--date`：采集最近 72 小时。
-- “今日 / 今天 / 最新 / 日报”未指定绝对日期或自然日时，仍采集最近 72 小时。
-- 传 `--date YYYY-MM-DD`：只采集该自然日。
+- 默认采集最近 72 小时；“今日 / 今天 / 最新 / 日报”未明确指定自然日时也用此窗口。
+- 明确指定自然日时传 `--date YYYY-MM-DD`，只采集该日。
 - 时间窗口确定后，不因候选不足改变窗口。
 - AIHOT `/api/v1/items` 只提供最近 7 天；超出范围的历史自然日采集会记录该来源失败，不补造历史条目。

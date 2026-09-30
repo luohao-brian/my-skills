@@ -147,12 +147,44 @@ class AiNewsDiagnosticsTests(unittest.TestCase):
         doc["events"][0]["review"]["category"] = "products"
         self.assertIn("## 🚀 产品 / 应用（1）", EDITORIAL.render_all_events(doc))
 
+    def test_fixed_category_cannot_hide_dynamic_category_hint(self) -> None:
+        doc = {"window": {"label": "test"}, "events": [{
+            "event_id": "benchmark", "members": [{"title": "Agent benchmark results", "url": "https://example.com/benchmark"}],
+            "review": {"decision": "pending", "category": "model_research",
+                       "display_summary": "研究团队发布智能体基准，并公布评测结果。",
+                       "display_summary_source_url": "https://example.com/benchmark"},
+        }]}
+        self.assertEqual(EDITORIAL.category_review_queue(doc)[0]["suggested_category"], "evaluation")
+        with self.assertRaisesRegex(ValueError, "dynamic category candidates require review"):
+            EDITORIAL.render_all_events(doc)
+        doc["events"][0]["review"]["category"] = "evaluation"
+        self.assertIn("## 📊 评测 / 基准（1）", EDITORIAL.render_all_events(doc))
+        doc["events"][0]["review"]["category"] = "model_research"
+        doc["events"][0]["review"]["category_reviewed"] = True
+        self.assertIn("## 🧠 模型 / 研究（1）", EDITORIAL.render_all_events(doc))
+
     def test_long_source_summary_is_not_clipped_into_a_fragment(self) -> None:
         source = "1." + "牛津大学宣布与 OpenAI 合作数字化馆藏，官方公告称便利研究者查阅；" * 3 + "报道还援引内部纪要。"
         result = EDITORIAL.short_summary(source)
         self.assertEqual(result, "")
         self.assertEqual(EDITORIAL.short_summary("arXiv:2609.31784v1 Announce Type: new Abstract: Open-weight models are often released, fine-tuned, and…"), "")
         self.assertEqual(EDITORIAL.short_summary("arXiv:2609.31784v1 Announce Type: new Abstract: The method compares model checkpoints. Longer notes follow..."), "The method compares model checkpoints.")
+
+    def test_editorial_summary_keeps_two_complete_sentences(self) -> None:
+        summary = "研究团队发布新方法，并公开评估结果。第二句说明该结果仅在所用测试集上成立。"
+        self.assertEqual(EDITORIAL.editorial_summary(summary), summary)
+        self.assertEqual(EDITORIAL.editorial_summary("研究团队介绍了方法。" * 25), "")
+        self.assertEqual(EDITORIAL.editorial_summary("研究团队介绍了方法，结论尚未写完…"), "")
+
+    def test_both_render_modes_keep_reviewed_second_sentence(self) -> None:
+        summary = "研究团队发布新方法，并公开评估结果。第二句说明该结果仅在所用测试集上成立。"
+        doc = {"window": {"label": "test"}, "events": [{
+            "event_id": "study", "members": [{"title": "Study", "url": "https://example.com/study", "source": "Example"}],
+            "review": {"decision": "select", "category": "model_research", "title_zh": "新方法",
+                       "summary_zh": summary, "verified_url": "https://example.com/study"},
+        }]}
+        for output in (EDITORIAL.render_report(doc), EDITORIAL.render_all_events(doc)):
+            self.assertIn("摘要：" + summary, output)
 
     def test_pending_title_keeps_project_identity_and_review_override(self) -> None:
         github = {"title": "逆向技能包登上开源趋势榜。", "url": "https://github.com/zhaoxuya520/reverse-skill"}

@@ -1,5 +1,7 @@
 # AI 新闻输出
 
+`collect` 默认采集最近 72 小时；明确指定自然日时传 `--date YYYY-MM-DD`。`--out` 指定候选文件。需要代理时在本次调用中传 `--http-proxy`、`--https-proxy` 和可选的 `--no-proxy`；代理参数不持久化，也不写入候选 JSON。
+
 `collect` 输出一个 JSON 对象：
 
 ```json
@@ -38,6 +40,10 @@ AIHOT 候选额外保留 `original_url`、`original_source`、`discovered_at` �
 
 `editorial.py prepare` 输出的 `events.json` 包含原 `window`、`sources`、`diagnostics`，以及 `group_links[]` 和 `events[]`。`diagnostics.event_count` 是保守归并后的事件数，`grouped_rows` 是合并掉的候选行数；这两个数字不代表漏并率或精选质量。审核合同见 [editorial.md](editorial.md)。
 
-`editorial.py summary-queue` 列出当前事件中缺少完整短摘要的 `event_id`、标题、采集文本和原文链接，不依赖特定新闻。`editorial.py render --all-events` 在同一页显示全部未拒绝事件，每个动态栏目只出现一次，栏目内中文条目排在英文条目前；审核状态只保存在事件 JSON，不写入简报标题。`pending` 不是拒绝，也不被当作已核验。待核验事件可用 `review.display_title`、`review.display_summary` 保存经来源支持的展示文案，并用 `review.display_summary_source_url` 指向该事件的来源链接；这些字段不改变审核状态。缺少完整摘要或来源链接不属于事件成员时渲染失败并报告事件 ID。跨语言自动归并须有同一原文链接及两个具体英文标题锚点；其余同事件由 `merge` 记录人工确认。
+`editorial.py summary-queue` 列出缺少完整摘要的事件 ID、标题、采集文本和原文链接。`category-queue` 列出已填常用栏目、但标题提示可能属于扩展栏目的事件；逐条复核后改 `review.category`，或填 `review.category_reviewed=true` 保留原栏目。新建栏目时同时填写 `category_label`。
+
+`render --all-events` 在同一页显示全部未拒绝事件，每个栏目只出现一次，栏目内中文条目排在英文条目前。`pending` 不是拒绝，也不被当作已核验；审核状态只保存在事件 JSON。待核验事件可填 `review.display_title`、`review.display_summary` 和指向事件成员链接的 `review.display_summary_source_url`；这些字段不改变审核状态。缺少完整摘要、来源链接不属于事件成员或分类复核未完成时，渲染失败并报告事件 ID。
+
+跨语言自动归并须有同一原文链接及两个具体英文标题锚点；其余同事件由 `merge` 记录人工确认。
 
 旧候选只含 `title`、`url`、`summary` 时仍可渲染；缺少来源归属时不得生成来源热力图，也不得按 URL 域名猜测来源。
