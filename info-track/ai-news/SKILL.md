@@ -24,7 +24,9 @@ python3 {baseDir}/scripts/editorial.py render --all-events --input events.json -
 
 `summary-queue` 与 `category-queue` 每批写回 `events.json` 后重跑，直到 `total` 为零。相似事件的人工合并用 `editorial.py merge`；命令、字段和判断规则见 [事件审核规则](references/editorial.md)。只刊载逐项核验事件时，使用不带 `--all-events` 的 `render`。
 
-每次运行都以本轮新生成的候选、事件队列和简报为准，不直接复用旧的运行产物。采集、审核和渲染只使用上述命令及 skill 规定的输出文件；不要调用 `write_file`、`execute_code`，不要创建 `inspect.py` 等临时分析文件或额外报告。只有确需执行 skill 定义的事件合并时，才生成本轮对应的 `pairs.json`，不得覆盖既有文件。最终消息只发送简报正文，不发送命令、进程、文件路径、内部校验器、执行进度或工具错误；发送到飞书前删除或脱敏所有原始邮箱地址（例如 `name [at] example.com`，或直接省略），遇到 `230028 / EMAIL_ADDRESS` 时只允许脱敏后重试一次。
+每次日报在工作区新建独立运行目录，存放本轮候选、事件、审核输入和简报，不复用上轮文件。允许写入审核结果和合并所需的 `pairs.json`；更新已有文件前先完整读取，遇到覆盖保护时先补齐读取，不换工具绕过。优先使用现有队列和合并命令，不为查看候选另写临时分析脚本。
+
+最终只发送简报正文，内部工具错误、文件路径和审核过程留在运行记录；影响内容的来源缺失用一句话说明。发送到飞书时省略原始邮箱，必要时写成 `name [at] example.com`。cron 的投递错误由宿主处理，不能声称仅靠此说明实现自动重试。
 
 ## 按需读取
 
