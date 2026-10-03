@@ -24,7 +24,7 @@ python3 {baseDir}/scripts/editorial.py render --all-events --input events.json -
 
 `summary-queue` 与 `category-queue` 每批写回 `events.json` 后重跑，直到 `total` 为零。相似事件的人工合并用 `editorial.py merge`；命令、字段和判断规则见 [事件审核规则](references/editorial.md)。只刊载逐项核验事件时，使用不带 `--all-events` 的 `render`。
 
-每次运行都以本轮新生成的候选、事件队列和简报为准，不直接复用旧的运行产物。采集、审核和渲染只使用上述命令及 skill 规定的输出文件；不要调用 `write_file`、`execute_code`，不要创建 `inspect.py` 等临时分析文件或额外报告。只有确需执行 skill 定义的事件合并时，才生成本轮对应的 `pairs.json`，不得覆盖既有文件。最终消息只发送简报正文，不发送命令、进程、文件路径、内部校验器、执行进度或工具错误；确需说明来源失败时，只在简报的来源状态中简洁说明影响。
+每次运行都以本轮新生成的候选、事件队列和简报为准，不直接复用旧的运行产物。采集、审核和渲染只使用上述命令及 skill 规定的输出文件；不要调用 `write_file`、`execute_code`，不要创建 `inspect.py` 等临时分析文件或额外报告。只有确需执行 skill 定义的事件合并时，才生成本轮对应的 `pairs.json`，不得覆盖既有文件。最终消息只发送简报正文，不发送命令、进程、文件路径、内部校验器、执行进度或工具错误；发送到飞书前删除或脱敏所有原始邮箱地址（例如 `name [at] example.com`，或直接省略），遇到 `230028 / EMAIL_ADDRESS` 时只允许脱敏后重试一次。
 
 ## 按需读取
 
