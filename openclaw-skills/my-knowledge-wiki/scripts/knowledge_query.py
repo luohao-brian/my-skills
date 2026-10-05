@@ -154,7 +154,21 @@ def build_parser() -> argparse.ArgumentParser:
     ontology = subparsers.add_parser("ontology", help="read the canonical ontology graph")
     ontology.add_argument("--domain-id", default="")
     ontology.add_argument("--node-limit", type=positive_int(1, 100), default=100)
+    ontology.add_argument("--full", action="store_true", help="request the complete selected domain view")
     add_common(ontology)
+
+    article = subparsers.add_parser("article", help="read one indexed article")
+    article.add_argument("article_id")
+    add_common(article)
+
+    binding = subparsers.add_parser("binding", help="read one article's Ontology bindings and Leaf evidence")
+    binding.add_argument("article_id")
+    add_common(binding)
+
+    graph = subparsers.add_parser("graph", help="read one article's evidence graph")
+    graph.add_argument("article_id")
+    graph.add_argument("--no-sources", action="store_true", help="omit relationship source Leaves")
+    add_common(graph)
     return parser
 
 
@@ -196,9 +210,18 @@ def execute(args: argparse.Namespace, client: KnowledgeClient) -> Any:
         return client.request("GET", f"/ontology/concepts/{quote(node_id, safe=':-._~')}", query={
             "node_limit": args.node_limit,
         })
+    if args.command == "article":
+        return client.request("GET", f"/resources/{quote(args.article_id, safe=':-._~')}")
+    if args.command == "binding":
+        return client.request("GET", f"/resources/{quote(args.article_id, safe=':-._~')}/ontology")
+    if args.command == "graph":
+        return client.request("GET", f"/resources/{quote(args.article_id, safe=':-._~')}/graph", query={
+            "include_sources": not args.no_sources,
+        })
     return client.request("GET", "/ontology/map", query={
         "domain_id": args.domain_id or None,
         "node_limit": args.node_limit,
+        "full": "true" if args.full else None,
     })
 
 

@@ -135,7 +135,7 @@ class KnowledgeQuerySkillTests(unittest.TestCase):
         learning = KNOWLEDGE_QUERY.execute(learning_args, self.client())
         self.assertEqual(learning["focus"]["id"], "ai:ddpm")
         ontology_args = KNOWLEDGE_QUERY.build_parser().parse_args([
-            "ontology", "--domain-id", "mathematics",
+            "ontology", "--domain-id", "mathematics", "--full",
         ])
         KNOWLEDGE_QUERY.execute(ontology_args, self.client())
 
@@ -144,9 +144,19 @@ class KnowledgeQuerySkillTests(unittest.TestCase):
         self.assertEqual(learning_request["path"], "/api/knowledge/ontology/concepts/ai:ddpm?node_limit=40")
         self.assertEqual(
             ontology_request["path"],
-            "/api/knowledge/ontology/map?domain_id=mathematics&node_limit=100",
+            "/api/knowledge/ontology/map?domain_id=mathematics&node_limit=100&full=true",
         )
         self.assertEqual(ontology_request["authorization"], "Bearer secret-token")
+
+    def test_article_binding_and_graph_use_current_resource_routes(self) -> None:
+        for command, expected in (
+            ("article", "/api/knowledge/resources/article-1"),
+            ("binding", "/api/knowledge/resources/article-1/ontology"),
+            ("graph", "/api/knowledge/resources/article-1/graph?include_sources=True"),
+        ):
+            args = KNOWLEDGE_QUERY.build_parser().parse_args([command, "article-1"])
+            KNOWLEDGE_QUERY.execute(args, self.client())
+            self.assertEqual(RecordingHandler.requests[-1]["path"], expected)
 
 
 if __name__ == "__main__":

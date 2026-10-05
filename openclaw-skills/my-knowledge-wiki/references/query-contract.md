@@ -7,7 +7,7 @@ export MY_KNOWLEDGE_WIKI_API_URL="https://<host>/api/knowledge"
 export MY_KNOWLEDGE_WIKI_API_KEY="<token returned once by host apikey create>"
 ```
 
-`MY_KNOWLEDGE_WIKI_API_URL` 指向 Knowledge API 公网前缀。正式远程服务必须使用 HTTPS；只有 `localhost`、`127.0.0.1` 和 `::1` 可以使用 HTTP。
+`MY_KNOWLEDGE_WIKI_API_URL` 指向 Knowledge API 公网前缀，例如 `https://<host>/api/knowledge`。正式远程服务必须使用 HTTPS；只有 `localhost`、`127.0.0.1` 和 `::1` 可以使用 HTTP。
 
 自签名 HTTPS 服务由私有运行环境设置 `MY_KNOWLEDGE_WIKI_TLS_INSECURE=true`。默认值是 `false`；仓库不保存 endpoint 或 TLS 例外。该变量只影响 `MY_KNOWLEDGE_WIKI_API_URL` 指向的当前 HTTPS 服务，不能用于远程 HTTP。
 
@@ -27,7 +27,10 @@ Key 创建或轮换时只显示一次明文。把它放进 Agent 运行环境，
 | `learning` | `GET /ontology/concepts` + `GET /ontology/concepts/{node_id}` | `ontology:read` | 按概念名解析概念并返回跨领域关系与学习材料 |
 | `retrieve` | `POST /retrieve` | `search:read` | 读取命中 Section 和相邻 Leaf 上下文 |
 | `search` | `POST /search` | `search:read` | 检查候选文章与命中摘要 |
-| `ontology` | `GET /ontology/map` | `ontology:read` | 查询跨领域导航骨架或指定领域的完整审校概念图 |
+| `ontology` | `GET /ontology/map` | `ontology:read` | 查询跨领域导航骨架或指定领域的审校概念图；`--full` 请求完整视图 |
+| `article` | `GET /resources/{article_id}` | `resource:read` | 读取文章摘要、更新时间、Leaf 数量和公开链接 |
+| `binding` | `GET /resources/{article_id}/ontology` | `ontology:read` | 读取文章主绑定、相关绑定和正文 Leaf 证据 |
+| `graph` | `GET /resources/{article_id}/graph` | `graph:read` | 读取文章的实体、描述关系和来源 Leaf |
 
 常用参数通过 `python3 {baseDir}/scripts/knowledge_query.py <command> --help` 查看。
 
@@ -91,7 +94,26 @@ Key 创建或轮换时只显示一次明文。把它放进 Agent 运行环境，
 - `nodes[]`：图节点。字段包括 `id`、`domain_id`、`domain_label`、`parent_id`、`kind`、`label`、`description`、`route`、`article_count` 和 `course_count`。
 - `edges[]`：图关系，字段包括 `source`、`target` 和 `type`。
 - 不带 `domain_id` 时返回稳定的跨领域导航骨架；带 `domain_id` 时返回该领域全部受审阅节点和域内关系。
+- `--full` 映射为 `full=true`，用于请求所选领域的完整概念视图；不带 `--full` 时服务可返回有界导航骨架。
 - 共享字段：`request_id`、`content_revision`、`knowledge_revision`、`ontology_revision`、`truncated`。
+
+### `article`
+
+- 返回 `article`，包括 `article_id`、`source_path`、`title`、`sha256`、`updated_at`、`chunk_count` 和 `public_url`。
+- 文章正文不由该命令返回；使用 `retrieve` 查询 Section/Leaf，使用 `public_url` 跳转原文。
+- 共享字段：`request_id`、`content_revision`。
+
+### `binding`
+
+- 返回 `primary_binding`、`related_bindings` 和 `concept_evidence`。
+- 每条 `concept_evidence` 都应包含 `chunk_id`、`heading_path`、`source_quote`、`excerpt`、`start_line`、`end_line` 和 `public_url`。
+- 没有可靠主概念时服务可以返回空主绑定或 `unbound` 结果；不能把文章标题当作正文证据。
+
+### `graph`
+
+- 返回 `nodes`、`edges` 和 `truncated`；关系在默认 `include_sources=true` 时附带来源 Leaf。
+- 图谱事实来自文章 Leaf 的 Evidence Graph。它用于解释和检索，不会写回正式 Ontology。
+- `--no-sources` 只在不需要来源展开时使用；回答或审阅事实时保留来源。
 
 ## Knowledge organization
 
@@ -117,3 +139,4 @@ Knowledge snapshot
 - 指定 `domain_id` 的 `ontology` 是该领域的完整审校视图，可能包含尚无 resource 的节点。
 - `learning` 是一个概念的局部投影：焦点、直接关系、解释和挂载资源。
 - `search` 和 `retrieve` 是 publication/section 读取面；`query` 在该读取面上返回 answer 和 citation。
+- `binding` 是文章到 Ontology 的关联读取面；`graph` 是文章到 Evidence Graph 的事实读取面。二者不是同一套关系，也不互相改写。

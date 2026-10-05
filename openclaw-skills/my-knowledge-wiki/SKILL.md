@@ -19,13 +19,15 @@ python3 {baseDir}/scripts/knowledge_query.py query "DDPM 依赖哪些数学知�
 python3 {baseDir}/scripts/knowledge_query.py learning "DDPM"
 python3 {baseDir}/scripts/knowledge_query.py retrieve "DDPM"
 python3 {baseDir}/scripts/knowledge_query.py ontology --domain-id mathematics
+python3 {baseDir}/scripts/knowledge_query.py binding <article-id>
+python3 {baseDir}/scripts/knowledge_query.py graph <article-id>
 ```
 
 ## Interface Contract
 
-- `query` 返回带 citation 的回答；`search` 返回候选 Section；`retrieve` 返回 Section 原文与相邻上下文；`learning` 返回焦点概念、局部关系和材料；`ontology` 返回全局导航骨架或指定领域的审校概念图。
+- `query` 返回带 citation 的回答；`search` 返回候选 Section；`retrieve` 返回 Section 原文与相邻上下文；`article` 返回文章摘要和公开链接；`binding` 返回文章的 primary/related Ontology 绑定及 Leaf 证据；`graph` 返回文章的证据实体、关系和来源 Leaf；`learning` 返回焦点概念、局部关系和材料；`ontology` 返回全局导航骨架或指定领域的审校概念图，`--full` 请求完整领域视图。
 - 服务是只读、同步请求接口，不提供异步 task、job 状态或任务管理。`request_id` 是请求 trace 标识，不是任务 ID。
 - `content_revision`、`knowledge_revision` 和 `ontology_revision` 标识响应所属的内容、知识投影和 Ontology 快照；`truncated`、`degraded` 和 `warnings` 描述响应完整性或降级状态。字段定义见查询契约。
-- Ontology 以 domain、meta-node、concept 和 reviewed edge 组织知识。课程、Blog、论文和技术分析是挂在概念上的 resource，不是 Ontology 节点。
+- Ontology 以 domain、meta-node、concept 和 reviewed edge 组织知识。课程、Blog、论文和技术分析是挂在概念上的 resource，不是 Ontology 节点；文章中的实体和描述关系属于 Evidence Graph，不会自动变成 Ontology 节点或正式关系。
 - 脚本从 `MY_KNOWLEDGE_WIKI_API_URL` 和 `MY_KNOWLEDGE_WIKI_API_KEY` 读取服务地址和 Key。远程地址必须使用 HTTPS；自签名证书只能由私有运行环境显式设置 `MY_KNOWLEDGE_WIKI_TLS_INSECURE=true`，仓库不保存 endpoint。
 - 成功时 stdout 是服务返回的完整 JSON。配置、网络或 HTTP 失败时 stderr 输出错误并返回非零退出码。
