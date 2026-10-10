@@ -28,7 +28,17 @@ HOST_ENV = "MY_KNOWLEDGE_WIKI_MCP_HOST"
 PORT_ENV = "MY_KNOWLEDGE_WIKI_MCP_PORT"
 TIMEOUT_ENV = "MY_KNOWLEDGE_WIKI_MCP_TIMEOUT"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-PROTOCOL_VERSION = "2025-03-26"
+# Keep the legacy handshake transport, but negotiate the versions supported by
+# current Streamable HTTP clients instead of always downgrading them to the
+# oldest version. The wire format used by this adapter is compatible with
+# these three handshake-era revisions.
+LATEST_PROTOCOL_VERSION = "2025-11-25"
+DEFAULT_PROTOCOL_VERSION = "2025-03-26"
+SUPPORTED_PROTOCOL_VERSIONS = {
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+}
 MCP_PATH = "/mcp"
 
 
@@ -210,12 +220,13 @@ def result(value: Any) -> dict[str, Any]:
 class MCPHandler(BaseHTTPRequestHandler):
     server_version = "my-knowledge-wiki-mcp/1"
 
-    def _common_headers(self) -> None:
+    def _common_headers(self, protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id")
-        self.send_header("MCP-Protocol-Version", PROTOCOL_VERSION)
+        self.send_header("MCP-Protocol-Version", protocol_version)
 
-    def _send(self, status: int, payload: dict[str, Any], *, allow: str | None = None) -> None:
+    def _send(self, status: int, payload: dict[str, Any], *, allow: str | None = None,
+              protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -223,14 +234,14 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         if allow:
             self.send_header("Allow", allow)
-        self._common_headers()
+        self._common_headers(protocol_version)
         self.end_headers()
         self.wfile.write(data)
 
-    def _send_empty(self, status: int) -> None:
+    def _send_empty(self, status: int, *, protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
         self.send_response(status)
         self.send_header("Content-Length", "0")
-        self._common_headers()
+        self._common_headers(protocol_version)
         self.end_headers()
 
     def do_OPTIONS(self) -> None:  # noqa: N802
@@ -278,27 +289,62 @@ class MCPHandler(BaseHTTPRequestHandler):
             if length <= 0 or length > 2_000_000:
                 raise ValueError("invalid request body")
             request = json.loads(self.rfile.read(length))
-            response = dispatch(self.server.client, request)  # type: ignore[attr-defined]
+            messages = request if isinstance(request, list) else [request]
+            if not messages or not all(isinstance(message, dict) for message in messages):
+                raise ValueError("invalid JSON-RPC message")
+            protocol_version = negotiate_protocol_version(messages, self.headers.get("MCP-Protocol-Version"))
+            self.log_message(
+                "mcp rpc_methods=%s protocol=%s accept=%s",
+                ",".join(str(message.get("method", "")) for message in messages),
+                protocol_version,
+                self.headers.get("Accept", ""),
+            )
+            responses = [
+                response
+                for message in messages
+                for response in [dispatch(self.server.client, message, protocol_version)]  # type: ignore[attr-defined]
+                if response is not None
+            ]
+            # A notification has no JSON-RPC response. Streamable HTTP returns
+            # 202 when a POST contains only notifications/responses.
+            if not responses:
+                self._send_empty(202, protocol_version=protocol_version)
+                return
+            response = responses[0] if not isinstance(request, list) else responses
         except (ValueError, json.JSONDecodeError) as exc:
             response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": str(exc)}}
+            protocol_version = DEFAULT_PROTOCOL_VERSION
         except Exception as exc:  # errors are returned without secrets
             response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(locals().get("request"), dict) else None, "error": {"code": -32000, "message": str(exc)}}
-        self._send(200, response)
+            protocol_version = DEFAULT_PROTOCOL_VERSION
+        self._send(200, response, protocol_version=protocol_version)
 
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"{self.address_string()} {fmt % args}", file=sys.stderr)
 
 
-def dispatch(client: KnowledgeClient, request: dict[str, Any]) -> dict[str, Any]:
+def negotiate_protocol_version(messages: list[dict[str, Any]], header: str | None) -> str:
+    """Return the version shared with the client for this HTTP request."""
+    initialize = next((message for message in messages if message.get("method") == "initialize"), None)
+    requested = ((initialize or {}).get("params") or {}).get("protocolVersion")
+    requested = requested or header
+    if requested in SUPPORTED_PROTOCOL_VERSIONS:
+        return requested
+    return LATEST_PROTOCOL_VERSION
+
+
+def dispatch(client: KnowledgeClient, request: dict[str, Any],
+             protocol_version: str | None = None) -> dict[str, Any] | None:
     if request.get("jsonrpc") != "2.0" or "method" not in request:
         return {"jsonrpc": "2.0", "id": request.get("id"), "error": {"code": -32600, "message": "invalid JSON-RPC request"}}
     request_id = request.get("id")
     method = request["method"]
     params = request.get("params") or {}
+    protocol_version = protocol_version or negotiate_protocol_version([request], None)
     if method == "initialize":
-        return {"jsonrpc": "2.0", "id": request_id, "result": {"protocolVersion": PROTOCOL_VERSION, "capabilities": {"tools": {}}, "serverInfo": {"name": "my-knowledge-wiki", "version": "1.0.0"}}}
+        return {"jsonrpc": "2.0", "id": request_id, "result": {"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": "my-knowledge-wiki", "version": "1.0.0"}}}
     if method == "notifications/initialized":
-        return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+        return None
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": request_id, "result": {"tools": TOOLS}}
     if method == "tools/call":

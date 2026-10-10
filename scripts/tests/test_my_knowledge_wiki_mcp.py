@@ -42,7 +42,17 @@ class MCPTests(unittest.TestCase):
     def test_initialize_advertises_tools(self):
         response = MCP.dispatch(FakeClient(), {"jsonrpc": "2.0", "id": 1, "method": "initialize"})
         self.assertEqual(response["result"]["capabilities"], {"tools": {}})
-        self.assertEqual(response["result"]["protocolVersion"], "2025-03-26")
+        self.assertEqual(response["result"]["protocolVersion"], "2025-11-25")
+
+    def test_initialize_negotiates_client_version_and_notifications_have_no_response(self):
+        client = FakeClient()
+        response = MCP.dispatch(
+            client,
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+             "params": {"protocolVersion": "2025-06-18"}},
+        )
+        self.assertEqual(response["result"]["protocolVersion"], "2025-06-18")
+        self.assertIsNone(MCP.dispatch(client, {"jsonrpc": "2.0", "method": "notifications/initialized"}))
 
     def test_streamable_http_probe_methods(self):
         server = MCP.ThreadingHTTPServer(("127.0.0.1", 0), MCP.MCPHandler)
@@ -62,8 +72,8 @@ class MCPTests(unittest.TestCase):
             client.request("POST", "/mcp", body=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"}), headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
             response = client.getresponse()
             self.assertEqual(response.status, 200)
-            self.assertEqual(response.getheader("MCP-Protocol-Version"), "2025-03-26")
-            self.assertEqual(json.loads(response.read())["result"]["protocolVersion"], "2025-03-26")
+            self.assertEqual(response.getheader("MCP-Protocol-Version"), "2025-11-25")
+            self.assertEqual(json.loads(response.read())["result"]["protocolVersion"], "2025-11-25")
         finally:
             server.shutdown()
             server.server_close()
