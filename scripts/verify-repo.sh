@@ -130,7 +130,7 @@ PY
 "$PYTHON_BIN" - <<'PY'
 from pathlib import Path
 
-roots = [Path("hermes-plugins"), Path("info-track"), Path("openclaw-skills"), Path("scripts")]
+roots = [Path("hermes-plugins"), Path("info-track"), Path("openclaw-skills"), Path("scripts"), Path("mcp")]
 files = [path for root in roots for path in root.rglob("*.py") if "__pycache__" not in path.parts]
 for path in files:
     source = path.read_text(encoding="utf-8")
@@ -140,7 +140,7 @@ PY
 
 while IFS= read -r -d '' script; do
   bash -n "$script"
-done < <(find hermes-plugins info-track openclaw-skills scripts -type f -name '*.sh' -print0)
+done < <(find hermes-plugins info-track openclaw-skills scripts mcp -type f -name '*.sh' -print0)
 printf 'OK: shell syntax\n'
 
 if find hermes-plugins info-track openclaw-skills -type f \( -name '*.js' -o -name '*.mjs' \) -print -quit | grep -q .; then

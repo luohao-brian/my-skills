@@ -1,0 +1,18 @@
+{
+  "service": "my-knowledge-wiki-mcp",
+  "entrypoint": "server.py",
+  "port": 8080,
+  "public_path": "/mcp",
+  "health_path": "/healthz",
+  "auth": "none",
+  "env": {
+    "MY_KNOWLEDGE_WIKI_API_URL": "MY_KNOWLEDGE_WIKI_API_URL",
+    "MY_KNOWLEDGE_WIKI_API_KEY": "MY_KNOWLEDGE_WIKI_API_KEY",
+    "MY_KNOWLEDGE_WIKI_MCP_KEY": "MY_KNOWLEDGE_WIKI_API_KEY",
+    "MY_KNOWLEDGE_WIKI_MCP_AUTH": "none",
+    "MY_KNOWLEDGE_WIKI_MCP_HOST": "127.0.0.1",
+    "MY_KNOWLEDGE_WIKI_MCP_PORT": "8080",
+    "MY_KNOWLEDGE_WIKI_MCP_TIMEOUT": "30",
+    "MY_KNOWLEDGE_WIKI_TLS_INSECURE": "false"
+  }
+}
