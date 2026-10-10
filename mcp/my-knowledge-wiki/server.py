@@ -226,10 +226,12 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header("MCP-Protocol-Version", protocol_version)
 
     def _send(self, status: int, payload: dict[str, Any], *, allow: str | None = None,
-              protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+              protocol_version: str = LATEST_PROTOCOL_VERSION,
+              stream: bool = False) -> None:
+        encoded = json.dumps(payload, ensure_ascii=False)
+        data = (f"data: {encoded}\n\n" if stream else encoded).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "text/event-stream" if stream else "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         if allow:
@@ -311,13 +313,16 @@ class MCPHandler(BaseHTTPRequestHandler):
                 self._send_empty(202, protocol_version=protocol_version)
                 return
             response = responses[0] if not isinstance(request, list) else responses
+            stream = "text/event-stream" in self.headers.get("Accept", "").lower()
         except (ValueError, json.JSONDecodeError) as exc:
             response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": str(exc)}}
             protocol_version = DEFAULT_PROTOCOL_VERSION
+            stream = False
         except Exception as exc:  # errors are returned without secrets
             response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(locals().get("request"), dict) else None, "error": {"code": -32000, "message": str(exc)}}
             protocol_version = DEFAULT_PROTOCOL_VERSION
-        self._send(200, response, protocol_version=protocol_version)
+            stream = False
+        self._send(200, response, protocol_version=protocol_version, stream=stream)
 
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"{self.address_string()} {fmt % args}", file=sys.stderr)

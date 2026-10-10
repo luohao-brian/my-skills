@@ -69,11 +69,19 @@ class MCPTests(unittest.TestCase):
             self.assertIn("POST", options.getheader("Access-Control-Allow-Methods"))
             options.read()
 
-            client.request("POST", "/mcp", body=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"}), headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+            client.request("POST", "/mcp", body=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"}), headers={"Content-Type": "application/json", "Accept": "application/json"})
             response = client.getresponse()
             self.assertEqual(response.status, 200)
             self.assertEqual(response.getheader("MCP-Protocol-Version"), "2025-11-25")
             self.assertEqual(json.loads(response.read())["result"]["protocolVersion"], "2025-11-25")
+
+            client.request("POST", "/mcp", body=json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}), headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+            response = client.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.getheader("Content-Type"), "text/event-stream")
+            event = response.read().decode()
+            self.assertTrue(event.startswith("data: "))
+            self.assertIn('"tools"', event)
         finally:
             server.shutdown()
             server.server_close()
