@@ -29,6 +29,7 @@ PORT_ENV = "MY_KNOWLEDGE_WIKI_MCP_PORT"
 TIMEOUT_ENV = "MY_KNOWLEDGE_WIKI_MCP_TIMEOUT"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 PROTOCOL_VERSION = "2025-03-26"
+MCP_PATH = "/mcp"
 
 
 class ConfigError(RuntimeError):
@@ -209,23 +210,61 @@ def result(value: Any) -> dict[str, Any]:
 class MCPHandler(BaseHTTPRequestHandler):
     server_version = "my-knowledge-wiki-mcp/1"
 
-    def _send(self, status: int, payload: dict[str, Any]) -> None:
+    def _common_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id")
+        self.send_header("MCP-Protocol-Version", PROTOCOL_VERSION)
+
+    def _send(self, status: int, payload: dict[str, Any], *, allow: str | None = None) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        if allow:
+            self.send_header("Allow", allow)
+        self._common_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_empty(self, status: int) -> None:
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        self._common_headers()
+        self.end_headers()
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        if self.path != MCP_PATH:
+            self._send(404, {"error": "not found"})
+            return
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Protocol-Version, MCP-Session-Id")
+        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id")
+        self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path in {"/healthz", "/"}:
             self._send(200, {"ok": True, "service": "my-knowledge-wiki-mcp"})
             return
+        if self.path == MCP_PATH:
+            # Streamable HTTP reserves GET for a server-to-client event stream.
+            # This adapter is stateless and has no session stream to open.
+            self._send(405, {"error": "stateless MCP does not open a GET stream"}, allow="GET, POST, DELETE")
+            return
         self._send(405, {"error": "MCP uses POST /mcp"})
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        if self.path == MCP_PATH:
+            # There are no server-side sessions to terminate in stateless mode.
+            self._send_empty(204)
+            return
+        self._send(404, {"error": "not found"})
+
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/mcp":
+        if self.path != MCP_PATH:
             self._send(404, {"error": "not found"})
             return
         if self.server.mcp_auth == "bearer":  # type: ignore[attr-defined]

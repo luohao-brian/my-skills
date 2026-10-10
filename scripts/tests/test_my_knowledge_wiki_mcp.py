@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import http.client
 from pathlib import Path
 import re
 import sys
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -41,6 +43,31 @@ class MCPTests(unittest.TestCase):
         response = MCP.dispatch(FakeClient(), {"jsonrpc": "2.0", "id": 1, "method": "initialize"})
         self.assertEqual(response["result"]["capabilities"], {"tools": {}})
         self.assertEqual(response["result"]["protocolVersion"], "2025-03-26")
+
+    def test_streamable_http_probe_methods(self):
+        server = MCP.ThreadingHTTPServer(("127.0.0.1", 0), MCP.MCPHandler)
+        server.mcp_auth = "none"
+        server.mcp_key = ""
+        server.client = FakeClient()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            client = http.client.HTTPConnection(*server.server_address, timeout=5)
+            client.request("OPTIONS", "/mcp")
+            options = client.getresponse()
+            self.assertEqual(options.status, 204)
+            self.assertIn("POST", options.getheader("Access-Control-Allow-Methods"))
+            options.read()
+
+            client.request("POST", "/mcp", body=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"}), headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+            response = client.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.getheader("MCP-Protocol-Version"), "2025-03-26")
+            self.assertEqual(json.loads(response.read())["result"]["protocolVersion"], "2025-03-26")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
 
     def test_learning_resolves_alias(self):
         client = FakeClient()
