@@ -44,6 +44,14 @@ class MCPTests(unittest.TestCase):
         self.assertEqual(response["result"]["capabilities"], {"tools": {}})
         self.assertEqual(response["result"]["protocolVersion"], "2025-11-25")
 
+    def test_server_discover_advertises_supported_versions_and_tools(self):
+        response = MCP.dispatch(FakeClient(), {"jsonrpc": "2.0", "id": 1, "method": "server/discover"})
+        result = response["result"]
+        self.assertEqual(result["resultType"], "complete")
+        self.assertEqual(result["supportedVersions"], ["2025-11-25", "2025-06-18", "2025-03-26"])
+        self.assertEqual(result["capabilities"], {"tools": {}})
+        self.assertEqual(result["serverInfo"], {"name": "my-knowledge-wiki", "version": "1.0.0"})
+
     def test_initialize_negotiates_client_version_and_notifications_have_no_response(self):
         client = FakeClient()
         response = MCP.dispatch(

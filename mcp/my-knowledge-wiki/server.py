@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Read-only MCP adapter for the my-knowledge-wiki REST API.
 
-The server exposes the MCP JSON-RPC methods initialize, tools/list and
-tools/call over POST /mcp.  ChatGPT uses the no-auth deployment mode; the
-optional bearer mode reuses the same read-only key as the Knowledge API.
+The server exposes MCP discovery, initialize, tools/list and tools/call over
+POST /mcp. ChatGPT uses the no-auth deployment mode; the optional bearer mode
+reuses the same read-only key as the Knowledge API.
 """
 
 from __future__ import annotations
@@ -348,6 +348,17 @@ def dispatch(client: KnowledgeClient, request: dict[str, Any],
     protocol_version = protocol_version or negotiate_protocol_version([request], None)
     if method == "initialize":
         return {"jsonrpc": "2.0", "id": request_id, "result": {"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": "my-knowledge-wiki", "version": "1.0.0"}}}
+    if method == "server/discover":
+        return {"jsonrpc": "2.0", "id": request_id, "result": {
+            "resultType": "complete",
+            "supportedVersions": sorted(SUPPORTED_PROTOCOL_VERSIONS, reverse=True),
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "my-knowledge-wiki", "version": "1.0.0"},
+            "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "my-knowledge-wiki", "version": "1.0.0"}},
+            "instructions": "Read-only access to the Knowledge Wiki through search, retrieval, learning, ontology, article, binding, and graph tools.",
+            "ttlMs": 3600000,
+            "cacheScope": "public",
+        }}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
