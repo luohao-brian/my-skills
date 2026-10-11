@@ -9,9 +9,15 @@ reuses the same read-only key as the Knowledge API.
 from __future__ import annotations
 
 import json
+import ipaddress
+import math
+import socket
 import os
 import ssl
 import sys
+import threading
+import time
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -23,10 +29,15 @@ BACKEND_URL_ENV = "MY_KNOWLEDGE_WIKI_API_URL"
 BACKEND_KEY_ENV = "MY_KNOWLEDGE_WIKI_API_KEY"
 MCP_KEY_ENV = "MY_KNOWLEDGE_WIKI_MCP_KEY"
 MCP_AUTH_ENV = "MY_KNOWLEDGE_WIKI_MCP_AUTH"
+PUBLIC_ENABLED_ENV = "MCP_PUBLIC_ENABLED"
 TLS_INSECURE_ENV = "MY_KNOWLEDGE_WIKI_TLS_INSECURE"
 HOST_ENV = "MY_KNOWLEDGE_WIKI_MCP_HOST"
 PORT_ENV = "MY_KNOWLEDGE_WIKI_MCP_PORT"
 TIMEOUT_ENV = "MY_KNOWLEDGE_WIKI_MCP_TIMEOUT"
+RATE_LIMIT_ENV = "MCP_PUBLIC_RPM"
+TUNNEL_RATE_LIMIT_ENV = "MCP_TUNNEL_RPM"
+MAX_INFLIGHT_ENV = "MCP_MAX_INFLIGHT"
+MAX_BATCH_ENV = "MCP_MAX_BATCH"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 # Keep the legacy handshake transport, but negotiate the versions supported by
 # current Streamable HTTP clients instead of always downgrading them to the
@@ -47,7 +58,118 @@ class ConfigError(RuntimeError):
 
 
 class BackendError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None,
+                 headers: dict[str, str] | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.headers = headers or {}
+
+
+class MCPAdmissionError(RuntimeError):
+    def __init__(self, message: str, *, status_code: int,
+                 headers: dict[str, str] | None = None,
+                 code: int = -32029) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.code = code
+
+
+class MCPAdmission:
+    """Bound the local MCP process for public HTTPS and tunnel ingress."""
+
+    def __init__(self, public_rpm: int, tunnel_rpm: int, max_inflight: int, max_batch: int) -> None:
+        self.public_rpm = public_rpm
+        self.tunnel_rpm = tunnel_rpm
+        self.max_batch = max_batch
+        self._inflight = threading.BoundedSemaphore(max_inflight)
+        self._lock = threading.Lock()
+        self._request_times: dict[tuple[str, str], deque[float]] = {}
+
+    @staticmethod
+    def client_key(handler: BaseHTTPRequestHandler) -> tuple[str, str]:
+        # Listener ownership determines ingress; user-supplied ingress/forwarded
+        # headers on the tunnel listener never create a new budget.
+        ingress = getattr(handler.server, "ingress", "tunnel")
+        client = "shared" if ingress == "tunnel" else handler.headers.get("X-Real-IP", handler.client_address[0])
+        if ingress == "public":
+            try:
+                client = str(ipaddress.ip_address(client))
+            except ValueError:
+                client = handler.client_address[0]
+        return ingress, client
+
+    def charge(self, handler: BaseHTTPRequestHandler, cost: int) -> dict[str, str]:
+        if cost > self.max_batch:
+            raise MCPAdmissionError("MCP batch exceeds configured maximum", status_code=400, code=-32600)
+        ingress, client = self.client_key(handler)
+        limit = self.public_rpm if ingress == "public" else self.tunnel_rpm
+        now = time.monotonic()
+        key = (ingress, client)
+        with self._lock:
+            # Bound cardinality as well as the number of timestamps per client.
+            if len(self._request_times) >= 4096:
+                self._request_times = {k: v for k, v in self._request_times.items() if v and v[-1] > now - 60}
+            if key not in self._request_times and len(self._request_times) >= 4096:
+                raise MCPAdmissionError("MCP client capacity reached", status_code=503, code=-32003,
+                                        headers={"Retry-After": "60"})
+            values = self._request_times.setdefault(key, deque())
+            while values and values[0] <= now - 60:
+                values.popleft()
+            reset = max(1, math.ceil(60 - (now - values[0]))) if values else 60
+            rate = {"RateLimit-Limit": str(limit),
+                    "RateLimit-Remaining": str(max(0, limit - len(values))),
+                    "RateLimit-Reset": str(reset)}
+            if len(values) + cost > limit:
+                raise MCPAdmissionError(f"MCP {ingress} rate limit exceeded", status_code=429,
+                                        headers={**rate, "Retry-After": str(reset)})
+            for _ in range(cost):
+                values.append(now)
+            rate["RateLimit-Remaining"] = str(max(0, limit - len(values)))
+        return rate
+
+    def acquire(self, handler: BaseHTTPRequestHandler, cost: int) -> dict[str, str]:
+        rate = self.charge(handler, cost)
+        if not self._inflight.acquire(blocking=False):
+            raise MCPAdmissionError("MCP concurrency limit reached", status_code=503,
+                                    headers={**rate, "Retry-After": "1"}, code=-32003)
+        return rate
+
+    def release(self) -> None:
+        self._inflight.release()
+
+
+class BoundedMCPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 32
+
+    def __init__(self, address, handler, *, ingress, admission, workers=16, read_timeout=10):
+        super().__init__(address, handler)
+        self.ingress = ingress
+        self.admission = admission
+        self.read_timeout = read_timeout
+        self._workers = threading.BoundedSemaphore(workers)
+
+    def process_request(self, request, client_address):
+        request.settimeout(self.read_timeout)
+        if not self._workers.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._workers.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._workers.release()
 
 
 def _bool_env(name: str) -> bool:
@@ -77,24 +199,45 @@ def load_config() -> dict[str, Any]:
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ConfigError(f"{BACKEND_URL_ENV} must not contain credentials, query, or fragment")
     insecure = _bool_env(TLS_INSECURE_ENV)
+    public_enabled = _bool_env(PUBLIC_ENABLED_ENV)
     if insecure and parsed.scheme != "https":
         raise ConfigError(f"{TLS_INSECURE_ENV} requires an HTTPS backend URL")
     try:
         port = int(os.getenv(PORT_ENV, "8080"))
         timeout = float(os.getenv(TIMEOUT_ENV, "30"))
+        public_rpm = int(os.getenv(RATE_LIMIT_ENV, "60"))
+        tunnel_rpm = int(os.getenv(TUNNEL_RATE_LIMIT_ENV, "30"))
+        max_inflight = int(os.getenv(MAX_INFLIGHT_ENV, "8"))
+        max_batch = int(os.getenv(MAX_BATCH_ENV, "8"))
+        public_port = int(os.getenv("MCP_PUBLIC_PORT", "8081"))
+        workers = int(os.getenv("MCP_MAX_WORKERS", "16"))
+        read_timeout = float(os.getenv("MCP_READ_TIMEOUT", "10"))
     except ValueError as exc:
         raise ConfigError(f"invalid MCP port or timeout: {exc}") from None
-    if not 1 <= port <= 65535 or timeout <= 0:
+    if (not 1 <= port <= 65535 or timeout <= 0 or public_rpm < 1 or tunnel_rpm < 1
+            or max_inflight < 1 or max_batch < 1 or workers < 1 or read_timeout <= 0
+            or not 1 <= public_port <= 65535 or (public_enabled and public_port == port)):
         raise ConfigError("MCP port must be 1..65535 and timeout must be positive")
+    host = os.getenv(HOST_ENV, "127.0.0.1")
+    if host not in LOCAL_HOSTS:
+        raise ConfigError("MCP must bind to loopback")
     return {
         "backend_url": backend_url,
         "backend_key": backend_key,
         "mcp_key": mcp_key,
         "auth": auth,
+        "public_enabled": public_enabled,
         "insecure": insecure,
-        "host": os.getenv(HOST_ENV, "127.0.0.1"),
+        "host": host,
         "port": port,
         "timeout": timeout,
+        "public_rpm": public_rpm,
+        "tunnel_rpm": tunnel_rpm,
+        "max_inflight": max_inflight,
+        "max_batch": max_batch,
+        "public_port": public_port,
+        "workers": workers,
+        "read_timeout": read_timeout,
     }
 
 
@@ -135,7 +278,21 @@ class KnowledgeClient:
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = problem_detail(exc.read().decode("utf-8", errors="replace"))
-            raise BackendError(f"Knowledge API returned HTTP {exc.code}: {detail}") from None
+            headers = {
+                name: value
+                for name, value in (
+                    ("RateLimit-Limit", exc.headers.get("RateLimit-Limit")),
+                    ("RateLimit-Remaining", exc.headers.get("RateLimit-Remaining")),
+                    ("RateLimit-Reset", exc.headers.get("RateLimit-Reset")),
+                    ("Retry-After", exc.headers.get("Retry-After")),
+                )
+                if value
+            }
+            raise BackendError(
+                f"Knowledge API returned HTTP {exc.code}: {detail}",
+                status_code=exc.code,
+                headers=headers,
+            ) from None
         except (URLError, TimeoutError) as exc:
             raise BackendError(f"Knowledge API request failed: {getattr(exc, 'reason', exc)}") from None
         try:
@@ -220,14 +377,24 @@ def result(value: Any) -> dict[str, Any]:
 class MCPHandler(BaseHTTPRequestHandler):
     server_version = "my-knowledge-wiki-mcp/1"
 
+    def handle_one_request(self) -> None:
+        self._admitted = False
+        self._rate_headers = {}
+        try:
+            super().handle_one_request()
+        finally:
+            if self._admitted and getattr(self.server, "admission", None) is not None:
+                self.server.admission.release()
+
+
     def _common_headers(self, protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id")
+        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset")
         self.send_header("MCP-Protocol-Version", protocol_version)
 
     def _send(self, status: int, payload: dict[str, Any], *, allow: str | None = None,
               protocol_version: str = LATEST_PROTOCOL_VERSION,
-              stream: bool = False) -> None:
+              stream: bool = False, headers: dict[str, str] | None = None) -> None:
         encoded = json.dumps(payload, ensure_ascii=False)
         data = (f"data: {encoded}\n\n" if stream else encoded).encode("utf-8")
         self.send_response(status)
@@ -237,13 +404,18 @@ class MCPHandler(BaseHTTPRequestHandler):
         if allow:
             self.send_header("Allow", allow)
         self._common_headers(protocol_version)
+        for name, value in (headers if headers is not None else getattr(self, "_rate_headers", {})).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(data)
 
-    def _send_empty(self, status: int, *, protocol_version: str = LATEST_PROTOCOL_VERSION) -> None:
+    def _send_empty(self, status: int, *, protocol_version: str = LATEST_PROTOCOL_VERSION,
+                    headers: dict[str, str] | None = None) -> None:
         self.send_response(status)
         self.send_header("Content-Length", "0")
         self._common_headers(protocol_version)
+        for name, value in (headers if headers is not None else getattr(self, "_rate_headers", {})).items():
+            self.send_header(name, value)
         self.end_headers()
 
     def do_OPTIONS(self) -> None:  # noqa: N802
@@ -255,12 +427,22 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Protocol-Version, MCP-Session-Id")
-        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id")
+        self.send_header("Access-Control-Expose-Headers", "MCP-Protocol-Version, MCP-Session-Id, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset")
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path in {"/healthz", "/"}:
             self._send(200, {"ok": True, "service": "my-knowledge-wiki-mcp"})
+            return
+        if self.path in {
+            "/.well-known/oauth-protected-resource/mcp",
+            "/.well-known/oauth-protected-resource",
+        }:
+            # This connector intentionally has no OAuth/DCR flow.  A plain 404
+            # lets tunnel-client classify the target as an unauthenticated MCP
+            # server; returning the generic 405 here is treated as malformed
+            # OAuth metadata and keeps tunnel readiness degraded.
+            self._send_empty(404)
             return
         if self.path == MCP_PATH:
             # Streamable HTTP reserves GET for a server-to-client event stream.
@@ -286,6 +468,13 @@ class MCPHandler(BaseHTTPRequestHandler):
             if supplied != f"Bearer {expected}":
                 self._send(401, {"error": "invalid MCP credentials"})
                 return
+        response: dict[str, Any] | list[dict[str, Any]] | None = None
+        response_status = 200
+        response_headers: dict[str, str] = dict(self._rate_headers)
+        protocol_version = DEFAULT_PROTOCOL_VERSION
+        stream = False
+        empty_response = False
+        request: Any = None
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 2_000_000:
@@ -295,12 +484,19 @@ class MCPHandler(BaseHTTPRequestHandler):
             if not messages or not all(isinstance(message, dict) for message in messages):
                 raise ValueError("invalid JSON-RPC message")
             protocol_version = negotiate_protocol_version(messages, self.headers.get("MCP-Protocol-Version"))
-            self.log_message(
-                "mcp rpc_methods=%s protocol=%s accept=%s",
-                ",".join(str(message.get("method", "")) for message in messages),
-                protocol_version,
-                self.headers.get("Accept", ""),
-            )
+            cost = len(messages)
+            admission = getattr(self.server, "admission", None)
+            if admission is not None:
+                response_headers = admission.acquire(self, cost)
+                self._rate_headers = response_headers
+                self._admitted = True
+                self.log_message(
+                    "mcp ingress=%s client=%s cost=%s rpc_methods=%s protocol=%s accept=%s",
+                    *admission.client_key(self), cost,
+                    ",".join(str(message.get("method", "")) for message in messages),
+                    protocol_version,
+                    self.headers.get("Accept", ""),
+                )
             responses = [
                 response
                 for message in messages
@@ -310,19 +506,50 @@ class MCPHandler(BaseHTTPRequestHandler):
             # A notification has no JSON-RPC response. Streamable HTTP returns
             # 202 when a POST contains only notifications/responses.
             if not responses:
-                self._send_empty(202, protocol_version=protocol_version)
-                return
-            response = responses[0] if not isinstance(request, list) else responses
-            stream = "text/event-stream" in self.headers.get("Accept", "").lower()
+                response_status = 202
+                empty_response = True
+            else:
+                response = responses[0] if not isinstance(request, list) else responses
+                # ChatGPT's connector creation probe sends an Accept header
+                # containing both JSON and SSE, but validates the special
+                # server/discover response as a plain JSON document. Keep
+                # normal MCP calls streamable while making discovery
+                # unambiguously application/json on that mixed Accept path.
+                discovery_only = (
+                    not isinstance(request, list)
+                    and request.get("method") == "server/discover"
+                )
+                stream = (
+                    "text/event-stream" in self.headers.get("Accept", "").lower()
+                    and not discovery_only
+                )
         except (ValueError, json.JSONDecodeError) as exc:
             response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": str(exc)}}
             protocol_version = DEFAULT_PROTOCOL_VERSION
+            stream = False
+            response_status = 400
+        except MCPAdmissionError as exc:
+            response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(request, dict) else None,
+                        "error": {"code": exc.code, "message": str(exc)}}
+            response_status = exc.status_code
+            response_headers = exc.headers
+            stream = False
+        except BackendError as exc:
+            response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(request, dict) else None,
+                        "error": {"code": -32029 if exc.status_code == 429 else -32000, "message": str(exc)}}
+            response_status = exc.status_code if exc.status_code in {429, 503} else 502
+            response_headers = exc.headers
             stream = False
         except Exception as exc:  # errors are returned without secrets
             response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(locals().get("request"), dict) else None, "error": {"code": -32000, "message": str(exc)}}
             protocol_version = DEFAULT_PROTOCOL_VERSION
             stream = False
-        self._send(200, response, protocol_version=protocol_version, stream=stream)
+            response_status = 502
+        if empty_response:
+            self._send_empty(response_status, protocol_version=protocol_version, headers=response_headers)
+        else:
+            self._send(response_status, response or {}, protocol_version=protocol_version,
+                       stream=stream, headers=response_headers)
 
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"{self.address_string()} {fmt % args}", file=sys.stderr)
@@ -374,17 +601,34 @@ def dispatch(client: KnowledgeClient, request: dict[str, Any],
 
 def main() -> int:
     config = load_config()
-    server = ThreadingHTTPServer((config["host"], config["port"]), MCPHandler)
-    server.mcp_key = config["mcp_key"]  # type: ignore[attr-defined]
-    server.mcp_auth = config["auth"]  # type: ignore[attr-defined]
-    server.client = KnowledgeClient(config)  # type: ignore[attr-defined]
-    print(f"my-knowledge-wiki MCP listening on {config['host']}:{config['port']}", flush=True)
+    admission = MCPAdmission(config["public_rpm"], config["tunnel_rpm"], config["max_inflight"], config["max_batch"])
+    servers = []
     try:
-        server.serve_forever()
+        listeners = [("tunnel", config["port"])]
+        if config["public_enabled"]:
+            listeners.append(("public", config["public_port"]))
+        for ingress, port in listeners:
+            server = BoundedMCPServer((config["host"], port), MCPHandler, ingress=ingress,
+                                      admission=admission, workers=config["workers"], read_timeout=config["read_timeout"])
+            servers.append(server)
+            server.mcp_key = config["mcp_key"]
+            server.mcp_auth = config["auth"]
+            server.client = KnowledgeClient(config)
+        thread = None
+        if len(servers) > 1:
+            thread = threading.Thread(target=servers[1].serve_forever, daemon=True)
+            thread.start()
+        print(f"MCP tunnel={config['port']} public={config['public_port'] if config['public_enabled'] else 'disabled'} workers={config['workers']}", flush=True)
+        servers[0].serve_forever()
     except KeyboardInterrupt:
         return 0
     finally:
-        server.server_close()
+        for server in servers:
+            server.shutdown()
+        for server in servers:
+            server.server_close()
+        if thread is not None:
+            thread.join(timeout=2)
     return 0
 
 

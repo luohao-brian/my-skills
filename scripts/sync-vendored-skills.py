@@ -133,6 +133,9 @@ def package_version(checkout: Path, manifest: dict[str, object]) -> str | None:
     payload = json.loads((checkout / relative).read_text(encoding="utf-8"))
     if "version" in payload:
         return str(payload["version"])
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict) and metadata.get("version") is not None:
+        return str(metadata["version"])
     plugins = payload.get("plugins")
     if isinstance(plugins, list) and plugins and isinstance(plugins[0], dict):
         version = plugins[0].get("version")

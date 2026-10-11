@@ -11,10 +11,10 @@ Every diagram ships in three variants (see `assets/`):
 | **Minimal light** (default) | `assets/template.html`, `example-<type>.html` | Screenshot-ready. Diagram + title. Warm paper. |
 | **Minimal dark** | `assets/template-dark.html`, `example-<type>-dark.html` | Dark mode sites, slides, high-contrast posts. |
 | **Full editorial** | `assets/template-full.html`, `example-<type>-full.html` | Long-form posts where the diagram is the hero. |
-| **Consultant special** (quadrant only) | `example-quadrant-consultant.html` | BCG/McKinsey-style 2×2 scenario matrix. Clinical sans-serif, white bg, bold blue double-ended axes, named scenario cells. See [type-quadrant.md](../../upstream/references/type-quadrant.md#consultant-special-2x2-scenario-matrix). |
+| **Consultant special** (quadrant only) | `example-quadrant-consultant.html` | BCG/McKinsey-style 2×2 scenario matrix. See [type-quadrant.md](../../upstream/references/type-quadrant.md#consultant-special-2x2-scenario-matrix). |
 
-**Sketchy variant** (optional, applied to any of the above) — see [primitive-sketchy.md](../../upstream/references/primitive-sketchy.md). SVG turbulence filter wobbles strokes for a hand-drawn feel. Good for essays, not for technical docs.
+**Sketchy variant** (optional, applied to any of the above): a hand-drawn stroke filter for essays, not technical docs. See [primitive-sketchy.md](../../upstream/references/primitive-sketchy.md).
 
-**Terminal variant** (optional, replaces any of the above) — see [primitive-terminal.md](../../upstream/references/primitive-terminal.md). Start from `assets/template-terminal.html`; terminal examples use the `example-<type>-terminal.html` naming pattern. Charcoal CLI-window chrome, monospace, one red-orange accent. Good for dev-tool posts; not brand-tokenized, so skip it for onboarded output.
+**Terminal variant** (optional, replaces any of the above): CLI-window chrome for dev-tool posts. Start from `assets/template-terminal.html` and follow [primitive-terminal.md](../../upstream/references/primitive-terminal.md); examples are named `example-<type>-terminal.html`. Not brand-tokenized, so skip it for onboarded output.
 
 **Animation** (optional presentation layer) — see [animation.md](../../upstream/references/animation.md). Modes are `none` (default), `reveal`, `step`, and `loop`; motion never changes the static meaning or raises the complexity budget.

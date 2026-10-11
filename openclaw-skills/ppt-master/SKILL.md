@@ -1,7 +1,7 @@
 ---
 name: ppt-master
 description: 将 PDF、DOCX、PPTX、网页、Markdown、新闻或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。
-metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master","primaryEnv":"ARK_AGENT_PLAN_API_KEY","requires":{"anyBins":["python3","python"]}}}
+metadata: {"openclaw":{"skillKey":"ppt-master","emoji":"📊","homepage":"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master","primaryEnv":"ARK_AGENT_PLAN_API_KEY","requires":{"anyBins":["python3","python"],"env":["ARK_AGENT_PLAN_API_KEY"]}}}
 ---
 
 

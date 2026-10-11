@@ -1,0 +1,60 @@
+<!-- GENERATED FILE: do not edit. Source: ../../upstream/SKILL.md -->
+
+Source section: `Visual-type guide (44)`
+
+### Visual-type guide (44)
+
+| If you're showing… | Use | Reference |
+|---|---|---|
+| Components + connections in one system snapshot | **Architecture** | [type-architecture.md](../../upstream/references/type-architecture.md) |
+| Structural change between synchronized Before / After topologies, with a Changes ledger | **Architecture delta** | [type-architecture-delta.md](../../upstream/references/type-architecture-delta.md) |
+| Legacy IT landscape by phase or department; shows the *before* state | **IT current-state** | [type-it-state.md](../../upstream/references/type-it-state.md) |
+| Decision logic with branches | **Flowchart** | [type-flowchart.md](../../upstream/references/type-flowchart.md) |
+| Time-ordered messages between actors | **Sequence** | [type-sequence.md](../../upstream/references/type-sequence.md) |
+| States + transitions + guards | **State machine** | [type-state.md](../../upstream/references/type-state.md) |
+| Entities + fields + relationships | **ER / data model** | [type-er.md](../../upstream/references/type-er.md) |
+| Events positioned in time | **Timeline** | [type-timeline.md](../../upstream/references/type-timeline.md) |
+| Cross-functional process with handoffs | **Swimlane** | [type-swimlane.md](../../upstream/references/type-swimlane.md) |
+| Two-axis positioning / prioritization | **Quadrant** | [type-quadrant.md](../../upstream/references/type-quadrant.md) |
+| Multiple entities scored across 3–5 quantitative criteria | **Radar / Spider** | [type-radar.md](../../upstream/references/type-radar.md) |
+| One quantitative series across cyclic categories; angle=category, radius=magnitude | **Polar chart** | [type-polar.md](../../upstream/references/type-polar.md) |
+| Reinforcing cycle; the last step feeds the first and a hub accumulates state | **Loop** | [type-loop.md](../../upstream/references/type-loop.md) |
+| Hierarchy through containment / scope | **Nested** | [type-nested.md](../../upstream/references/type-nested.md) |
+| Parent → children relationships | **Tree** | [type-tree.md](../../upstream/references/type-tree.md) |
+| Human/agent/team ownership, reporting, routing, escalation | **Org chart** | [type-org-chart.md](../../upstream/references/type-org-chart.md) |
+| Stacked abstraction levels | **Layer stack** | [type-layers.md](../../upstream/references/type-layers.md) |
+| Parts of one object pulled apart along one axis: a teardown, an unboxing, assembly order | **Exploded axonometric** | [type-exploded.md](../../upstream/references/type-exploded.md) |
+| One floor or site seen from above at an angle: rooms with furniture, buildings by phase | **Axonometric plan** | [type-axonometric-plan.md](../../upstream/references/type-axonometric-plan.md) |
+| Overlap between sets | **Venn** | [type-venn.md](../../upstream/references/type-venn.md) |
+| Ranked hierarchy or conversion drop-off | **Pyramid / funnel** | [type-pyramid.md](../../upstream/references/type-pyramid.md) |
+| Quantitative comparison across categories | **Bar chart** | [type-bar.md](../../upstream/references/type-bar.md) |
+| A start total bridged to an end total by signed contributions (budget bridge, headcount deltas) | **Waterfall** | [type-waterfall.md](../../upstream/references/type-waterfall.md) |
+| Part-of-whole where the relative sizes are the story | **Treemap** | [type-treemap.md](../../upstream/references/type-treemap.md) |
+| Cross-tabulated data; fill encodes value per cell | **Heatmap** | [type-heatmap.md](../../upstream/references/type-heatmap.md) |
+| Continuous trends over time, change between exactly two states (slopegraph), one distribution per series (ridgeline), or rank movement across several snapshots (bump) | **Line chart** | [type-line.md](../../upstream/references/type-line.md) |
+| Tasks and phases on a timeline | **Gantt** | [type-gantt.md](../../upstream/references/type-gantt.md) |
+| Correlation or distribution of two variables; bubble (three variables) and beeswarm (one variable, dot per item) variants | **Scatter plot** | [type-scatter.md](../../upstream/references/type-scatter.md) |
+| End-to-end data stack on a container cluster | **High-Level** | [type-high-level.md](../../upstream/references/type-high-level.md) |
+| Multi-actor sequential process with data handoffs | **Process** | [type-process.md](../../upstream/references/type-process.md) |
+| Multi-tier data storage with quality levels and access policies | **Medallion** | [type-medallion.md](../../upstream/references/type-medallion.md) |
+| Role-scoped data flow: who does what at each pipeline step | **Data flow** | [type-data-flow.md](../../upstream/references/type-data-flow.md) |
+| Integration topology of a data platform — sources → core → consumers | **DP integration** | [type-dp-integration.md](../../upstream/references/type-dp-integration.md) |
+| Per-role / per-component access permissions matrix | **DP security matrix** | [type-dp-security-matrix.md](../../upstream/references/type-dp-security-matrix.md) |
+| A quantity splitting and merging across stages, band width = amount | **Sankey** | [type-sankey.md](../../upstream/references/type-sankey.md) |
+| Causes of one observed effect, grouped by category (root-cause analysis) | **Fishbone** | [type-fishbone.md](../../upstream/references/type-fishbone.md) |
+| Value chain against evolution — what to build, buy, and what is moving | **Wardley map** | [type-wardley.md](../../upstream/references/type-wardley.md) |
+| Work-in-progress by state, with WIP limits and blocked items | **Kanban** | [type-kanban.md](../../upstream/references/type-kanban.md) |
+| What a person does across stages of an experience, and how it feels | **User journey** | [type-journey.md](../../upstream/references/type-journey.md) |
+| Where software runs — zones, hosts, artifacts, replicas, ports | **Deployment** | [type-deployment.md](../../upstream/references/type-deployment.md) |
+| What depends on what, with fan-in and cycles a tree cannot express | **Dependency graph** | [type-dependency.md](../../upstream/references/type-dependency.md) |
+| Classes with operations, inheritance, composition (other UML routes elsewhere) | **UML class** | [type-uml-class.md](../../upstream/references/type-uml-class.md) |
+| Narrative backbone sliced into releases, with the cut line | **Story map** | [type-story-map.md](../../upstream/references/type-story-map.md) |
+| Physical tables: SQL types, constraints, indexes, column-level FKs | **Database schema** | [type-db-schema.md](../../upstream/references/type-db-schema.md) |
+
+Rules of thumb:
+
+- If a 3-column table communicates the same thing, pick the table.
+- If two types seem useful, pick the dominant axis; a semantic pattern may add behavior-specific primitives, not a second layout grammar.
+- If you're past the complexity budget (§7), split into an overview + detail.
+
+**Always load the chosen type reference linked in the guide before drawing.** When routed above, also load `semantic-patterns.md`; when animation is chosen, load `animation.md`.

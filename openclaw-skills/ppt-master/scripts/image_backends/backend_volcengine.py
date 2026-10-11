@@ -3,9 +3,10 @@
 Volcengine Seedream image generation backend.
 
 Configuration keys:
-  LAS_API_KEY                         (required)
+  ARK_AGENT_PLAN_API_KEY                           (required)
+  VOLCENGINE_API_KEY / ARK_API_KEY / LAS_API_KEY   (legacy overrides)
   VOLCENGINE_BASE_URL                (optional)
-  VOLCENGINE_MODEL                   (optional; Seedream 4.5 only)
+  VOLCENGINE_MODEL                   (optional; Seedream 5.0 Pro by default)
 """
 
 import sys
@@ -42,10 +43,10 @@ from image_backends.backend_common import (
 )
 
 
-DEFAULT_ENDPOINT = "https://operator.las.cn-beijing.volces.com/api/v1/images/generations"
-DEFAULT_MODEL = "doubao-seedream-4-5-251128"
+DEFAULT_ENDPOINT = "https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
+DEFAULT_MODEL = "doubao-seedream-5.0-pro"
 DEFAULT_IMAGE_SIZE = "2K"
-SUPPORTED_MODELS = {DEFAULT_MODEL}
+SUPPORTED_MODELS = {DEFAULT_MODEL, "doubao-seedream-4-5-251128"}
 
 ASPECT_RATIO_SIZE_MAP = {
     "2K": {
@@ -72,7 +73,7 @@ ASPECT_RATIO_SIZE_MAP = {
 
 
 def _validate_model(model: str) -> str:
-    """Limit the backend to the Seedream 4.5 contract implemented below."""
+    """Limit the backend to the supported Seedream image contracts."""
     resolved = model.strip()
     if resolved not in SUPPORTED_MODELS:
         raise ValueError(
@@ -86,7 +87,7 @@ def _resolve_url(base_url: str) -> str:
     base = base_url.rstrip("/")
     if base.endswith("/images/generations"):
         return base
-    if base.endswith("/api/v1"):
+    if base.endswith(("/api/v1", "/api/v3")):
         return base + "/images/generations"
     return base + "/api/v1/images/generations"
 
@@ -166,9 +167,13 @@ def generate(prompt: str,
     normalized_size = normalize_image_size(image_size)
     _resolve_size(aspect_ratio, normalized_size)
     api_key = require_api_key(
+        "ARK_AGENT_PLAN_API_KEY",
+        "VOLCENGINE_API_KEY",
+        "ARK_API_KEY",
         "LAS_API_KEY",
         message=(
-            "No LAS image key found. Set LAS_API_KEY."
+            "No API key found. Set ARK_AGENT_PLAN_API_KEY in the current environment "
+            "or a .env file."
         ),
     )
     base_url = os.environ.get("VOLCENGINE_BASE_URL") or DEFAULT_ENDPOINT

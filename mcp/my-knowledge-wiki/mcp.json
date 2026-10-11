@@ -2,9 +2,23 @@
   "service": "my-knowledge-wiki-mcp",
   "entrypoint": "server.py",
   "port": 8080,
+  "public_enabled": false,
   "public_path": "/mcp",
   "health_path": "/healthz",
   "auth": "none",
+  "limits": {
+    "nginx_rate": "30r/m",
+    "nginx_burst": 10,
+    "nginx_connections": 16,
+    "mcp_rpm": 60,
+    "tunnel_rpm": 30,
+    "mcp_inflight": 8,
+    "mcp_batch_max": 8,
+    "nginx_health_rate": "60r/m",
+    "nginx_api_rate": "120r/m",
+    "mcp_workers": 16,
+    "mcp_read_timeout": 10
+  },
   "env": {
     "MY_KNOWLEDGE_WIKI_API_URL": "MY_KNOWLEDGE_WIKI_API_URL",
     "MY_KNOWLEDGE_WIKI_API_KEY": "MY_KNOWLEDGE_WIKI_API_KEY",
@@ -13,6 +27,18 @@
     "MY_KNOWLEDGE_WIKI_MCP_HOST": "127.0.0.1",
     "MY_KNOWLEDGE_WIKI_MCP_PORT": "8080",
     "MY_KNOWLEDGE_WIKI_MCP_TIMEOUT": "30",
-    "MY_KNOWLEDGE_WIKI_TLS_INSECURE": "false"
-  }
+    "MY_KNOWLEDGE_WIKI_TLS_INSECURE": "false",
+    "MCP_PUBLIC_RPM": 60,
+    "MCP_TUNNEL_RPM": 30,
+    "MCP_MAX_INFLIGHT": 8,
+    "MCP_MAX_BATCH": 8,
+    "MCP_MAX_WORKERS": 16,
+    "MCP_READ_TIMEOUT": 10,
+    "MCP_PUBLIC_PORT": 8081,
+    "MCP_PUBLIC_ENABLED": false
+  },
+  "edge_prefixes": [
+    "/api/knowledge/",
+    "/site-api/knowledge/"
+  ]
 }

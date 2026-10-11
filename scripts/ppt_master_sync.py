@@ -147,7 +147,7 @@ def _write_openclaw_skill(skill_path: Path) -> None:
         "---\n"
         "name: ppt-master\n"
         "description: 将 PDF、DOCX、PPTX、网页、Markdown、新闻或主题资料生成可编辑 SVG/PPTX 演示文稿，也可填充模板、美化既有 PPTX、添加动画与旁白。用户要求创建、制作、优化、检查或导出 PPT/演示文稿，提到 ppt-master，或需要 SVG 页面与 PowerPoint 互转时使用。\n"
-        "metadata: {\"openclaw\":{\"skillKey\":\"ppt-master\",\"emoji\":\"📊\",\"homepage\":\"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master\",\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\",\"requires\":{\"anyBins\":[\"python3\",\"python\"]}}}\n"
+        "metadata: {\"openclaw\":{\"skillKey\":\"ppt-master\",\"emoji\":\"📊\",\"homepage\":\"https://github.com/luohao-brian/my-skills/tree/main/openclaw-skills/ppt-master\",\"primaryEnv\":\"ARK_AGENT_PLAN_API_KEY\",\"requires\":{\"anyBins\":[\"python3\",\"python\"],\"env\":[\"ARK_AGENT_PLAN_API_KEY\"]}}}\n"
         "---\n\n"
     )
     skill_path.write_text(frontmatter + body, encoding="utf-8")
@@ -301,6 +301,40 @@ def _apply_patches(stage: Path, manifest: dict[str, object]) -> None:
         _run(["git", "apply", str(patch_path)], cwd=stage)
 
 
+def _apply_agent_plan_media_docs(stage: Path) -> None:
+    backend = stage / "scripts" / "image_backends" / "backend_volcengine.py"
+    text = backend.read_text(encoding="utf-8")
+    text = text.replace(
+        "  LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY   (required)",
+        "  ARK_AGENT_PLAN_API_KEY                           (required)\n"
+        "  VOLCENGINE_API_KEY / ARK_API_KEY / LAS_API_KEY   (legacy overrides)",
+        1,
+    )
+    text = text.replace(
+        "  VOLCENGINE_MODEL                   (optional; Seedream 4.5 only)",
+        "  VOLCENGINE_MODEL                   (optional; Seedream 5.0 Pro by default)",
+        1,
+    )
+    backend.write_text(text, encoding="utf-8")
+    env_example = stage / ".env.example"
+    if env_example.is_file():
+        text = env_example.read_text(encoding="utf-8")
+        old = (
+            "# LAS_API_KEY=your-las-key\n"
+            "# VOLCENGINE_MODEL=doubao-seedream-4-5-251128\n"
+            "# VOLCENGINE_BASE_URL=https://operator.las.cn-beijing.volces.com/api/v1\n"
+            "# Optional Ark base URL / 可选 Ark 基址\n"
+            "# VOLCENGINE_BASE_URL=https://ark.cn-beijing.volces.com/api/v3"
+        )
+        new = (
+            "# ARK_AGENT_PLAN_API_KEY=your-agent-plan-key\n"
+            "# VOLCENGINE_MODEL=doubao-seedream-5.0-pro\n"
+            "# VOLCENGINE_BASE_URL=https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
+        )
+        if old in text:
+            env_example.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
 def _write_provenance(stage: Path, manifest: dict[str, object], commit: str) -> None:
     lock = {
         "schema_version": 2,
@@ -419,6 +453,7 @@ def main() -> int:
             _write_openclaw_skill(stage / "SKILL.md")
             _copy_overlays(stage, manifest)
             _apply_patches(stage, manifest)
+            _apply_agent_plan_media_docs(stage)
             _write_provenance(stage, manifest, commit)
             _validate_stage(stage)
             target = args.target.expanduser().resolve()

@@ -13,10 +13,7 @@ Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment)
   IMAGE_BACKEND=ideogram    -> Ideogram backend
   IMAGE_BACKEND=qwen        -> Alibaba Qwen image backend
   IMAGE_BACKEND=zhipu       -> Zhipu GLM-Image backend
-  IMAGE_BACKEND=volcengine  -> LAS Seedream backend
-  IMAGE_BACKEND=ark-api     -> Ark API Seedream backend
-  IMAGE_BACKEND=ark-agent-plan -> Ark Agent Plan Seedream backend
-  IMAGE_BACKEND=ark         -> Agent Plan with Ark API fallback
+  IMAGE_BACKEND=volcengine  -> Volcengine Seedream backend
   IMAGE_BACKEND=tencent     -> Tencent Cloud TokenHub backend
   IMAGE_BACKEND=modelscope  -> ModelScope backend
   IMAGE_BACKEND=siliconflow -> SiliconFlow backend
@@ -111,7 +108,7 @@ BACKEND_REGISTRY = {
         "module": "backend_gemini",
         "tier": "core",
         "label": "Google Gemini",
-        "default_model": "gemini-3.1-flash-image",
+        "default_model": "gemini-nano-banana-2.1",
         "default_image_size": "1K",
         "key_hint": "GEMINI_API_KEY",
         "aliases": ["google"],
@@ -155,34 +152,11 @@ BACKEND_REGISTRY = {
     "volcengine": {
         "module": "backend_volcengine",
         "tier": "core",
-        "label": "LAS Seedream",
-        "default_model": "doubao-seedream-4-5-251128",
-        "default_image_size": "2K",
-        "key_hint": "LAS_API_KEY",
-    },
-    "ark": {
-        "module": "backend_ark",
-        "tier": "core",
-        "label": "Ark Agent Plan, then Ark API",
-        "default_model": "doubao-seedream-5.0-lite",
-        "default_image_size": "2K",
-        "key_hint": "ARK_AGENT_PLAN_API_KEY / ARK_API_KEY",
-    },
-    "ark-api": {
-        "module": "backend_ark_api",
-        "tier": "core",
-        "label": "Ark API Seedream",
-        "default_model": "doubao-seedream-5-0-260128",
-        "default_image_size": "2K",
-        "key_hint": "ARK_API_KEY",
-    },
-    "ark-agent-plan": {
-        "module": "backend_ark_plan",
-        "tier": "core",
-        "label": "Ark Agent Plan Seedream",
-        "default_model": "doubao-seedream-5.0-lite",
+        "label": "Volcengine Seedream",
+        "default_model": "doubao-seedream-5.0-pro",
         "default_image_size": "2K",
         "key_hint": "ARK_AGENT_PLAN_API_KEY",
+        "aliases": ["ark", "doubao", "seedream"],
     },
     "tencent": {
         "module": "backend_tencent",
@@ -242,7 +216,7 @@ BACKEND_REGISTRY = {
         "module": "backend_fal",
         "tier": "experimental",
         "label": "fal.ai",
-        "default_model": "fal-ai/nano-banana-2",
+        "default_model": "google/nano-banana-2.1",
         "default_image_size": "1K",
         "key_hint": "FAL_KEY / FAL_API_KEY",
         "aliases": ["fal-ai"],
@@ -259,7 +233,7 @@ BACKEND_REGISTRY = {
         "module": "backend_openrouter",
         "tier": "experimental",
         "label": "OpenRouter",
-        "default_model": "google/gemini-3.1-flash-image",
+        "default_model": "google/gemini-nano-banana-2.1",
         "default_image_size": "1K",
         "key_hint": "OPENROUTER_API_KEY",
     },
@@ -287,12 +261,10 @@ def _load_image_env_file() -> Path | None:
         )
         for key, replacement in replacements.items()
     }
-    env_path = load_prefixed_env_file(
+    return load_prefixed_env_file(
         IMAGE_ENV_PREFIXES,
         deprecated_keys=deprecated_messages,
     )
-    os.environ.setdefault("IMAGE_BACKEND", "ark")
-    return env_path
 
 
 def _validate_runtime_config() -> None:
@@ -434,7 +406,7 @@ def _resolve_backend() -> tuple[object, str]:
     Returns:
         A backend module with a generate() function.
     """
-    backend_name = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    backend_name = os.environ.get("IMAGE_BACKEND", "").strip().lower() or "volcengine"
     if backend_name:
         canonical = BACKEND_ALIASES.get(backend_name)
         if not canonical:

@@ -15,5 +15,7 @@ When behavior, state, enforcement, or risk carries the meaning, first load [`ref
 | Trust boundaries plus permitted/forbidden ingress or deploy paths | **Secure paved road** → Architecture |
 | Controls grouped by where they are enforced | **Governance / control catalog** → Layer stack |
 | Defenses compensate for prior gaps and residual risk propagates | **Compensating security layers** → Layer stack |
+| Hierarchical, ID-addressable decomposition needing per-block I/O, constraints, and a code link | **Traceable block decomposition** → Tree |
+| One subject progresses through phases, waits, retries, cancellation, and terminal outcomes | **Lifecycle phase map** → State Machine |
 
 The pattern owns semantic primitives and its tighter budget; the type owns layout grammar. Use [`references/animation.md`](../../upstream/references/animation.md) only when motion is requested or materially clarifies ordered change; static remains the default.

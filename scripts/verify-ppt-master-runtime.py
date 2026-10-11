@@ -152,8 +152,10 @@ def verify_runtime_files(errors: list[str]) -> None:
         errors.append("SKILL.md does not expose the Agent Plan credential as primaryEnv")
     metadata_line = next(line for line in skill_text.splitlines() if line.startswith("metadata: "))
     metadata = json.loads(metadata_line.removeprefix("metadata: "))
-    if "ARK_AGENT_PLAN_API_KEY" in metadata["openclaw"].get("requires", {}).get("env", []):
-        errors.append("optional Agent Plan credential is required for the whole skill")
+    required_env = metadata["openclaw"].get("requires", {}).get("env", [])
+    expected_env = ["ARK_AGENT_PLAN_API_KEY"]
+    if required_env != expected_env:
+        errors.append(f"SKILL.md requires.env must equal {expected_env!r}")
     runtime_text = (SKILL / "references" / "runtime.md").read_text(encoding="utf-8")
     for name in ("runtime-directory.md", "runtime-dependencies.md"):
         if name not in runtime_text:
@@ -228,15 +230,13 @@ def verify_patch_effects(errors: list[str]) -> None:
     ):
         errors.append("upstream formal release fail-closed gate is missing")
     image_gen = (SKILL / "scripts" / "image_gen.py").read_text(encoding="utf-8")
-    for name in ('"ark": {', '"ark-agent-plan": {', '"ark-api": {'):
-        if name not in image_gen:
-            errors.append(f"Ark image route is missing {name}")
+    if '"volcengine": {' not in image_gen:
+        errors.append("upstream Volcengine image backend is missing")
     volcengine = (SKILL / "scripts" / "image_backends" / "backend_volcengine.py").read_text(encoding="utf-8")
-    if '"ARK_API_KEY"' in volcengine:
-        errors.append("LAS backend still accepts ARK_API_KEY")
-    for module in ("backend_ark.py", "backend_ark_api.py", "backend_ark_plan.py"):
-        if not (SKILL / "scripts" / "image_backends" / module).is_file():
-            errors.append(f"Ark image adapter is missing {module}")
+    if '"/api/v3"' not in volcengine:
+        errors.append("Volcengine backend does not support /api/v3 base URLs")
+    if "VOLCENGINE_MODEL" not in volcengine:
+        errors.append("Volcengine backend does not expose model configuration")
     notes_to_audio = (SKILL / "scripts" / "notes_to_audio.py").read_text(encoding="utf-8")
     if "backend_volcengine.SUPPORTED_PROFILES" not in notes_to_audio:
         errors.append("provider TTS bridge core patch is not active")

@@ -35,18 +35,19 @@ Run before producing any diagram.
 - [ ] `<title>` is the first child of `<svg>` (before `<defs>`) and both `<title>` and `<desc>` are filled in?
 - [ ] `<title>` / `<desc>` IDs are prefixed for this diagram and variant — never bare `title` / `desc`?
 - [ ] Arrows drawn before boxes?
-- [ ] **Every connector between off-axis nodes uses a rounded right-angle elbow (`r=8`)? No diagonal `<line>` slants?**
-- [ ] **Every arrow label has a visible 6–10px gap above its connector? (Mask rect not touching the stroke.)**
-- [ ] **No two connectors overlap, share a stroke path, or run on top of each other? Crossings use the bridge/hop primitive?**
-- [ ] **When several connectors enter or exit the same edge of a box, each has its own attach point (≥12px apart)? No connector hides another?**
-- [ ] **No connector passes behind a non-endpoint box, except the unavoidable-intervening-box case (§6 rule 5) — and in that case, the stroke is dashed and the label sits at the visible end?**
-- [ ] **No label mask overlaps a node drawn after it? (Node fill would clip the text — §6 rule 6. From a repository checkout, run `python3 <repo-root>/scripts/verify-geometry.py <file>`.)**
+- [ ] **§6 rule 1:** off-axis connectors are `r=8` elbows, no diagonal slants?
+- [ ] **§6 rule 2:** a visible 6 to 10px gap between every label mask and its connector?
+- [ ] **§6 rule 3:** no overlapping or stacked connectors; bridge/hop at crossings?
+- [ ] **§6 rule 4:** a distinct attach point per connector on a shared edge, 12px or more apart, none hiding another?
+- [ ] **§6 rule 5:** no transit behind a non-endpoint box, except the unavoidable case (dashed, label at the visible end)?
+- [ ] **§6 rule 6:** no label mask overlapping a node drawn after it? (From a repository checkout, run `python3 <repo-root>/scripts/verify-geometry.py <file>`.)
 - [ ] Every arrow label has an opaque `fill="#f5f5f5"` rect behind it?
 - [ ] Legend is a horizontal bottom strip, not floating?
 - [ ] No vertical `writing-mode` text?
 - [ ] `viewBox` expanded for the legend strip (~60px)?
-- [ ] Every font size, coord, width, height, gap divisible by 4?
-- [ ] From the installed skill directory, did `python3 scripts/self_check.py <file>` pass? (Accessible-SVG contract, single-file safety, motion basics; ships with the skill.)
+- [ ] **`min-width` equals the viewBox width, and the SVG sits in a local `overflow-x: auto` wrapper? (Otherwise a phone scrolls the whole page — or an `overflow: hidden` ancestor clips the diagram with no scrollbar at all. See [output-spec.md](../../upstream/references/output-spec.md).)**
+- [ ] Node origins, dimensions, gaps, padding on the 4px grid; type sizes on the role ramp?
+- [ ] From the installed skill directory, did `python3 scripts/self_check.py <file>` pass? (Accessible-SVG contract, single-file safety, motion basics.)
 - [ ] If animated, does the complete static/no-JS frame work, does reduced motion hide/disable playback, and is the controller copied verbatim from `assets/template-motion.html`? From a repository checkout, also run `python3 <repo-root>/scripts/verify-motion.py path/to/generated.html` plus the skin linter; from an installed skill, manually check print and static-query states on top of the self-check.
 
 **Typography:**

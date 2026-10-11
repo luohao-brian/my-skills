@@ -19,7 +19,7 @@ These mark "AI slop" schematics of any type:
 | `rounded-2xl` on boxes | Max radius 6–10px or none |
 | Coral on every "important" node | Coral is 1–2 editorial accents, not a signaling system |
 | Reproducing Mermaid's renderer layout | Imports automatic spacing and routing instead of making an editorial layout |
-| Any breach of the six §6 connector rules | Diagonal slants, labels touching their stroke, masks clipped by a later node, overlapping paths, shared attach points, transit behind a non-endpoint box — each is an automatic fail; §6 states them in full |
+| Any breach of the six §6 connector rules | Automatic fail: diagonal slants, labels touching their stroke, masks clipped by a later node, overlapping paths, shared attach points, transit behind a non-endpoint box |
 
 Type-specific anti-patterns live in each type reference linked in the guide.
 

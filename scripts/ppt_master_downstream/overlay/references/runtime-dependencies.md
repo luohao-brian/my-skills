@@ -2,8 +2,8 @@
 
 The calling runtime owns its Python launcher, environment, dependency manager,
 browser installation, credentials, billing, and process lifecycle. This
-distribution selects Ark Agent Plan by default for images and TTS; image
-generation can fall back to Ark API. Explicit provider settings take precedence.
+distribution follows the upstream Volcengine image backend and adds the local
+Ark Agent Plan TTS provider. Explicit provider settings take precedence.
 
 ## Python and browser
 
@@ -20,12 +20,11 @@ generation can fall back to Ark API. Explicit provider settings take precedence.
 
 ## Image generation and search
 
-Follow the upstream acquisition path, image workflow, and manifests. For API
-generation, the downstream default is `ark`: Agent Plan first, with Ark API
-fallback on service failure. `image_gen.py --backend ark` or `IMAGE_BACKEND=ark`
-selects the same route explicitly.
-`--backend ark-agent-plan` and `--backend ark-api` select either service alone.
-The command-line option takes precedence. Read [`runtime-media.md`](runtime-media.md).
+Follow the upstream acquisition path, image workflow, and manifests. Use the
+upstream `volcengine` backend for either Ark API or Agent Plan by setting the
+complete `VOLCENGINE_BASE_URL` endpoint, the matching key variable accepted by
+the upstream backend, and optional `VOLCENGINE_MODEL`. The command-line option
+takes precedence. Read [`runtime-media.md`](runtime-media.md).
 
 ## TTS
 
