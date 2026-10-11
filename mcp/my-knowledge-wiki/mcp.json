@@ -6,6 +6,15 @@
   "public_path": "/mcp",
   "health_path": "/healthz",
   "auth": "none",
+  "tunnel": {
+    "harpoon_targets": [
+      {
+        "label": "connector-probe",
+        "url": "https://mcp.invalid",
+        "description": "Reserved no-network probe target"
+      }
+    ]
+  },
   "limits": {
     "nginx_rate": "30r/m",
     "nginx_burst": 10,

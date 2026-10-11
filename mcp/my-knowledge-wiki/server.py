@@ -520,9 +520,11 @@ class MCPHandler(BaseHTTPRequestHandler):
                     not isinstance(request, list)
                     and request.get("method") == "server/discover"
                 )
+                modern_stateless = protocol_version == "2026-07-28"
                 stream = (
                     "text/event-stream" in self.headers.get("Accept", "").lower()
                     and not discovery_only
+                    and not modern_stateless
                 )
         except (ValueError, json.JSONDecodeError) as exc:
             response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": str(exc)}}

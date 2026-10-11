@@ -2,8 +2,10 @@
 
 This directory adds a read-only MCP adapter while preserving the existing
 `openclaw-skills/my-knowledge-wiki` REST skill. The adapter exposes
-`initialize`, `tools/list`, and `tools/call` on `POST /mcp` and forwards tool
-calls to the existing Knowledge API.
+`server/discover`, `initialize`, `tools/list`, and `tools/call` on `POST /mcp`
+and forwards tool calls to the existing Knowledge API. It supports MCP
+2026-07-28 stateless discovery/tool requests and retains the 2025
+initialization handshake for older clients.
 
 ## Run
 
