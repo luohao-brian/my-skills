@@ -43,9 +43,10 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 # current Streamable HTTP clients instead of always downgrading them to the
 # oldest version. The wire format used by this adapter is compatible with
 # these three handshake-era revisions.
-LATEST_PROTOCOL_VERSION = "2025-11-25"
+LATEST_PROTOCOL_VERSION = "2026-07-28"
 DEFAULT_PROTOCOL_VERSION = "2025-03-26"
 SUPPORTED_PROTOCOL_VERSIONS = {
+    "2026-07-28",
     "2025-11-25",
     "2025-06-18",
     "2025-03-26",
@@ -558,7 +559,10 @@ class MCPHandler(BaseHTTPRequestHandler):
 def negotiate_protocol_version(messages: list[dict[str, Any]], header: str | None) -> str:
     """Return the version shared with the client for this HTTP request."""
     initialize = next((message for message in messages if message.get("method") == "initialize"), None)
-    requested = ((initialize or {}).get("params") or {}).get("protocolVersion")
+    params = (initialize or {}).get("params") or {}
+    requested = params.get("protocolVersion")
+    if not requested:
+        requested = (params.get("_meta") or {}).get("io.modelcontextprotocol/protocolVersion")
     requested = requested or header
     if requested in SUPPORTED_PROTOCOL_VERSIONS:
         return requested
