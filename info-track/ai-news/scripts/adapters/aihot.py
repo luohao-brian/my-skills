@@ -1,4 +1,4 @@
-"""AIHOT public v1 selected items as an attributed aggregator source."""
+"""AIHOT public v1 items as an attributed aggregator source."""
 
 from __future__ import annotations
 

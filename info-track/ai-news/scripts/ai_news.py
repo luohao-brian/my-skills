@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import os
 import re
 import sys
+import time
 import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta, timezone
@@ -32,6 +34,57 @@ REQUIRED_CANDIDATE_FIELDS = [
 PROVENANCE_FIELDS = ["source_id", "source", "source_role", "published_at"]
 SOURCE_ROLES = {"media", "aggregator", "official"}
 LOCAL_NO_PROXY = ("localhost", "127.0.0.1", "::1")
+DEFAULT_SOURCE_TIMEOUT_SECONDS = 20
+
+
+class SourceTimeoutError(TimeoutError):
+    """A source exceeded its independent collection deadline."""
+
+
+def _source_worker(source: dict[str, Any], window: dict[str, Any], connection) -> None:
+    """Fetch one source in an isolated child so blocked socket calls can be killed."""
+    try:
+        raw_items = resolve_fetcher(source)(source, window)
+        connection.send(("ok", raw_items))
+    except Exception as exc:  # pragma: no cover - exercised by live sources.
+        connection.send(("error", str(exc)))
+    finally:
+        connection.close()
+
+
+def _fetch_source_with_timeout(fetcher, source: dict[str, Any], window: dict[str, Any]):
+    """Run one source fetch with an independent deadline in CLI collection."""
+    configured = source.get("timeout_seconds", DEFAULT_SOURCE_TIMEOUT_SECONDS)
+    try:
+        timeout = max(1.0, float(configured))
+    except (TypeError, ValueError):
+        timeout = float(DEFAULT_SOURCE_TIMEOUT_SECONDS)
+
+    # Unit tests call collect_data() directly and patch adapters in-process. Keep
+    # that path unchanged; the CLI path gets a killable child process.
+    if __name__ != "__main__":
+        return fetcher(source, window), timeout
+
+    methods = multiprocessing.get_all_start_methods()
+    context = multiprocessing.get_context("fork" if "fork" in methods else methods[0])
+    parent, child = context.Pipe(duplex=False)
+    process = context.Process(target=_source_worker, args=(source, window, child))
+    process.start()
+    child.close()
+    try:
+        process.join(timeout)
+        if process.is_alive():
+            process.terminate()
+            process.join(2)
+            raise SourceTimeoutError(f"source exceeded {timeout:g}s timeout")
+        if not parent.poll():
+            raise RuntimeError(f"source worker exited with code {process.exitcode}")
+        status, payload = parent.recv()
+        if status == "error":
+            raise RuntimeError(payload)
+        return payload, timeout
+    finally:
+        parent.close()
 
 
 def proxy_url(value: str) -> str:
@@ -219,10 +272,22 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
         source_kind = str(source["kind"])
         source_role = str(source["role"])
 
+        started = time.monotonic()
         try:
             fetcher = resolve_fetcher(source)
-            raw_items = fetcher(source, window)
+            raw_items, timeout = _fetch_source_with_timeout(fetcher, source, window)
         except Exception as exc:  # pragma: no cover - network sources drift.
+            elapsed = time.monotonic() - started
+            configured = source.get("timeout_seconds", DEFAULT_SOURCE_TIMEOUT_SECONDS)
+            try:
+                timeout = max(1.0, float(configured))
+            except (TypeError, ValueError):
+                timeout = float(DEFAULT_SOURCE_TIMEOUT_SECONDS)
+            print(
+                f"[ai-news] source={source_id} status=failed elapsed={elapsed:.1f}s "
+                f"timeout={timeout:g}s error={exc}",
+                file=sys.stderr,
+            )
             source_rows.append(
                 {
                     "source_id": source_id,
@@ -234,9 +299,18 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                     "candidates": 0,
                     "exact_duplicates": 0,
                     "error": str(exc),
+                    "elapsed_seconds": round(elapsed, 1),
+                    "timeout_seconds": timeout,
                 }
             )
             continue
+
+        elapsed = time.monotonic() - started
+        print(
+            f"[ai-news] source={source_id} status=ok elapsed={elapsed:.1f}s "
+            f"timeout={timeout:g}s raw={len(raw_items)}",
+            file=sys.stderr,
+        )
 
         source_candidate_count = 0
         source_exact_duplicates = 0
@@ -257,7 +331,7 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
             if published < window["start"] or published > window["end"]:
                 continue
 
-            selected_item = {
+            candidate_item = {
                 "title": item["title"],
                 "url": item["source_url"],
                 "summary": item["summary_basis"],
@@ -267,18 +341,18 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                 "published_at": published.isoformat(timespec="seconds"),
             }
             if source_kind == "aihot":
-                selected_item.update({
+                candidate_item.update({
                     "original_url": str(raw.get("original_url") or ""),
                     "original_source": str(raw.get("original_source") or ""),
                     "discovered_at": str(raw.get("discovered_at") or ""),
                     "external_id": str(raw.get("external_id") or ""),
                 })
-            key = article_key(selected_item)
+            key = article_key(candidate_item)
             if key in source_article_keys:
                 source_exact_duplicates += 1
                 continue
             source_article_keys.add(key)
-            candidates.append(selected_item)
+            candidates.append(candidate_item)
             source_candidate_count += 1
 
         source_rows.append(
@@ -292,6 +366,8 @@ def collect_data(args: argparse.Namespace) -> dict[str, Any]:
                 "candidates": source_candidate_count,
                 "exact_duplicates": source_exact_duplicates,
                 "error": None,
+                "elapsed_seconds": round(elapsed, 1),
+                "timeout_seconds": timeout,
             }
         )
 
@@ -315,9 +391,8 @@ def public_document(data: dict[str, Any]) -> dict[str, Any]:
     role_rows: dict[str, dict[str, int]] = {}
     for row in data["_sources"]:
         role = str(row["role"])
-        aggregate = role_rows.setdefault(role, {"sources": 0, "selected": 0, "window_candidates": 0})
+        aggregate = role_rows.setdefault(role, {"sources": 0, "window_candidates": 0})
         aggregate["sources"] += 1
-        aggregate["selected"] += int(row["candidates"])
         aggregate["window_candidates"] += int(row["candidates"])
     return {
         "window": data["window"],
@@ -327,7 +402,6 @@ def public_document(data: dict[str, Any]) -> dict[str, Any]:
                 "count": row["candidates"],
                 "raw": row["raw"],
                 "window_candidates": row["candidates"],
-                "selected": row["candidates"],
                 "unique_urls": len(urls_by_source.get(row["source_id"], set())),
                 "unique_articles": len(articles_by_source.get(row["source_id"], set())),
                 "exact_duplicate_rows": row["exact_duplicates"],
@@ -335,6 +409,8 @@ def public_document(data: dict[str, Any]) -> dict[str, Any]:
                 "kind": row["kind"],
                 "role": row["role"],
                 "error": row["error"],
+                "elapsed_seconds": row.get("elapsed_seconds"),
+                "timeout_seconds": row.get("timeout_seconds", DEFAULT_SOURCE_TIMEOUT_SECONDS),
             }
             for row in data["_sources"]
         },
@@ -429,11 +505,11 @@ def render_markdown(data: dict[str, Any]) -> str:
 
     candidates = data["candidates"]
     rendered_items = [format_candidate(item) for item in candidates]
-    range_note = f"候选数量：{len(candidates)}"
+    range_note = f"新闻条目数：{len(candidates)}"
     sections = [range_note, *rendered_items]
 
     body = "\n\n".join(sections).strip()
-    rendered = f"# AI 新闻候选｜{data['window']['label']}\n\n{body}"
+    rendered = f"# AI 新闻简报｜{data['window']['label']}\n\n{body}"
     return rendered.rstrip() + "\n"
 
 
