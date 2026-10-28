@@ -8,6 +8,7 @@ api_version: 1
 capabilities:
   - tools.override
 python_dependencies:
+  - "PyYAML>=6.0.3,<7"
   - "httpx>=0.28.1,<1"
   - "websocket-client>=1.7,<2"
   - "requests>=2.32,<3"
