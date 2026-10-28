@@ -30,6 +30,20 @@
       "url": "https://techcrunch.com/category/artificial-intelligence/feed/"
     },
     {
+      "id": "qbitai",
+      "name": "量子位",
+      "role": "media",
+      "kind": "rss",
+      "url": "https://www.qbitai.com/feed"
+    },
+    {
+      "id": "36kr",
+      "name": "36氪",
+      "role": "media",
+      "kind": "rss",
+      "url": "https://www.36kr.com/feed"
+    },
+    {
       "id": "tensorfeed",
       "name": "TensorFeed",
       "role": "aggregator",
@@ -56,34 +70,6 @@
       "role": "aggregator",
       "kind": "maomu_timeline",
       "url": "https://maomu.com/news"
-    },
-    {
-      "id": "openai-news",
-      "name": "OpenAI News",
-      "role": "official",
-      "kind": "rss",
-      "url": "https://openai.com/news/rss.xml"
-    },
-    {
-      "id": "anthropic-news",
-      "name": "Anthropic News",
-      "role": "official",
-      "kind": "anthropic_list",
-      "url": "https://www.anthropic.com/news"
-    },
-    {
-      "id": "google-ai-blog",
-      "name": "Google AI Blog",
-      "role": "official",
-      "kind": "rss",
-      "url": "https://blog.google/innovation-and-ai/technology/ai/rss/"
-    },
-    {
-      "id": "deepmind-blog",
-      "name": "Google DeepMind Blog",
-      "role": "official",
-      "kind": "rss",
-      "url": "https://deepmind.google/blog/rss.xml"
     }
   ]
 }

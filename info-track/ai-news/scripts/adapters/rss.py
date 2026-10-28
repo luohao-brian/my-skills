@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 from datetime import datetime, timedelta, timezone
+import re
 import xml.etree.ElementTree as ET
 
 from .common import fetch_text, first_text
@@ -40,8 +41,13 @@ def _parse_datetime(value: str) -> datetime | None:
         return parsed
     except ValueError:
         pass
-    text = text.replace(" GMT", " +0000").replace(" UTC", " +0000")
-    for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M %z", "%d %b %Y %H:%M:%S %z"):
+    text = re.sub(r"\s+", " ", text.replace(" GMT", " +0000").replace(" UTC", " +0000"))
+    for fmt in (
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M %z",
+        "%d %b %Y %H:%M:%S %z",
+        "%Y-%m-%d %H:%M:%S %z",
+    ):
         try:
             parsed = datetime.strptime(text, fmt)
             if parsed.tzinfo is None:

@@ -21,6 +21,16 @@ TITLE_SPAN_RE = re.compile(
     r"<span\b[^>]*class=[\"'][^\"']*title[^\"']*[\"'][^>]*>(.*?)</span>", re.IGNORECASE | re.DOTALL
 )
 STALE_LINK_THRESHOLD = 5
+MAOMU_ENTRY_RE = re.compile(
+    r'<article\b[^>]*class=["\'][^"\']*\bnews-entry\b[^"\']*["\'][^>]*>(.*?)</article>',
+    re.IGNORECASE | re.DOTALL,
+)
+MAOMU_TIME_RE = re.compile(r'<time\b[^>]*\bdatetime=["\']([^"\']+)["\']', re.IGNORECASE)
+MAOMU_LINK_RE = re.compile(
+    r'<a\b[^>]*class=["\'][^"\']*\bnews-entry-link\b[^"\']*["\'][^>]*'
+    r'href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
 META_DESC_RE = re.compile(
     r"<meta\b[^>]*(?:name|property)=[\"'](?:description|og:description)[\"'][^>]*content=[\"']([^\"']+)[\"']",
     re.IGNORECASE,
@@ -187,62 +197,48 @@ def fetch_tmtpost(source: dict[str, Any], window: dict[str, Any] | None = None) 
 
 
 def fetch_maomu(source: dict[str, Any], window: dict[str, Any] | None = None) -> list[dict[str, str]]:
-    """Parse the maomu news timeline.
-
-    The page groups items under date headers ("今日 - 2026-09-27" or plain
-    "2026-09-26") and stamps each item with a Beijing-time HH:MM clock. Older
-    sidebar entries ("N天前") carry no news-time marker and are not matched.
-    Composing header date plus item clock yields exact per-item timestamps
-    instead of labeling everything with the collection day.
-    """
+    """Read the latest maomu news page with per-card publication timestamps."""
     url = str(source["url"])
-    html = fetch_text(url)
-    group_re = re.compile(
-        r'<div\b[^>]*class=["\'][^"\']*news-tag[^"\']*["\'][^>]*>\s*<span[^>]*>([^<]+)</span>',
-        re.IGNORECASE,
-    )
-    item_re = re.compile(
-        r'class=["\']news-time["\'][^>]*>\s*<span[^>]*>(\d{1,2}:\d{2})</span>'
-        r'\s*</div>'
-        r'\s*<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
-        re.IGNORECASE | re.DOTALL,
-    )
-    h3_re = re.compile(r"<h3\b[^>]*>(.*?)</h3>", re.IGNORECASE | re.DOTALL)
-    desc_re = re.compile(r'<div\b[^>]*class=["\'][^"\']*desc[^"\']*["\'][^>]*>(.*?)</div>', re.IGNORECASE | re.DOTALL)
-    source_re = re.compile(
-        r'<div\b[^>]*class=["\'][^"\']*source-name[^"\']*["\'][^>]*>(.*?)</div>', re.IGNORECASE | re.DOTALL
-    )
-    iso_date_re = re.compile(r"20\d{2}-\d{2}-\d{2}")
+    return _parse_maomu_page(fetch_text(url), url)
 
+
+def _parse_maomu_page(html: str, base_url: str) -> list[dict[str, str]]:
+    blocks = MAOMU_ENTRY_RE.findall(html)
+    if not blocks:
+        raise ValueError("maomu news cards not found")
     items: list[dict[str, str]] = []
-    groups = list(group_re.finditer(html))
-    for index, group in enumerate(groups):
-        date_match = iso_date_re.search(group.group(1))
-        if not date_match:
+    for block in blocks:
+        time_match = MAOMU_TIME_RE.search(block)
+        link_match = MAOMU_LINK_RE.search(block)
+        if not time_match or not link_match:
             continue
-        day = date_match.group(0)
-        segment_end = groups[index + 1].start() if index + 1 < len(groups) else len(html)
-        segment = html[group.end():segment_end]
-        for clock, href, body in item_re.findall(segment):
-            title_match = h3_re.search(body)
-            title = strip_html(title_match.group(1)) if title_match else ""
-            if len(title) < 4:
-                continue
-            desc_match = desc_re.search(body)
-            source_match = source_re.search(body)
-            summary = strip_html(desc_match.group(1)) if desc_match else title
-            source_name = strip_html(source_match.group(1)) if source_match else ""
-            if source_name:
-                summary = f"{summary} {source_name}" if summary else source_name
-            hour, minute = clock.split(":")
-            items.append(
-                {
-                    "title": title,
-                    "source_url": absolutize_url(url, href),
-                    "published_at": f"{day}T{int(hour):02d}:{minute}:00+08:00",
-                    "summary_basis": summary,
-                }
-            )
+        title_match = re.search(r"<h3\b[^>]*>(.*?)</h3>", link_match.group(2), re.IGNORECASE | re.DOTALL)
+        if not title_match:
+            continue
+        title = strip_html(title_match.group(1))
+        summary_match = re.search(r"<p\b[^>]*>(.*?)</p>", link_match.group(2), re.IGNORECASE | re.DOTALL)
+        summary = strip_html(summary_match.group(1)) if summary_match else title
+        meta_match = re.search(
+            r'<div\b[^>]*class=["\'][^"\']*news-entry-meta[^"\']*["\'][^>]*>(.*?)</div>',
+            block,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if meta_match:
+            source_links = LINK_RE.findall(meta_match.group(1))
+            if source_links:
+                summary += " " + strip_html(source_links[-1][1])
+        if len(title) < 4 or not summary:
+            continue
+        items.append(
+            {
+                "title": title,
+                "source_url": absolutize_url(base_url, link_match.group(1)),
+                "published_at": time_match.group(1),
+                "summary_basis": summary,
+            }
+        )
+    if not items:
+        raise ValueError("maomu news cards found but none parsed")
     return items
 
 

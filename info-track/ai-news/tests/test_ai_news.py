@@ -5,6 +5,7 @@ import gzip
 import importlib.util
 import io
 import json
+import multiprocessing
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,15 +21,76 @@ SPEC.loader.exec_module(MODULE)
 from adapters import common as COMMON
 from adapters import html_index as HTML_INDEX
 from adapters import aihot as AIHOT
+from adapters import rss as RSS
 
 
 TZ = timezone(timedelta(hours=8))
 
 
 class AiNewsDiagnosticsTests(unittest.TestCase):
+    def test_added_rss_sources_and_36kr_pubdate(self) -> None:
+        registry = json.loads((SCRIPT.parents[1] / "references" / "sources.json").read_text())
+        sources = {source["id"]: source for source in registry["sources"]}
+        self.assertEqual(sources["qbitai"]["url"], "https://www.qbitai.com/feed")
+        self.assertEqual(sources["36kr"]["url"], "https://www.36kr.com/feed")
+
+        published_at = "2026-10-28 13:58:42  +0800"
+        expected = datetime(2026, 10, 28, 13, 58, 42, tzinfo=TZ)
+        self.assertEqual(RSS._parse_datetime(published_at), expected)
+        self.assertEqual(MODULE.parse_datetime(published_at), expected)
+
+    def test_36kr_rss_filters_available_items_within_window(self) -> None:
+        payload = """<rss><channel>
+          <item><title>窗口内</title><link>https://36kr.com/p/1</link>
+            <pubDate>2026-10-28 13:58:42  +0800</pubDate><description>来源摘要</description></item>
+          <item><title>窗口外</title><link>https://36kr.com/p/2</link>
+            <pubDate>2026-10-24 13:58:42  +0800</pubDate><description>旧摘要</description></item>
+        </channel></rss>"""
+        window = {
+            "start": datetime(2026, 10, 25, tzinfo=TZ),
+            "end": datetime(2026, 10, 28, 15, tzinfo=TZ),
+        }
+        source = {"url": "https://www.36kr.com/feed"}
+        with mock.patch.object(RSS, "fetch_text", return_value=payload) as fetch:
+            rows = RSS.fetch_rss(source, window)
+
+        fetch.assert_called_once_with(source["url"])
+        self.assertEqual([row["title"] for row in rows], ["窗口内"])
+
     def test_default_sources_exclude_hex2077_daily_digest(self) -> None:
         registry = json.loads((SCRIPT.parents[1] / "references" / "sources.json").read_text())
         self.assertNotIn("hex2077", {source["id"] for source in registry["sources"]})
+        self.assertTrue(
+            {"openai-news", "anthropic-news", "google-ai-blog", "deepmind-blog"}.isdisjoint(
+                {source["id"] for source in registry["sources"]}
+            )
+        )
+
+    def test_maomu_current_card_markup_keeps_article_time_and_source(self) -> None:
+        html = """
+        <article class="news-entry">
+          <div class="news-entry-time"><time dateTime="2026-10-28T06:20:38.000Z">14:20</time></div>
+          <div class="news-entry-body">
+            <a class="news-entry-link" href="https://example.com/news/1">
+              <div class="news-entry-copy"><h3>新的 AI 新闻标题</h3><p>来源提供的摘要。</p></div>
+            </a>
+            <div class="news-entry-meta"><span>来源</span><a href="https://example.com/news/1">原媒体</a></div>
+          </div>
+        </article>
+        """
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=html):
+            rows = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["title"], "新的 AI 新闻标题")
+        self.assertEqual(rows[0]["source_url"], "https://example.com/news/1")
+        self.assertEqual(rows[0]["published_at"], "2026-10-28T06:20:38.000Z")
+        self.assertEqual(rows[0]["summary_basis"], "来源提供的摘要。 原媒体")
+
+    def test_maomu_missing_news_cards_reports_parser_failure(self) -> None:
+        with mock.patch.object(HTML_INDEX, "fetch_text", return_value="<html><body>new layout</body></html>"):
+            with self.assertRaisesRegex(ValueError, "cards not found"):
+                HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
 
     def test_hex_parser_keeps_linked_words_in_summary(self) -> None:
         html = '<li><strong>安全研究新进展</strong>据<a href="https://example.com/report">报告</a>，报告披露了研究方法。</li>'
@@ -167,6 +229,38 @@ class AiNewsDiagnosticsTests(unittest.TestCase):
         first = {"title": "Story A", "url": "https://example.com/daily", "summary": "A"}
         second = {"title": "Story B", "url": "https://example.com/daily", "summary": "B"}
         self.assertNotEqual(MODULE.article_key(first), MODULE.article_key(second))
+
+    def test_render_folds_cross_source_exact_duplicates(self) -> None:
+        document = {
+            "window": {"label": "test"},
+            "sources": {},
+            "candidates": [
+                {"title": "Story A", "url": "https://example.com/daily?utm_source=media", "summary": "Direct report."},
+                {"title": "Story A", "url": "https://example.com/daily?utm_source=aggregator", "summary": "Aggregator copy."},
+                {"title": "Story B", "url": "https://example.com/daily", "summary": "Separate story."},
+            ],
+        }
+
+        rendered = MODULE.render_markdown(document)
+
+        self.assertIn("新闻条目数：2", rendered)
+        self.assertEqual(rendered.count("### Story A"), 1)
+        self.assertIn("Direct report.", rendered)
+        self.assertNotIn("Aggregator copy.", rendered)
+        self.assertIn("### Story B", rendered)
+
+    @unittest.skipUnless("fork" in multiprocessing.get_all_start_methods(), "requires forked source worker")
+    def test_source_worker_returns_result_larger_than_pipe_buffer(self) -> None:
+        rows = [{"summary_basis": "x" * 131_072}]
+        source = {"id": "large-result", "timeout_seconds": 3}
+        with (
+            mock.patch.dict(MODULE.__dict__, {"__name__": "__main__"}),
+            mock.patch.object(MODULE, "resolve_fetcher", return_value=lambda _source, _window: rows),
+        ):
+            actual, timeout = MODULE._fetch_source_with_timeout(None, source, {})
+
+        self.assertEqual(actual, rows)
+        self.assertEqual(timeout, 3)
 
     def test_explicit_proxy_overrides_inherited_scheme_settings(self) -> None:
         inherited = {
@@ -415,84 +509,6 @@ class DatedAnchorParserTests(unittest.TestCase):
             errors = MODULE.validate_sources()
 
         self.assertTrue(any("unknown kind" in error for error in errors))
-
-
-class MaomuTimelineTests(unittest.TestCase):
-    MAOMU_HTML = """
-    <html><body>
-      <div class="news-tag" style="margin:20px 0;"><span>今日 - 2026-09-27</span></div>
-      <ul class="ant-timeline news-list hidden-sm-and-down">
-        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
-          <div class="ant-row"><div class="ant-col ant-col-19">
-            <div class="news-time"><span>08:53</span></div>
-            <a class="dark:text-white" target="_blank" href="https://www.36kr.com/p/4000927879319685">
-              <h3 class="title line-clamp-2">管住AI，成了一门新生意</h3>
-              <div class="desc text-gray-500 line-clamp-2">三类玩家，掘金AI安全。</div>
-              <div class="source-name text-gray-500">来源： <span>36氪</span></div>
-            </a>
-          </div></div>
-        </div></li>
-        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
-          <div class="ant-row"><div class="ant-col ant-col-19">
-            <div class="news-time"><span>07:59</span></div>
-            <a target="_blank" href="https://www.tmtpost.com/8153235.html">
-              <h3 class="title line-clamp-2">Edge AI Daily 早报（9月27日）</h3>
-              <div class="desc text-gray-500 line-clamp-2">OpenAI发布持久化智能体。</div>
-              <div class="source-name text-gray-500">来源： <span>钛媒体</span></div>
-            </a>
-          </div></div>
-        </div></li>
-      </ul>
-      <div class="news-tag" style="margin:20px 0;"><span>2026-09-26</span></div>
-      <ul class="ant-timeline news-list hidden-sm-and-down">
-        <li class="ant-timeline-item"><div class="ant-timeline-item-content">
-          <div class="news-time"><span>23:44</span></div>
-          <a target="_blank" href="https://www.ithome.com/1/007/444.htm">
-            <h3 class="title line-clamp-2">Anthropic Claude 刷新物理学世界纪录</h3>
-            <div class="desc text-gray-500 line-clamp-2">单挑基于杨振宁理论 9 圈难题。</div>
-            <div class="source-name text-gray-500">来源： <span>IT之家</span></div>
-          </a>
-        </div></li>
-      </ul>
-      <a class="news-item" target="_blank" href="https://www.36kr.com/p/3991444838857731">
-        <div class="news-day">6天前 输出token永久免费的旧闻</div>
-      </a>
-    </body></html>
-    """
-
-    def test_timeline_items_get_exact_datetimes(self) -> None:
-        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.MAOMU_HTML):
-            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
-
-        self.assertEqual(len(items), 3)
-        self.assertEqual(items[0]["published_at"], "2026-09-27T08:53:00+08:00")
-        self.assertEqual(items[0]["title"], "管住AI，成了一门新生意")
-        self.assertEqual(items[0]["summary_basis"], "三类玩家，掘金AI安全。 来源： 36氪")
-        self.assertEqual(items[2]["published_at"], "2026-09-26T23:44:00+08:00")
-
-    def test_sidebar_day_ago_entries_are_excluded(self) -> None:
-        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=self.MAOMU_HTML):
-            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
-
-        self.assertNotIn("3991444838857731", {item["source_url"] for item in items})
-
-    def test_groups_without_iso_date_are_skipped(self) -> None:
-        html = (
-            '<html><body>'
-            '<div class="news-tag"><span>昨日推荐</span></div>'
-            '<div class="news-time"><span>12:00</span></div>'
-            '<a href="https://example.com/x"><h3 class="title">没有日期的分组标题</h3></a>'
-            '<div class="news-tag"><span>2026-09-27</span></div>'
-            '<div class="news-time"><span>08:00</span></div>'
-            '<a href="https://example.com/y"><h3 class="title">今天的热门新闻标题</h3></a>'
-            "</body></html>"
-        )
-        with mock.patch.object(HTML_INDEX, "fetch_text", return_value=html):
-            items = HTML_INDEX.fetch_maomu({"url": "https://maomu.com/news"})
-
-        self.assertEqual(len(items), 1)
-        self.assertEqual(items[0]["published_at"], "2026-09-27T08:00:00+08:00")
-        self.assertEqual(items[0]["source_url"], "https://example.com/y")
 
 
 class FetchTextTests(unittest.TestCase):

@@ -72,19 +72,25 @@ def _fetch_source_with_timeout(fetcher, source: dict[str, Any], window: dict[str
     process.start()
     child.close()
     try:
-        process.join(timeout)
-        if process.is_alive():
-            process.terminate()
-            process.join(2)
-            raise SourceTimeoutError(f"source exceeded {timeout:g}s timeout")
-        if not parent.poll():
+        # Read before joining: a large result can fill the pipe and block the
+        # worker in connection.send() until the parent drains it.
+        if not parent.poll(timeout):
+            if process.is_alive():
+                raise SourceTimeoutError(f"source exceeded {timeout:g}s timeout")
+            process.join(0)
             raise RuntimeError(f"source worker exited with code {process.exitcode}")
         status, payload = parent.recv()
+        process.join(2)
+        if process.is_alive():
+            raise RuntimeError("source worker did not exit after sending result")
         if status == "error":
             raise RuntimeError(payload)
         return payload, timeout
     finally:
         parent.close()
+        if process.is_alive():
+            process.terminate()
+            process.join(2)
 
 
 def proxy_url(value: str) -> str:
@@ -174,10 +180,12 @@ def parse_datetime(value: str) -> datetime | None:
             pass
     text = re.sub(r"\s+GMT$", " +0000", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+UTC$", " +0000", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text)
     for fmt in (
         "%a, %d %b %Y %H:%M:%S %z",
         "%a, %d %b %Y %H:%M %z",
         "%d %b %Y %H:%M:%S %z",
+        "%Y-%m-%d %H:%M:%S %z",
         "%Y-%m-%dT%H:%M:%S%z",
         "%Y-%m-%d",
         "%b %d, %Y",
@@ -503,9 +511,15 @@ def render_markdown(data: dict[str, Any]) -> str:
     if errors:
         raise ValueError("invalid ai-news document:\n" + "\n".join(errors))
 
-    candidates = data["candidates"]
-    rendered_items = [format_candidate(item) for item in candidates]
-    range_note = f"新闻条目数：{len(candidates)}"
+    seen_articles: set[tuple[str, str]] = set()
+    rendered_items: list[str] = []
+    for item in data["candidates"]:
+        key = article_key(item)
+        if key in seen_articles:
+            continue
+        seen_articles.add(key)
+        rendered_items.append(format_candidate(item))
+    range_note = f"新闻条目数：{len(rendered_items)}"
     sections = [range_note, *rendered_items]
 
     body = "\n\n".join(sections).strip()
