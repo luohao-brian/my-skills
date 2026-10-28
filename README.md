@@ -6,14 +6,14 @@
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
-| 直接使用上游 | 44 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
+| 直接使用上游 | 44 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本或锁定版本 |
 | 本地维护版本 | 21 | 交付源码位于本仓库，由本仓库校验和发布 |
 
-分类以实际使用的版本为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；未经修改则列入“直接使用上游”。
+分类以实际交付的 skill 为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；直接安装上游发布包的 skill 列入“直接使用上游”。直接使用上游时跟随安装来源的更新，不在本仓库记录固定 tag、commit 或复制一份源码。
 
 ## 直接使用上游的 skill（44）
 
-OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装，仓库地址见分组标题。Archify、AL Site 和 AL Sandbox 单独安装，仓库地址见名称链接。本仓库不保存这些 skill 的副本。
+OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装，仓库地址见分组标题。Archify、AL Site 和 AL Sandbox 单独安装，仓库地址见名称链接。本仓库不保存这些 skill 的副本，也不为其锁定上游版本；实际安装版本由对应 CLI 或上游安装渠道管理。
 
 ### [OpenCLI](https://github.com/jackwener/opencli)（随 CLI 安装，5；上游已移除 sitemap 类 skill）
 
@@ -169,7 +169,7 @@ python3 scripts/sync-vendored-skills.py all --ref <tag-or-commit> --apply
 
 ### PPT Master
 
-PPT Master 使用 `scripts/ppt_master_downstream/manifest.json` 固定上游发布版本。发布目录由上游整树、确定性打包转换、附加覆盖层和小型补丁队列重新生成。
+当前仓库交付的 PPT Master 含 OpenClaw 入口、运行时配置和 Ark Agent Plan TTS 适配，因此属于本地维护版本。`scripts/ppt_master_downstream/manifest.json` 记录重建该交付包所用的上游发布版本；发布目录由上游整树、确定性打包转换、附加覆盖层和小型补丁队列重新生成。直接使用上游发布包时，无需此 manifest，也不由本仓库锁定版本。
 
 本地 diff 以最小化为目标：保留打包、调用方工作目录、运行时依赖和方舟 Agent Plan 接入适配；PPT 创作、字体转换、质量检查与导出流程沿用上游。新增本地改动前先确认上游是否已提供所需能力，避免维护第二套制作或验收规则。
 

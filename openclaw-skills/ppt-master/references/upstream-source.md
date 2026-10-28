@@ -1,6 +1,6 @@
 # Upstream Source
 
-This distribution materializes `skills/ppt-master` from [`v6.7.0`](https://github.com/hugohe3/ppt-master/tree/v6.7.0/skills/ppt-master) at commit `b4efe3ddf237a97a42880164759162f8e2412f2f`.
+This distribution materializes `skills/ppt-master` from [`v6.7.3`](https://github.com/hugohe3/ppt-master/tree/v6.7.3/skills/ppt-master) at commit `622bf0148bca4f697b0184322c7e2aa2a04520a2`.
 
 The release tree is not reconstructed by skipping commits. Deterministic packaging transforms, additive runtime adapters, and the small patch queue listed in `../upstream.lock.json` are applied to the fixed release tree. Unsupported upstream features are provenance records only and never alter Git history.
 

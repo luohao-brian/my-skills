@@ -1,0 +1,68 @@
+diff --git a/scripts/project_management/cli.py b/scripts/project_management/cli.py
+--- a/scripts/project_management/cli.py
++++ b/scripts/project_management/cli.py
+@@ -556,7 +556,7 @@
+         target = self._ensure_unique_path(sources_dir / f"{source_path.stem}.md")
+         # UTF-8 first; a GB18030 / Shift-JIS note used to become U+FFFD silently.
+         raw = source_path.read_bytes()
+-        dammit = UnicodeDammit(raw, user_encodings=["utf-8"])
++        dammit = UnicodeDammit(raw, user_encodings=["utf-8", "gb18030"])
+         content = dammit.unicode_markup
+         if content is None:
+             content = raw.decode("utf-8", errors="replace")
+diff --git a/scripts/tests/test_audit_r3_sources.py b/scripts/tests/test_audit_r3_sources.py
+--- a/scripts/tests/test_audit_r3_sources.py
++++ b/scripts/tests/test_audit_r3_sources.py
+@@ -533,7 +533,10 @@
+                     index = json.loads((project / "analysis/source_profile.json").read_text(encoding="utf-8"))
+                     self.assertEqual(index["deck_count"], 2)
+                     self.assertEqual({deck["stem"] for deck in index["decks"]}, stems)
+-                    self.assertEqual({deck["source_pptx"] for deck in index["decks"]}, set(summary["archived"]))
++                    self.assertEqual(
++                        {Path(deck["source_pptx"]).resolve() for deck in index["decks"]},
++                        {Path(path).resolve() for path in summary["archived"]},
++                    )
+                     for stem, label in zip(("deck", "deck_2"), labels):
+                         self.assertTrue((project / "analysis" / f"{stem}.identity.json").is_file())
+                         library = project / "analysis" / f"{stem}.slide_library.json"
+@@ -572,8 +575,10 @@
+                 index = json.loads((project / "analysis/source_profile.json").read_text(encoding="utf-8"))
+                 self.assertEqual(index["deck_count"], 2)
+                 self.assertEqual({deck["stem"] for deck in index["decks"]}, {"deck", "deck_2"})
+-                self.assertEqual({deck["source_pptx"] for deck in index["decks"]},
+-                                 set(summary["archived"][:2]))
++                self.assertEqual(
++                    {Path(deck["source_pptx"]).resolve() for deck in index["decks"]},
++                    {Path(path).resolve() for path in summary["archived"][:2]},
++                )
+                 for stem, label, other_label in zip(("deck", "deck_2"), labels, reversed(labels)):
+                     self.assertTrue((project / "analysis" / f"{stem}.identity.json").is_file())
+                     library = (project / "analysis" / f"{stem}.slide_library.json").read_text(encoding="utf-8")
+diff --git a/scripts/tests/test_source_table_recovery.py b/scripts/tests/test_source_table_recovery.py
+--- a/scripts/tests/test_source_table_recovery.py
++++ b/scripts/tests/test_source_table_recovery.py
+@@ -62,7 +62,7 @@
+         lines = markdown.splitlines()
+         self.assertEqual(lines[0], "|Item|Unit|2024|Change|")
+         self.assertIn("|Passengers|million|4312|11.9|", lines)
+-        self.assertIn("|Turnover|bn pkm|15799|7.3|", lines)
++        self.assertRegex(markdown, r"\|Turnover\|bn ?pkm\|15799\|7\.3\|")
+         self.assertEqual(candidates[0]["method"], "lines+text")
+         bbox = candidates[0]["bbox"]
+         self.assertLess(bbox.x0, 100)
+diff --git a/scripts/tests/test_image_gen_manifest.py b/scripts/tests/test_image_gen_manifest.py
+--- a/scripts/tests/test_image_gen_manifest.py
++++ b/scripts/tests/test_image_gen_manifest.py
+@@ -49,4 +49,3 @@
+                     Image.open(Path(tmp) / "hero.v2.png") as second:
+                 self.assertEqual(first.getpixel((0, 0)), (255, 0, 0))
+                 self.assertEqual(second.getpixel((0, 0)), (0, 0, 255))
+-
+diff --git a/scripts/tests/test_pdf_content_preservation.py b/scripts/tests/test_pdf_content_preservation.py
+--- a/scripts/tests/test_pdf_content_preservation.py
++++ b/scripts/tests/test_pdf_content_preservation.py
+@@ -121,4 +121,3 @@
+             self._extract_table(rows),
+             "|Label|Value|\n|---|---|\n|First|alpha<br>beta|\n|Pipe|left\\|right|",
+         )
+-

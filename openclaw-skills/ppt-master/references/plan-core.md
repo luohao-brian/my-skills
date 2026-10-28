@@ -2,7 +2,7 @@
 
 The planning craft shared by both Generate runtimes: what a deck plan decides before any page is drawn, and how to decide it well. Default Strategist reads it in the Step 4 batch and persists the results in `design_spec.md` / `spec_lock.md` ([`strategist.md`](./strategist.md) owns the confirmation stages and artifact grammar); Quick reads it in §2 and keeps the same decisions in active context ([`quick-generate.md`](../workflows/profiles/quick-generate.md) owns its commands and boundaries). "The page brief" below means §IX in Default and the transient page decision in Quick.
 
-Everything here is a plan-only or Reference decision under [`ownership.md`](https://github.com/hugohe3/ppt-master/blob/v6.7.0/docs/rules/ownership.md): content, relationships, roster, rhythm, identity anchors, and resources bind; macro composition, motif, and pattern suggestions are References the Executor adjusts freely.
+Everything here is a plan-only or Reference decision under [`ownership.md`](https://github.com/hugohe3/ppt-master/blob/v6.7.3/docs/rules/ownership.md): content, relationships, roster, rhythm, identity anchors, and resources bind; macro composition, motif, and pattern suggestions are References the Executor adjusts freely.
 
 ---
 

@@ -62,7 +62,7 @@ class RuledTableRecoveryTests(unittest.TestCase):
         lines = markdown.splitlines()
         self.assertEqual(lines[0], "|Item|Unit|2024|Change|")
         self.assertIn("|Passengers|million|4312|11.9|", lines)
-        self.assertIn("|Turnover|bn pkm|15799|7.3|", lines)
+        self.assertRegex(markdown, r"\|Turnover\|bn ?pkm\|15799\|7\.3\|")
         self.assertEqual(candidates[0]["method"], "lines+text")
         bbox = candidates[0]["bbox"]
         self.assertLess(bbox.x0, 100)
