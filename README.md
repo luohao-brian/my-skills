@@ -2,16 +2,16 @@
 
 这里放自维护的 skill、Hermes 插件，以及当前使用的上游 skill 清单。
 
-当前环境共使用 **78 个 skill**：
+当前环境共使用 **65 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
-| 直接使用上游 | 56 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
-| 本地维护版本 | 22 | 交付源码位于本仓库，由本仓库校验和发布 |
+| 直接使用上游 | 44 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本 |
+| 本地维护版本 | 21 | 交付源码位于本仓库，由本仓库校验和发布 |
 
 分类以实际使用的版本为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；未经修改则列入“直接使用上游”。
 
-## 直接使用上游的 skill（56）
+## 直接使用上游的 skill（44）
 
 OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装，仓库地址见分组标题。Archify、AL Site 和 AL Sandbox 单独安装，仓库地址见名称链接。本仓库不保存这些 skill 的副本。
 
@@ -62,24 +62,12 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 
 - [`archify`](https://github.com/tt-a1i/archify)
 
-### [HyperFrames](https://github.com/heygen-com/hyperframes)（随 CLI 安装，19）
+### [HyperFrames](https://github.com/heygen-com/hyperframes)（随 CLI 安装，7）
 
 - `hyperframes`
-- `hyperframes-core`
 - `hyperframes-cli`
-- `hyperframes-animation`
-- `hyperframes-creative`
-- `hyperframes-keyframes`
 - `hyperframes-registry`
 - `media-use`
-- `general-video`
-- `motion-graphics`
-- `faceless-explainer`
-- `embedded-captions`
-- `talking-head-recut`
-- `music-to-video`
-- `product-launch-video`
-- `pr-to-video`
 - `remotion-to-hyperframes`
 - `slideshow`
 - `figma`
@@ -139,7 +127,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | --- | --- | --- |
 | `oss-image-bed` | [`openclaw-skills/oss-image-bed/`](openclaw-skills/oss-image-bed/) | 上传文件到阿里云 OSS 或火山 TOS，生成临时链接并自动清理 |
 
-## 不在 78 个标准部署项中的组件
+## 不在 65 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 
