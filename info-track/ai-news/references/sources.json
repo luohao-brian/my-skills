@@ -62,7 +62,8 @@
       "name": "TMTPost Edge AI Daily",
       "role": "aggregator",
       "kind": "tmtpost_daily",
-      "url": "https://www.tmtpost.com/user/7944025"
+      "url": "https://www.tmtpost.com/user/7944025",
+      "timeout_seconds": 40
     },
     {
       "id": "maomu-news",
