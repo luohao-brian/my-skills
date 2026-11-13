@@ -15,7 +15,6 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
@@ -32,7 +31,7 @@ import web_to_md  # noqa: E402
 from svg_to_pptx.drawingml.converter import convert_svg_to_slide_shapes  # noqa: E402
 from svg_to_pptx.drawingml.utils import project_filter_errors  # noqa: E402
 from svg_to_pptx.pptx_package.builder import _slide_size_type  # noqa: E402
-from project_management.cli import _is_project_tree  # noqa: E402
+from project_management.cli import _is_project_tree, PROJECTS_ROOT  # noqa: E402
 from narration_sync import _project_input_path  # noqa: E402
 from tts_backends import backend_edge  # noqa: E402
 from compact_svg_styles import compact_svg_style_tree  # noqa: E402
@@ -130,7 +129,8 @@ class PdfClauseAndScanTests(unittest.TestCase):
 
 class ImportSourcesProjectTreeTests(unittest.TestCase):
     def test_research_web_sources_dir_is_not_a_project(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=PROJECTS_ROOT) as tmp:
             root = Path(tmp)
             scratch = root.with_name(root.name + "_web_sources")
             scratch.mkdir()
@@ -140,8 +140,7 @@ class ImportSourcesProjectTreeTests(unittest.TestCase):
                 (root / "svg_output").mkdir()
                 (root / "sources").mkdir()
                 (root / "sources" / "a.md").write_text("# a\n", encoding="utf-8")
-                with patch("project_management.cli.PROJECTS_ROOT", root.parent):
-                    self.assertTrue(_is_project_tree(root / "sources" / "a.md"))
+                self.assertTrue(_is_project_tree(root / "sources" / "a.md"))
             finally:
                 for child in scratch.iterdir():
                     child.unlink()

@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/hugohe3/ppt-master.git",
     "subtree": "skills/ppt-master",
-    "release": "v6.7.3",
-    "commit": "622bf0148bca4f697b0184322c7e2aa2a04520a2"
+    "release": "v6.9.0",
+    "commit": "ce92fb43e4ade9c701f4c869e286f13fce743c72"
   },
   "packaging_transforms": [
     "openclaw_frontmatter",
@@ -28,11 +28,11 @@
     "tts-provider-bridge.patch",
     "runtime-script-path.patch",
     "macos-path-portability.patch",
-    "runtime-test-portability.patch",
-    "source-import-compatibility.patch"
+    "runtime-test-portability.patch"
   ],
   "subsumed_by_upstream": [
-    "formal release export requires a current passing final SVG quality report"
+    "formal release export requires a current passing final SVG quality report",
+    "GB18030 text source decoding"
   ],
   "unsupported_upstream_features": [
     "runtime attribution and independent identity guards",

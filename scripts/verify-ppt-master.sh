@@ -13,6 +13,13 @@ else
 fi
 [[ -x "$PYTHON_BIN" ]] || command -v "$PYTHON_BIN" >/dev/null 2>&1 || { printf 'FAIL: %s is required\n' "$PYTHON_BIN" >&2; exit 1; }
 
+# macOS exposes the same temp directory as /var and /private/var. Upstream
+# path-equality tests need the canonical spelling inherited by subprocesses.
+if [[ -d "${TMPDIR:-}" ]]; then
+  TMPDIR="$(cd -- "$TMPDIR" && pwd -P)"
+  export TMPDIR
+fi
+
 export PYTHONDONTWRITEBYTECODE=1
 "$PYTHON_BIN" scripts/verify-ppt-master-runtime.py
 "$PYTHON_BIN" -m unittest discover -s openclaw-skills/ppt-master/scripts/tests -p 'test_*.py'

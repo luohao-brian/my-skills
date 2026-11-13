@@ -533,10 +533,7 @@ class SameStemProjectImportTests(unittest.TestCase):
                     index = json.loads((project / "analysis/source_profile.json").read_text(encoding="utf-8"))
                     self.assertEqual(index["deck_count"], 2)
                     self.assertEqual({deck["stem"] for deck in index["decks"]}, stems)
-                    self.assertEqual(
-                        {Path(deck["source_pptx"]).resolve() for deck in index["decks"]},
-                        {Path(path).resolve() for path in summary["archived"]},
-                    )
+                    self.assertEqual({deck["source_pptx"] for deck in index["decks"]}, set(summary["archived"]))
                     for stem, label in zip(("deck", "deck_2"), labels):
                         self.assertTrue((project / "analysis" / f"{stem}.identity.json").is_file())
                         library = project / "analysis" / f"{stem}.slide_library.json"
@@ -575,10 +572,8 @@ class SameStemProjectImportTests(unittest.TestCase):
                 index = json.loads((project / "analysis/source_profile.json").read_text(encoding="utf-8"))
                 self.assertEqual(index["deck_count"], 2)
                 self.assertEqual({deck["stem"] for deck in index["decks"]}, {"deck", "deck_2"})
-                self.assertEqual(
-                    {Path(deck["source_pptx"]).resolve() for deck in index["decks"]},
-                    {Path(path).resolve() for path in summary["archived"][:2]},
-                )
+                self.assertEqual({deck["source_pptx"] for deck in index["decks"]},
+                                 set(summary["archived"][:2]))
                 for stem, label, other_label in zip(("deck", "deck_2"), labels, reversed(labels)):
                     self.assertTrue((project / "analysis" / f"{stem}.identity.json").is_file())
                     library = (project / "analysis" / f"{stem}.slide_library.json").read_text(encoding="utf-8")

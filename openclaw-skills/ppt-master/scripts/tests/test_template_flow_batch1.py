@@ -81,7 +81,7 @@ class TemplateInstallTests(unittest.TestCase):
     def setUp(self) -> None:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        self.tmp = Path(temp.name).resolve()
+        self.tmp = Path(temp.name)
         self.project = _workspace(self.tmp / 'project', 'deck', 'old')
         self.layout = _workspace(self.tmp / 'layout', 'layout', 'new')
         for directory in ('images', 'icons'):

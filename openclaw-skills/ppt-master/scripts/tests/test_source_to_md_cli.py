@@ -254,7 +254,7 @@ class SourceCollisionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name).resolve()
+        self.root = Path(self.temporary.name)
 
     def _run_cli(self, *arguments: str) -> subprocess.CompletedProcess:
         return subprocess.run(
