@@ -2,16 +2,16 @@
 
 这里放自维护的 skill、Hermes 插件，以及当前使用的上游 skill 清单。
 
-当前环境共使用 **65 个 skill**：
+当前环境共使用 **62 个 skill**：
 
 | 来源 | 数量 | 维护方式 |
 | --- | ---: | --- |
-| 直接使用上游 | 44 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本或锁定版本 |
+| 直接使用上游 | 41 | 随对应 CLI 或从上游仓库安装，本仓库不保存副本或锁定版本 |
 | 本地维护版本 | 21 | 交付源码位于本仓库，由本仓库校验和发布 |
 
 分类以实际交付的 skill 为准。入口、运行时适配、服务提供方、文档或资源有本地改动，就列入“本地维护版本”；直接安装上游发布包的 skill 列入“直接使用上游”。直接使用上游时跟随安装来源的更新，不在本仓库记录固定 tag、commit 或复制一份源码。
 
-## 直接使用上游的 skill（44）
+## 直接使用上游的 skill（41）
 
 OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装，仓库地址见分组标题。Archify、AL Site 和 AL Sandbox 单独安装，仓库地址见名称链接。本仓库不保存这些 skill 的副本，也不为其锁定上游版本；实际安装版本由对应 CLI 或上游安装渠道管理。
 
@@ -27,7 +27,9 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 
 - `officecli`
 
-### [Lark CLI](https://github.com/larksuite/cli)（随 CLI 安装，28）
+### [Lark CLI](https://github.com/larksuite/cli)（随 CLI 安装，25）
+
+会议、妙记和会中机器人统一使用 `lark-meeting`。
 
 - `lark-approval`
 - `lark-apps`
@@ -42,7 +44,6 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 - `lark-mail`
 - `lark-markdown`
 - `lark-meeting`
-- `lark-minutes`
 - `lark-note`
 - `lark-okr`
 - `lark-openapi-explorer`
@@ -51,8 +52,6 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 - `lark-skill-maker`
 - `lark-slides`
 - `lark-task`
-- `lark-vc`
-- `lark-vc-agent`
 - `lark-whiteboard`
 - `lark-wiki`
 - `lark-workflow-meeting-summary`
@@ -127,7 +126,7 @@ OpenCLI、Office CLI、Lark CLI 和 HyperFrames 会在安装 CLI 时一并安装
 | --- | --- | --- |
 | `oss-image-bed` | [`openclaw-skills/oss-image-bed/`](openclaw-skills/oss-image-bed/) | 上传文件到阿里云 OSS 或火山 TOS，生成临时链接并自动清理 |
 
-## 不在 65 个标准部署项中的组件
+## 不在 62 个标准部署项中的组件
 
 仓库还保留两个独立组件，但它们不属于上面的默认 skill 集：
 
