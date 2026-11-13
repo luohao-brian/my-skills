@@ -1,18 +1,19 @@
 <!-- GENERATED FILE: do not edit. Source: ../../upstream/SKILL.md -->
 
-Source section: `Visual-type guide (44)`
+Source section: `Visual-type guide (50)`
 
-### Visual-type guide (44)
+### Visual-type guide (50)
 
 | If you're showing… | Use | Reference |
 |---|---|---|
-| Components + connections in one system snapshot | **Architecture** | [type-architecture.md](../../upstream/references/type-architecture.md) |
+| Components + connections in one snapshot; nested admin vs traffic scopes | **Architecture** | [type-architecture.md](../../upstream/references/type-architecture.md) |
 | Structural change between synchronized Before / After topologies, with a Changes ledger | **Architecture delta** | [type-architecture-delta.md](../../upstream/references/type-architecture-delta.md) |
 | Legacy IT landscape by phase or department; shows the *before* state | **IT current-state** | [type-it-state.md](../../upstream/references/type-it-state.md) |
 | Decision logic with branches | **Flowchart** | [type-flowchart.md](../../upstream/references/type-flowchart.md) |
 | Time-ordered messages between actors | **Sequence** | [type-sequence.md](../../upstream/references/type-sequence.md) |
 | States + transitions + guards | **State machine** | [type-state.md](../../upstream/references/type-state.md) |
 | Entities + fields + relationships | **ER / data model** | [type-er.md](../../upstream/references/type-er.md) |
+| A short ordered method with numbered stages, icons, and brief explanations | **Steps** | [type-steps.md](../../upstream/references/type-steps.md) |
 | Events positioned in time | **Timeline** | [type-timeline.md](../../upstream/references/type-timeline.md) |
 | Cross-functional process with handoffs | **Swimlane** | [type-swimlane.md](../../upstream/references/type-swimlane.md) |
 | Two-axis positioning / prioritization | **Quadrant** | [type-quadrant.md](../../upstream/references/type-quadrant.md) |
@@ -33,7 +34,7 @@ Source section: `Visual-type guide (44)`
 | Cross-tabulated data; fill encodes value per cell | **Heatmap** | [type-heatmap.md](../../upstream/references/type-heatmap.md) |
 | Continuous trends over time, change between exactly two states (slopegraph), one distribution per series (ridgeline), or rank movement across several snapshots (bump) | **Line chart** | [type-line.md](../../upstream/references/type-line.md) |
 | Tasks and phases on a timeline | **Gantt** | [type-gantt.md](../../upstream/references/type-gantt.md) |
-| Correlation or distribution of two variables; bubble (three variables) and beeswarm (one variable, dot per item) variants | **Scatter plot** | [type-scatter.md](../../upstream/references/type-scatter.md) |
+| Correlation or distribution of two variables; bubble (three variables), beeswarm (one variable, dot per item), and box plot (five-number summary per group) variants | **Scatter plot** | [type-scatter.md](../../upstream/references/type-scatter.md) |
 | End-to-end data stack on a container cluster | **High-Level** | [type-high-level.md](../../upstream/references/type-high-level.md) |
 | Multi-actor sequential process with data handoffs | **Process** | [type-process.md](../../upstream/references/type-process.md) |
 | Multi-tier data storage with quality levels and access policies | **Medallion** | [type-medallion.md](../../upstream/references/type-medallion.md) |
@@ -45,11 +46,16 @@ Source section: `Visual-type guide (44)`
 | Value chain against evolution — what to build, buy, and what is moving | **Wardley map** | [type-wardley.md](../../upstream/references/type-wardley.md) |
 | Work-in-progress by state, with WIP limits and blocked items | **Kanban** | [type-kanban.md](../../upstream/references/type-kanban.md) |
 | What a person does across stages of an experience, and how it feels | **User journey** | [type-journey.md](../../upstream/references/type-journey.md) |
+| What the customer does vs what the service hides, across stages, with a line of visibility | **Service blueprint** | [type-service-blueprint.md](../../upstream/references/type-service-blueprint.md) |
 | Where software runs — zones, hosts, artifacts, replicas, ports | **Deployment** | [type-deployment.md](../../upstream/references/type-deployment.md) |
-| What depends on what, with fan-in and cycles a tree cannot express | **Dependency graph** | [type-dependency.md](../../upstream/references/type-dependency.md) |
+| What depends on what, with fan-in and cycles a tree cannot express; arc diagram (nodes on a line, height is skip-span) variant | **Dependency graph** | [type-dependency.md](../../upstream/references/type-dependency.md) |
 | Classes with operations, inheritance, composition (other UML routes elsewhere) | **UML class** | [type-uml-class.md](../../upstream/references/type-uml-class.md) |
 | Narrative backbone sliced into releases, with the cut line | **Story map** | [type-story-map.md](../../upstream/references/type-story-map.md) |
 | Physical tables: SQL types, constraints, indexes, column-level FKs | **Database schema** | [type-db-schema.md](../../upstream/references/type-db-schema.md) |
+| A biological process as a bipartite species/process graph | **SBGN** | [type-sbgn.md](../../upstream/references/type-sbgn.md) |
+| Source requirements, design elements, and tests linked by stable IDs, with gaps explicit | **Requirement traceability** | [type-requirement-traceability.md](../../upstream/references/type-requirement-traceability.md) |
+| Commands, resulting events, and read models across ordered stages | **Event modeling** | [type-event-modeling.md](../../upstream/references/type-event-modeling.md) |
+| One bounded whole counted in equal discrete units out of 100 | **Unit Grid** | [type-unit-grid.md](../../upstream/references/type-unit-grid.md) |
 
 Rules of thumb:
 

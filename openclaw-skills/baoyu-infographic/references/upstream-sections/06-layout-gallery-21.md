@@ -4,6 +4,8 @@ Source section: `Layout Gallery (21)`
 
 ## Layout Gallery (21)
 
+Definitions: `references/layouts/<layout>.md`.
+
 | Layout | Best For |
 |--------|----------|
 | `linear-progression` | Timelines, processes, tutorials |
@@ -27,5 +29,3 @@ Source section: `Layout Gallery (21)`
 | `winding-roadmap` | Journey, milestones |
 | `circular-flow` | Cycles, recurring processes |
 | `dense-modules` | High-density modules, data-rich guides |
-
-Full definitions live at `references/layouts/<layout>.md`.

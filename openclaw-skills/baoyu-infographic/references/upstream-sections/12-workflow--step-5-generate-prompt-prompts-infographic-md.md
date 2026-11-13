@@ -4,15 +4,8 @@ Source section: `Step 5: Generate Prompt → `prompts/infographic.md``
 
 ### Step 5: Generate Prompt → `prompts/infographic.md`
 
-**Backup rule**: If `prompts/infographic.md` exists, rename to `prompts/infographic-backup-YYYYMMDD-HHMMSS.md`
+**Backup rule**: if `prompts/infographic.md` exists, rename to `prompts/infographic-backup-YYYYMMDD-HHMMSS.md`.
 
-Combine:
-1. Layout definition from `references/layouts/<layout>.md`
-2. Style definition from `references/styles/<style>.md`
-3. Base template from `references/base-prompt.md`
-4. Structured content from Step 2
-5. All text in confirmed language
+Combine: layout definition (`references/layouts/<layout>.md`), style definition (`references/styles/<style>.md`), base template (`references/base-prompt.md`), structured content from Step 2; all text in the confirmed language.
 
-**Aspect ratio resolution** for `{{ASPECT_RATIO}}`:
-- Named presets → ratio string: landscape→`16:9`, portrait→`9:16`, square→`1:1`
-- Custom W:H ratios → use as-is (e.g., `3:4`, `4:3`, `2.35:1`)
+`{{ASPECT_RATIO}}`: landscape→`16:9`, portrait→`9:16`, square→`1:1`; custom W:H ratios as-is (e.g., `3:4`, `4:3`, `2.35:1`).

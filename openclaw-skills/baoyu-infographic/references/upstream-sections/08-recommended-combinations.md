@@ -25,4 +25,4 @@ Source section: `Recommended Combinations`
 | Educational Diagram | `hub-spoke` + `hand-drawn-edu` |
 | Process Tutorial | `linear-progression` + `hand-drawn-edu` |
 
-Default combination: `bento-grid` + `craft-handmade` (fallback recommendation only — per the [Confirmation Policy](#confirmation-policy), defaults never bypass Step 4).
+Default combination: `bento-grid` + `craft-handmade` (fallback recommendation only — never bypasses Step 4).

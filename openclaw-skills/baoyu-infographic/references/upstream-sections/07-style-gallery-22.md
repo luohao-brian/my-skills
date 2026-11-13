@@ -4,6 +4,8 @@ Source section: `Style Gallery (22)`
 
 ## Style Gallery (22)
 
+Definitions: `references/styles/<style>.md`.
+
 | Style | Description |
 |-------|-------------|
 | `craft-handmade` | Hand-drawn, paper craft (default) |
@@ -28,5 +30,3 @@ Source section: `Style Gallery (22)`
 | `retro-pop-grid` | 1970s retro pop art, Swiss grid, thick outlines |
 | `hand-drawn-edu` | Macaron pastels, hand-drawn wobble, stick figures |
 | `retro-popup-pop` | Retro popup collage, vintage UI, thick outlines, flat pop colors |
-
-Full definitions live at `references/styles/<style>.md`.

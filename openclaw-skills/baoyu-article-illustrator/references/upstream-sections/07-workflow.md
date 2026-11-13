@@ -12,3 +12,5 @@ Source section: `Workflow`
 - [ ] Step 5: Generate images
 - [ ] Step 6: Finalize
 ```
+
+Detailed procedures for every step: [references/workflow.md](../../upstream/references/workflow.md).

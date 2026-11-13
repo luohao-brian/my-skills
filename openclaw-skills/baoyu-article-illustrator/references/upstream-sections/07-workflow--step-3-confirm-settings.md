@@ -4,9 +4,7 @@ Source section: `Step 3: Confirm Settings ⚠️`
 
 ### Step 3: Confirm Settings ⚠️
 
-**Hard gate**: this step is mandatory per the [Confirmation Policy](#confirmation-policy) — Steps 4+ cannot start until the user confirms here (or explicitly opts out with "直接生成" / equivalent wording in the current request).
-
-**ONE AskUserQuestion, max 4 Qs. Q1-Q2 REQUIRED. Q3 required unless preset chosen.**
+**Hard gate** per the [Confirmation Policy](#confirmation-policy). ONE AskUserQuestion, max 4 Qs. Q1-Q2 required; Q3 required unless a preset was chosen.
 
 | Q | Options |
 |---|---------|
@@ -16,4 +14,4 @@ Source section: `Step 3: Confirm Settings ⚠️`
 | Q4: Palette | Default (style colors), macaron, warm, neon — **skip if preset includes palette or preferred_palette set** |
 | Q5: Language | When article language ≠ EXTEND.md setting |
 
-Full procedures: [references/workflow.md](../../upstream/references/workflow.md#step-3-confirm-settings-)
+See [workflow.md](../../upstream/references/workflow.md#step-3-confirm-settings-).

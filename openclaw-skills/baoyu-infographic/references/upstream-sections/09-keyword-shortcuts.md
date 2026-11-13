@@ -4,7 +4,7 @@ Source section: `Keyword Shortcuts`
 
 ## Keyword Shortcuts
 
-When the user's input contains these keywords, use the mapped layout as the leading Step 3 recommendation and promote the listed styles to the top of the Step 3 list. Skip content-based layout inference for matched keywords. Append any `Prompt Notes` to the Step 5 prompt.
+When the user's input contains these keywords, use the mapped layout as the leading Step 3 recommendation, promote the listed styles to the top of the Step 3 list, skip content-based layout inference, and append any `Prompt Notes` to the Step 5 prompt.
 
 | User Keyword | Layout | Recommended Styles | Default Aspect | Prompt Notes |
 |--------------|--------|--------------------|----------------|--------------|

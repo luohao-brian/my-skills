@@ -10,15 +10,15 @@ Pinned upstream content lives under `upstream/`. Keep it unchanged.
 
 ## Progressive routing
 
-For a new illustration pass, first read [`image tools`](references/upstream-sections/02-image-generation-tools.md), [`batch policy`](references/upstream-sections/03-batch-generation-policy.md), [`confirmation policy`](references/upstream-sections/04-confirmation-policy.md), [`three dimensions`](references/upstream-sections/06-three-dimensions.md), and [`types`](references/upstream-sections/07-types.md). Load each `references/upstream-sections/09-workflow--step-*.md` only when reaching that step. Then read:
+For a new illustration pass, first read [`image tools`](references/upstream-sections/02-image-generation-tools.md), [`batch policy`](references/upstream-sections/03-batch-generation-policy.md), [`confirmation policy`](references/upstream-sections/04-confirmation-policy.md), and [`three dimensions`](references/upstream-sections/06-three-dimensions.md). Load each `references/upstream-sections/07-workflow--step-*.md` only when reaching that step. Then read:
 
 - [`upstream/references/workflow.md`](upstream/references/workflow.md)
 - [`upstream/references/prompt-construction.md`](upstream/references/prompt-construction.md)
 - [`upstream/references/usage.md`](upstream/references/usage.md)
-- [`upstream/references/style-presets.md`](upstream/references/style-presets.md) only when the style is not fixed
+- [`upstream/references/styles.md`](upstream/references/styles.md) and [`upstream/references/style-presets.md`](upstream/references/style-presets.md) only when the style is not fixed
 - exactly one selected file under `upstream/references/styles/`
 
-Read [`user input tools`](references/upstream-sections/01-user-input-tools.md) only when the source must be fetched, [`reference images`](references/upstream-sections/05-reference-images.md) only when references are supplied, and [`modification`](references/upstream-sections/11-modification.md) only for an existing illustration. Read `upstream/references/config/first-time-setup.md` only when no `EXTEND.md` preference exists.
+Read [`user input tools`](references/upstream-sections/01-user-input-tools.md) only when the source must be fetched, [`reference images`](references/upstream-sections/05-reference-images.md) only when references are supplied, and [`modification`](references/upstream-sections/09-modification.md) only for an existing illustration. Read `upstream/references/config/first-time-setup.md` only when no `EXTEND.md` preference exists.
 
 Resolve every relative path from `upstream/`.
 

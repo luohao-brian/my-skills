@@ -4,9 +4,7 @@ Source section: `Step 4: Confirm Options`
 
 ### Step 4: Confirm Options
 
-**Hard gate**: this step is mandatory per the [Confirmation Policy](#confirmation-policy) — Steps 5–6 cannot start until the user confirms here (or explicitly opts out with `--no-confirm` / equivalent in the current request).
-
-Ask the user to confirm the questions below following the [User Input Tools](#user-input-tools) rule at the top of this file (batch into one call if the runtime supports multiple questions; otherwise ask one at a time in priority order).
+**Hard gate** per the [Confirmation Policy](#confirmation-policy) (opt-out: `--no-confirm` / equivalent in the current request). Ask per [User Input Tools](#user-input-tools):
 
 | Priority | Question | When | Options |
 |----------|----------|------|---------|
