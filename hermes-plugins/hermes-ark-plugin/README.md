@@ -83,7 +83,7 @@ plugins:
         image_generate:
           backend: ark-agent-plan
           api_key: ${ARK_AGENT_PLAN_API_KEY}
-          model: doubao-seedream-5.0-lite
+          model: doubao-seedream-5-0-pro
           resolution: 2K
         video_generate:
           backend: ark-agent-plan
@@ -114,7 +114,7 @@ video_gen:
 
 ## Models
 
-- Seedream Agent Plan: `doubao-seedream-5.0-lite`, `doubao-seedream-5.0-pro`
+- Seedream Agent Plan: `doubao-seedream-5-0-pro`, `doubao-seedream-5.0-flash`
 - Seedream Ark API: `doubao-seedream-5-0-260128`,
   `doubao-seedream-5-0-pro-260628`, `doubao-seedream-5-0-flash-260915`
 - Seedance Agent Plan: `doubao-seedance-2.0-fast`, `doubao-seedance-2.5`

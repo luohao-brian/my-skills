@@ -4,10 +4,10 @@
 
 | `--backend` | 凭证 | Endpoint | 默认模型 |
 | --- | --- | --- | --- |
-| `ark-agent-plan` | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations` | `doubao-seedream-5.0-lite` |
+| `ark-agent-plan` | `ARK_AGENT_PLAN_API_KEY` | `https://ark.cn-beijing.volces.com/api/plan/v3/images/generations` | `doubao-seedream-5-0-pro` |
 | `ark-api` | `ARK_API_KEY` | `https://ark.cn-beijing.volces.com/api/v3/images/generations` | `doubao-seedream-5-0-260128` |
 
-Agent Plan 还可使用 `doubao-seedream-5.0-pro`。Ark API 还可使用 `doubao-seedream-5-0-pro-260628` 和 `doubao-seedream-5-0-flash-260915`。脚本不在后端之间自动切换或重试。
+Agent Plan 还可使用 `doubao-seedream-5.0-flash`；Lite 模型不在 Agent Plan 开放范围内，调用会返回 `UnsupportedModel`。Ark API 还可使用 `doubao-seedream-5-0-pro-260628` 和 `doubao-seedream-5-0-flash-260915`。脚本不在后端之间自动切换或重试。
 
 官方资料：
 
@@ -19,26 +19,26 @@ Agent Plan 还可使用 `doubao-seedream-5.0-pro`。Ark API 还可使用 `doubao
 
 ```bash
 uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "极简产品海报，画面中央放置一只白色陶瓷杯。" --aspect-ratio 1:1 --resolution 2K
-uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "生成三张连贯的城市晨景，保持地点和风格一致。" --max-images 3
+uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "生成三张连贯的城市晨景，保持地点和风格一致。" --backend ark-api --max-images 3
 uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ark-api --model doubao-seedream-5-0-pro-260628 --resolution 1.5K
 uv run --no-project --with 'requests>=2.32,<3' python3 {baseDir}/scripts/volc_image_gen.py "单张精细产品图" --backend ark-api --model doubao-seedream-5-0-flash-260915 --resolution 1.5K
 ```
 
 尺寸规则：
 
-- Lite：`2K`、`3K`、`4K`。
+- Lite（仅 Ark API）：`2K`、`3K`、`4K`。
 - Pro / Flash 普通生图：`1K`、`1.5K`、`2K`，默认 `2K`。
 - `--aspect-ratio` 支持 `1:1`、`3:4`、`4:3`、`3:2`、`2:3`、`16:9`、`9:16`、`21:9`。脚本将比例补入提示词，并把分辨率档位原样传给 `size`。
 - `--size WIDTHxHEIGHT` 是兼容入口。Pro / Flash 自定义尺寸总像素范围为 921600 到 4624220，宽高比范围为 1:16 到 16:1。
 
 组图规则：
 
-- 只有 Lite 支持组图。
+- 只有 Ark API 的 Lite 支持组图；Agent Plan 的 Pro / Flash 每次只返回一张。
 - 用 `--max-images` 设置最多返回数量，并在提示词中写明实际需要的数量与各图内容。
 - 参考图数量与最多输出数量之和不得超过 15；参考图最多 14 张。
 - `--count` 仅作为旧命令兼容别名。
 
-`--web-search` 只用于 Lite。`--output-format` 支持 `png`、`jpeg`；`--response-format` 支持 `url`、`b64_json`。
+`--web-search` 只用于 Ark API 的 Lite。`--output-format` 支持 `png`、`jpeg`；`--response-format` 支持 `url`、`b64_json`。
 
 `seed` 只属于旧的 Seedream 3.0 文生图接口。本脚本支持的 Lite、Pro 与 Flash 模型不发送该字段。Pro / Flash 单图生成不发送 `sequential_image_generation`。
 

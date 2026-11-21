@@ -23,10 +23,11 @@ ASPECT_SIZES = {
 }
 PRO_MODEL = "doubao-seedream-5-0-pro-260628"
 FLASH_MODEL = "doubao-seedream-5-0-flash-260915"
-PLAN_PRO_MODEL = "doubao-seedream-5.0-pro"
-SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL}
+PLAN_PRO_MODEL = "doubao-seedream-5-0-pro"
+PLAN_FLASH_MODEL = "doubao-seedream-5.0-flash"
+SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL, PLAN_FLASH_MODEL}
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seedream-5.0-lite", PLAN_PRO_MODEL),
+    "ark-agent-plan": (PLAN_PRO_MODEL, PLAN_FLASH_MODEL),
     "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL, FLASH_MODEL),
 }
 
@@ -82,7 +83,7 @@ class ArkImageGenerateProvider(ImageGenProvider):
 
         cfg = section("image_generate")
         backend = section_backend("image_generate")
-        default_model = "doubao-seedream-5.0-lite" if backend == "ark-agent-plan" else "doubao-seedream-5-0-260128"
+        default_model = PLAN_PRO_MODEL if backend == "ark-agent-plan" else "doubao-seedream-5-0-260128"
         model = str(kwargs.get("model") or cfg.get("model") or default_model)
         resolution = str(kwargs.get("resolution") or cfg.get("resolution") or "2K").upper()
         refs = [value for value in [image_url, *(reference_image_urls or [])] if value]

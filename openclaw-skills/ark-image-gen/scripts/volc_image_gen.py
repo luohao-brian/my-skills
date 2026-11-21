@@ -20,8 +20,9 @@ DEFAULT_OUTPUT_DIR = Path.home() / "Documents" / "hermes-workspace" / "images"
 REQUEST_TIMEOUT_SECONDS = 180
 PRO_MODEL = "doubao-seedream-5-0-pro-260628"
 FLASH_MODEL = "doubao-seedream-5-0-flash-260915"
-PLAN_PRO_MODEL = "doubao-seedream-5.0-pro"
-SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL}
+PLAN_PRO_MODEL = "doubao-seedream-5-0-pro"
+PLAN_FLASH_MODEL = "doubao-seedream-5.0-flash"
+SINGLE_IMAGE_MODELS = {PRO_MODEL, FLASH_MODEL, PLAN_PRO_MODEL, PLAN_FLASH_MODEL}
 ASPECT_RATIOS = ("1:1", "3:4", "4:3", "3:2", "2:3", "16:9", "9:16", "21:9")
 SIZE_ALIASES = {value: value for value in ASPECT_RATIOS}
 
@@ -29,7 +30,7 @@ BACKENDS = {
     "ark-agent-plan": {
         "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
         "api_key_env": "ARK_AGENT_PLAN_API_KEY",
-        "model": "doubao-seedream-5.0-lite",
+        "model": PLAN_PRO_MODEL,
     },
     "ark-api": {
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
@@ -38,18 +39,10 @@ BACKENDS = {
     },
 }
 BACKEND_MODELS = {
-    "ark-agent-plan": ("doubao-seedream-5.0-lite", PLAN_PRO_MODEL),
+    "ark-agent-plan": (PLAN_PRO_MODEL, PLAN_FLASH_MODEL),
     "ark-api": ("doubao-seedream-5-0-260128", PRO_MODEL, FLASH_MODEL),
 }
 MODEL_CAPABILITIES = {
-    "doubao-seedream-5.0-lite": {
-        "resolutions": ("2K", "3K", "4K"),
-        "max_references": 14,
-        "max_images": 15,
-        "multi_image": True,
-        "web_search": True,
-        "layer_decomposition": False,
-    },
     "doubao-seedream-5-0-260128": {
         "resolutions": ("2K", "3K", "4K"),
         "max_references": 14,
@@ -75,6 +68,14 @@ MODEL_CAPABILITIES = {
         "layer_decomposition": True,
     },
     PLAN_PRO_MODEL: {
+        "resolutions": ("1K", "1.5K", "2K"),
+        "max_references": 10,
+        "max_images": 1,
+        "multi_image": False,
+        "web_search": False,
+        "layer_decomposition": True,
+    },
+    PLAN_FLASH_MODEL: {
         "resolutions": ("1K", "1.5K", "2K"),
         "max_references": 10,
         "max_images": 1,

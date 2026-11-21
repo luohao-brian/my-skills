@@ -150,7 +150,7 @@ class ArkSkillProtocolTests(unittest.TestCase):
         self.assertEqual(IMAGE.BACKENDS["ark-agent-plan"], {
             "base_url": "https://ark.cn-beijing.volces.com/api/plan/v3",
             "api_key_env": "ARK_AGENT_PLAN_API_KEY",
-            "model": "doubao-seedream-5.0-lite",
+            "model": "doubao-seedream-5-0-pro",
         })
         self.assertEqual(IMAGE.BACKENDS["ark-api"], {
             "base_url": "https://ark.cn-beijing.volces.com/api/v3",
@@ -332,8 +332,8 @@ class ArkSkillProtocolTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "must not exceed 15"):
             IMAGE.validate_request(
-                "ark-agent-plan",
-                "doubao-seedream-5.0-lite",
+                "ark-api",
+                "doubao-seedream-5-0-260128",
                 "2K",
                 3,
                 image_count=13,

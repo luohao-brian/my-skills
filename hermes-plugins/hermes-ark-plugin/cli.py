@@ -235,7 +235,7 @@ def _default_ark_entry(api_key_env: str, *, voice: str | None = None, backend: s
         "image_generate": {
             "backend": backend,
             "api_key": "${" + media_key_env + "}",
-            "model": "doubao-seedream-5.0-lite" if plan else "doubao-seedream-5-0-260128",
+            "model": "doubao-seedream-5-0-pro" if plan else "doubao-seedream-5-0-260128",
             "resolution": "2K",
             "timeout_seconds": 180,
         },
